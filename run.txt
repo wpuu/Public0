@@ -1,0 +1,4254 @@
+这是我现有的项目，请基于这些代码继续开发。
+
+
+===== PROJECT TREE =====
+run
+├── 1.js
+├── index.html
+├── package-lock.json
+├── package.json
+├── src
+│   ├── App.tsx
+│   ├── defaults
+│   │   └── gemini-v49.7-txt.js
+│   ├── index.css
+│   ├── main.tsx
+│   ├── utils
+│   │   └── cn.ts
+│   └── vite-env.d.ts
+├── tsconfig.json
+└── vite.config.ts
+
+===== 固定关键文件 =====
+[FOUND] package.json
+[FOUND] vite.config.ts
+[FOUND] tsconfig.json
+[FOUND] index.html
+[FOUND] src/main.tsx
+[FOUND] src/App.tsx
+[FOUND] src/index.css
+
+===== package.json =====
+{
+  "name": "react-vite-tailwind",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "jszip": "^3.10.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "tailwind-merge": "3.4.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.17",
+    "@types/node": "^22.0.0",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3",
+    "vite": "7.2.4",
+    "vite-plugin-singlefile": "2.3.0"
+  }
+}
+
+
+===== vite.config.ts =====
+import path from "path";
+import { fileURLToPath } from "url";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss(), viteSingleFile()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
+});
+
+
+===== tsconfig.json =====
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "types": ["node"],
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Path mapping */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "vite.config.ts"]
+}
+
+
+===== index.html =====
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gemini Ubuntu JS 调试与 TXT 翻译台</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+
+===== src/main.tsx =====
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import "./index.css";
+import { App } from "./App";
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+
+
+===== src/App.tsx =====
+import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
+import defaultNodeScriptTemplate from "./defaults/gemini-v49.7-txt.js?raw";
+
+type LogLevel = "info" | "success" | "warn" | "error";
+type SegmentStatus = "pending" | "running" | "done" | "error";
+type SegmentViewFilter = "all" | SegmentStatus;
+type ExecutionDetailFilter = "all" | "done" | "error";
+type SourceImportKind = "manual" | "txt" | "epub";
+
+type ModelPreset = {
+  label: string;
+  value: string;
+  note: string;
+};
+
+type RunLog = {
+  id: string;
+  time: string;
+  level: LogLevel;
+  message: string;
+};
+
+type PrecheckResult = {
+  id: string;
+  time: string;
+  keyPreview: string;
+  model: string;
+  ok: boolean;
+  latencyMs: number;
+  message: string;
+};
+
+type SegmentRecord = {
+  index: number;
+  start: number;
+  end: number;
+  source: string;
+  output: string;
+  status: SegmentStatus;
+  parseMode: string;
+  records: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  error: string;
+  lastUpdatedAt: string;
+};
+
+type ExecutionDetail = {
+  id: string;
+  timestamp: string;
+  segmentIndex: number;
+  start: number;
+  end: number;
+  keyPreview: string;
+  model: string;
+  status: string;
+  parseMode: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  durationMs: number;
+  fileSizeKb: number;
+  error: string;
+  preview: string;
+};
+
+type WorkspaceSnapshot = {
+  selectedModelPreset: string;
+  modelValue: string;
+  segmentSize: string | number;
+  maxOutputTokens: string | number;
+  temperature: string | number;
+  segmentDelayMs: string | number;
+  systemPrompt: string;
+  sourceText: string;
+  sourceFileName: string;
+  sourceImportKind: SourceImportKind;
+  sourceCleanedFileName: string;
+  sourceOriginalLength: number;
+  outputPreview: string;
+  fullScript: string;
+  scriptContent: string;
+  rerunSelection: string;
+  precheckResults: PrecheckResult[];
+  runLogs: RunLog[];
+  segments: SegmentRecord[];
+  executionDetails: ExecutionDetail[];
+};
+
+type HistoryEntry = {
+  id: string;
+  createdAt: string;
+  label: string;
+  snapshot: WorkspaceSnapshot;
+};
+
+type GeminiResponse = {
+  text: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+};
+
+type LayoutBoxSnapshot = {
+  width: number;
+  height: number;
+};
+
+type LayoutSnapshot = {
+  savedAt: string;
+  boxes: Record<string, LayoutBoxSnapshot>;
+};
+
+const MODEL_PRESETS: ModelPreset[] = [
+  {
+    label: "gemini-3-flash-preview（默认）",
+    value: "gemini-3-flash-preview",
+    note: "当前默认推荐，适合快速预检与大多数翻译测试。",
+  },
+  {
+    label: "3.1 Flash-Lite Preview",
+    value: "gemini-3.1-flash-lite-preview",
+    note: "更便宜，适合高频分段测试。",
+  },
+  {
+    label: "3.1 Flash Preview",
+    value: "gemini-3.1-flash-preview",
+    note: "平衡速度与质量。",
+  },
+  {
+    label: "3.1 Pro Preview",
+    value: "gemini-3.1-pro-preview",
+    note: "质量优先，适合重点重翻。",
+  },
+  {
+    label: "2.5 Pro",
+    value: "gemini-2.5-pro",
+    note: "稳定的高质量备选模型。",
+  },
+];
+
+const MODEL_RECOMMENDATIONS = [
+  {
+    match: ["gemini-3.1-flash-lite-preview", "3.1-flash-lite"],
+    segmentSize: 22000,
+    maxOutputTokens: 8192,
+    temperature: 0,
+    segmentDelayMs: 650,
+    summary: "轻量模型默认用 0 温度和 650ms 间隔，保持测试稳定。",
+  },
+  {
+    match: ["gemini-3.1-flash-preview", "3.1-flash"],
+    segmentSize: 28000,
+    maxOutputTokens: 12288,
+    temperature: 0,
+    segmentDelayMs: 650,
+    summary: "适合常规长文本测试，默认按原脚本长分段逻辑处理。",
+  },
+  {
+    match: ["gemini-3.1-pro-preview", "3.1-pro-preview"],
+    segmentSize: 28000,
+    maxOutputTokens: 16384,
+    temperature: 0,
+    segmentDelayMs: 650,
+    summary: "质量优先，默认仍使用 0 温度与较短间隔。",
+  },
+  {
+    match: ["gemini-2.5-pro", "2.5-pro"],
+    segmentSize: 28000,
+    maxOutputTokens: 16384,
+    temperature: 0,
+    segmentDelayMs: 650,
+    summary: "稳定高质量，默认参数尽量贴近当前 TXT 调试流程。",
+  },
+  {
+    match: ["gemini-3-flash-preview", "3-flash-preview"],
+    segmentSize: 28000,
+    maxOutputTokens: 16384,
+    temperature: 0,
+    segmentDelayMs: 650,
+    summary: "默认值保持 28000 分段，最大输出 16384，Temperature 为 0，间隔 650ms。",
+  },
+];
+
+function getModelRecommendation(model: string) {
+  const normalized = model.trim().toLowerCase();
+
+  const matched =
+    MODEL_RECOMMENDATIONS.find((item) => item.match.some((keyword) => normalized.includes(keyword))) ||
+    MODEL_RECOMMENDATIONS[MODEL_RECOMMENDATIONS.length - 1];
+
+  return matched;
+}
+
+const DEFAULT_SYSTEM_PROMPT = `你是一位拥有二十年经验的资深中文文学翻译家，曾为国内一线出版社（如人民文学出版社、译林出版社、上海译文出版社）翻译过多部畅销外文小说。你的翻译作品以"信、达、雅"著称，深受中国读者喜爱。
+
+## 你的翻译原则
+
+### 忠实与自然
+- 准确传达原文的语义、语气、情感和节奏，不遗漏、不增添原文没有的信息
+- 翻译必须读起来像一位中国作家直接用中文写的小说，而非翻译腔
+- 避免欧化长句，将英文的复杂从句拆分为符合中文阅读习惯的短句
+- 人物对话要符合角色身份、年龄、性格，口语化且鲜活
+
+### 词汇与表达
+- 优先使用当代中国读者熟悉的日常用语，避免生僻词和过度文雅的书面语
+- 严禁堆砌四字成语（如"跌宕起伏""引人入胜""毋庸置疑"），偶尔自然使用即可
+- 禁止使用以下AI高频词汇和句式：
+  · "值得注意的是""不可否认""毫无疑问""事实上""总而言之""综上所述"
+  · "令人叹为观止""恰如其分""应运而生""如火如荼""与此同时"
+  · "不仅……而且……""无论……都……"等过度工整的关联词组合
+  · "这不禁让人……""这无疑是……"等评论式插入语
+  · "“此外”、“然而”、“值得注意的是”、“不可否认”等生硬的书面语
+  ·“以此以此”、“等等等等”、“非常非常”、“某种”等明显啰嗦重复的词语
+- 形容词和副词要克制，不过度渲染情绪
+- 比喻和修辞保留原文的意象，必要时转化为中国读者能理解的等效表达
+
+### 句式与结构
+- 句子长度参差错落，长短句自然交替，营造阅读节奏
+- 段落之间过渡自然，不使用"首先""其次""最后"等机械连接词
+- 保持原文的段落划分，不自行合并或拆分段落
+- 叙述视角、时态与原文保持一致
+- 多余的空格要去掉。润色时也要避免不要出现多余的空格。
+
+### 对话处理
+- 对话使用中文双引号""
+- 根据角色特点赋予不同的说话风格和用词习惯
+- 语气词（"嗯""啊""呢""吧""嘛"）适当使用，不过度
+
+### 专有名词
+- 人名：首次出现时注入术语表，翻译中文译名，强制统一译法
+- 地名：有通行译名的用通行译名，注入术语表，强制统一译法
+- 品牌、书名、歌曲名等：有官方中文名的用官方名
+
+### 格式要求
+- 仅输出译文，不输出任何解释、注释、译者按语或元评论
+- 不要在译文前后添加任何说明性文字
+
+### 内容清洗]
+- 删除所有 Project Gutenberg 版权声明、archive.org 版权声明、standardebooks.org 版权声明，以及其他网站来源的版权信息与法律免责条款。
+- 删除目录、网址、页码。`;
+
+const LATEST_UPDATE_TITLE = "v3.1.3";
+const LATEST_UPDATE_TEXT = "• 纯净原文新增前 10% / 后 10% 行级边界清洗：优先识别 CONTENTS、INTRODUCTION / PREFACE / PROLOGUE、THE END / THE END. / END / END. / Transcriber’s Notes。\n• 导入 TXT 时会先按 JS 纯净原文逻辑清洗，再把清洗后的文本直接放入待处理文本区与分段流程。";
+
+const MODULE0_TOOLTIP = `主要功能
+用于测试 Gemini 翻译 / 润色 TXT、小说片段、JS 代码注释与文案，并支持 Ubuntu 用 Node 脚本调试与下载。
+最后一次更新：${LATEST_UPDATE_TITLE}
+${LATEST_UPDATE_TEXT}
+复制框内内容
+• 支持小说片段、TXT、JS / TS 代码注释与 UI 文案翻译为中文。
+• API Keys 每行一个，可轮换调用；历史与本地快照默认不保存 Key。
+• 使用字符数与起止位置保存分段，原文一致时可精准恢复执行进度。
+• 支持预检、执行、指定分段重翻、断点继续、完整脚本二次修改与下载。
+更新日志
+v3.1.0
+• 默认模型改为 gemini-3-flash-preview，并支持可编辑模型 ID，避免旧模型下架后无法运行。
+• 新增 API Key 轮换、批量预检、分段保存、历史记录、TXT 导入/导出与完整脚本下载。
+• 移除旧的精修模块，统一改为 TXT 翻译 / 润色 / 重翻的单流程工作台。
+v3.0.2
+• 增加按字符起止位置保存分段数据，便于中断后继续执行与指定分段重翻。
+• 增加运行日志、分段明细、原文 / 译文对照与 Token 汇总。`;
+
+const STORAGE_KEYS = {
+  workspace: "gemini-translation-workbench-workspace",
+  histories: "gemini-translation-workbench-histories",
+  layout: "gemini-translation-workbench-layout",
+};
+
+const DEFAULT_SOURCE_TEXT = `可在这里粘贴外文小说片段、TXT 内容、JS 注释文案，测试翻译为中文的效果。\n\n示例：\nThe moonlight spilled across the old corridor.\n她没有回头，只是轻声说了一句：\"Don't follow me.\"\n// Please keep the syntax untouched and only translate the human-readable text.`;
+
+function createId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function formatTimestamp(date = new Date()) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
+}
+
+function parseKeys(input: string) {
+  return input
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function maskKey(key: string) {
+  const normalized = (key || "").trim();
+  if (!normalized) {
+    return "**";
+  }
+  if (normalized.length <= 10) {
+    return `${normalized.slice(0, 3)}**${normalized.slice(-2)}`;
+  }
+
+  return `${normalized.slice(0, 6)}**${normalized.slice(-4)}`;
+}
+
+function estimateTextSizeKb(text: string) {
+  return Number((new TextEncoder().encode(text || "").length / 1024).toFixed(2));
+}
+
+function runTranslationSelfCheck(sourceText: string, outputText: string) {
+  const sourceLength = (sourceText || "").length;
+  const normalizedOutput = (outputText || "").trim();
+  const outputLength = normalizedOutput.length;
+  const sizeKb = estimateTextSizeKb(normalizedOutput);
+  const ratio = sourceLength > 0 ? (outputLength / sourceLength) * 100 : 100;
+
+  if (!normalizedOutput) {
+    return { ok: false, ratio, sizeKb, reason: "空结果" };
+  }
+
+  if (/^(i('| a)m sorry|sorry,|i can'?t|i cannot|as an ai|here is the translation)/i.test(normalizedOutput)) {
+    return { ok: false, ratio, sizeKb, reason: "结果疑似拒答或说明性内容" };
+  }
+
+  if (outputLength > 30000) {
+    return { ok: false, ratio, sizeKb, reason: "输出过大（>30000 字符）" };
+  }
+
+  if (sourceLength > 500 && ratio > 110) {
+    return { ok: false, ratio, sizeKb, reason: `长度比异常偏高（${ratio.toFixed(1)}%）` };
+  }
+
+  if (sourceLength >= 22000 && (ratio < 18 || sizeKb < 16)) {
+    return { ok: false, ratio, sizeKb, reason: `疑似坏块：长度比 ${ratio.toFixed(1)}%，文件大小 ${sizeKb.toFixed(2)}K` };
+  }
+
+  if (sourceLength >= 16000 && (ratio < 14 || sizeKb < 10)) {
+    return { ok: false, ratio, sizeKb, reason: `疑似坏块：长度比 ${ratio.toFixed(1)}%，文件大小 ${sizeKb.toFixed(2)}K` };
+  }
+
+  if (sourceLength >= 8000 && outputLength < 800) {
+    return { ok: false, ratio, sizeKb, reason: `结果过短：仅 ${outputLength} 字符` };
+  }
+
+  return { ok: true, ratio, sizeKb, reason: `正常 | 长度比 ${ratio.toFixed(1)}% | ${sizeKb.toFixed(2)}K` };
+}
+
+function safeJsonParse<T>(raw: string | null, fallback: T) {
+  if (!raw) {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function toNumber(value: string | number, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toInputValue(value: string | number | undefined, fallback: number) {
+  if (value === undefined || value === null || value === "") {
+    return String(fallback);
+  }
+
+  return String(value);
+}
+
+function stripFileExtension(filename: string) {
+  return filename.replace(/\.[^.]+$/, "");
+}
+
+function sanitizeFilenameBase(filename: string) {
+  const base = stripFileExtension(filename).trim();
+  const cleaned = base.replace(/[\\/:*?"<>|]/g, "_").replace(/\s+/g, " ").trim();
+  return cleaned || "未命名TXT";
+}
+
+function formatDownloadTimestamp(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+}
+
+function buildTxtDownloadName(sourceFileName: string) {
+  const base = sanitizeFilenameBase(sourceFileName || "未命名TXT");
+  return `${base}（${formatDownloadTimestamp()}）.TXT`;
+}
+
+function buildPureSourceArchiveName(date = new Date()) {
+  return `纯净原文_${formatDownloadTimestamp(date)}_212.TXT`;
+}
+
+function getHistorySourceName(sourceFileName: string) {
+  return (sourceFileName || "未命名TXT").trim() || "未命名TXT";
+}
+
+function normalizeTextNewlines(text: string) {
+  return (text || "").replace(/\r\n/g, "\n");
+}
+
+function decodeHtmlEntities(text: string) {
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
+function extractReadableTextFromHtml(html: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  doc.querySelectorAll("script, style, noscript").forEach((node) => node.remove());
+
+  const blockSelector = [
+    "p",
+    "div",
+    "section",
+    "article",
+    "header",
+    "footer",
+    "aside",
+    "blockquote",
+    "pre",
+    "li",
+    "ul",
+    "ol",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "tr",
+    "table",
+    "br",
+    "hr",
+  ].join(",");
+
+  doc.querySelectorAll(blockSelector).forEach((node) => {
+    if (node.tagName.toLowerCase() === "br") {
+      node.replaceWith(doc.createTextNode("\n"));
+      return;
+    }
+    node.appendChild(doc.createTextNode("\n\n"));
+  });
+
+  const text = decodeHtmlEntities(doc.body?.textContent || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[\t \u3000]+\n/g, "\n")
+    .replace(/\n[\t \u3000]+/g, "\n")
+    .trim();
+
+  return text;
+}
+
+async function parseLocalEpub(file: File) {
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const containerXml = await zip.file("META-INF/container.xml")?.async("string");
+  if (!containerXml) {
+    throw new Error("未找到 EPUB 的 META-INF/container.xml");
+  }
+
+  const parser = new DOMParser();
+  const containerDoc = parser.parseFromString(containerXml, "application/xml");
+  const rootfilePath = containerDoc.querySelector("rootfile")?.getAttribute("full-path");
+  if (!rootfilePath) {
+    throw new Error("未找到 EPUB 的 OPF 路径");
+  }
+
+  const opfContent = await zip.file(rootfilePath)?.async("string");
+  if (!opfContent) {
+    throw new Error("未读取到 EPUB 的 OPF 内容");
+  }
+
+  const opfDoc = parser.parseFromString(opfContent, "application/xml");
+  const metadataTitle = opfDoc.querySelector("metadata > title, dc\\:title")?.textContent?.trim() || file.name;
+  const opfBase = rootfilePath.includes("/") ? rootfilePath.slice(0, rootfilePath.lastIndexOf("/") + 1) : "";
+  const manifest = new Map(
+    Array.from(opfDoc.querySelectorAll("manifest > item")).map((item) => {
+      const id = item.getAttribute("id") || "";
+      return [
+        id,
+        {
+          href: item.getAttribute("href") || "",
+          mediaType: item.getAttribute("media-type") || "",
+          properties: item.getAttribute("properties") || "",
+        },
+      ];
+    })
+  );
+
+  const chapters: Array<{ title: string; content: string }> = [];
+  const spineItems = Array.from(opfDoc.querySelectorAll("spine > itemref"));
+
+  for (const itemRef of spineItems) {
+    const idref = itemRef.getAttribute("idref") || "";
+    const manifestItem = manifest.get(idref);
+    if (!manifestItem || !/html|xhtml/i.test(manifestItem.mediaType)) {
+      continue;
+    }
+    if ((manifestItem.properties || "").includes("nav")) {
+      continue;
+    }
+
+    const chapterPath = new URL(manifestItem.href, `https://epub.local/${opfBase}`).pathname.replace(/^\//, "");
+    const chapterHtml = await zip.file(chapterPath)?.async("string");
+    if (!chapterHtml) {
+      continue;
+    }
+
+    const chapterDoc = parser.parseFromString(chapterHtml, "text/html");
+    const title =
+      chapterDoc.querySelector("title")?.textContent?.trim() ||
+      chapterDoc.querySelector("h1, h2, h3")?.textContent?.trim() ||
+      `Chapter ${chapters.length + 1}`;
+    const content = extractReadableTextFromHtml(chapterHtml);
+    if (content.trim().length > 20) {
+      chapters.push({ title, content });
+    }
+  }
+
+  const mergedText = chapters.length
+    ? chapters.map((chapter) => `### ${chapter.title}\n\n${chapter.content}`).join("\n\n")
+    : "";
+
+  return {
+    title: metadataTitle,
+    text: mergedText,
+    length: mergedText.length,
+  };
+}
+
+function buildHistoryLabel(mode: string, sourceFileName: string, completed: number, total: number, date = new Date()) {
+  return `${mode} ${formatTimestamp(date)}｜${getHistorySourceName(sourceFileName)}（${completed}/${total} 段）`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function normalizeModelOutput(text: string) {
+  let result = text.replace(/\r\n/g, "\n");
+
+  if (result.trimStart().startsWith("```")) {
+    result = result.replace(/^```[a-zA-Z0-9_-]*\n?/, "");
+    result = result.replace(/\n?```\s*$/, "");
+  }
+
+  return result.trim();
+}
+
+function buildSegmentPrompt(segment: SegmentRecord, totalSegments: number) {
+  return [
+    `请处理以下第 ${segment.index} / ${totalSegments} 段文本。`,
+    `字符范围：${segment.start}-${segment.end}，长度：${segment.source.length} 字符。`,
+    "请严格只返回处理后的正文，不要解释。",
+    "--- 原文开始 ---",
+    segment.source,
+    "--- 原文结束 ---",
+  ].join("\n");
+}
+
+function findStandaloneLineMatch(sample: string, patterns: RegExp[]) {
+  for (const pattern of patterns) {
+    const match = pattern.exec(sample);
+    if (match && match.index !== undefined) {
+      return match;
+    }
+  }
+  return null;
+}
+
+function applyLineBoundaryTrim(text: string) {
+  let normalized = normalizeTextNewlines(text);
+  const totalLength = normalized.length;
+  if (!totalLength) {
+    return normalized;
+  }
+
+  const scopeLength = Math.max(1, Math.floor(totalLength * 0.1));
+  const frontSample = normalized.slice(0, scopeLength);
+
+  const frontPrimary = findStandaloneLineMatch(frontSample, [/^[\t \u3000]*CONTENTS[\t \u3000]*$/im]);
+  const frontFallback = findStandaloneLineMatch(frontSample, [
+    /^[\t \u3000]*INTRODUCTION[\t \u3000]*$/im,
+    /^[\t \u3000]*PREFACE[\t \u3000]*$/im,
+    /^[\t \u3000]*PROLOGUE[\t \u3000]*$/im,
+  ]);
+  const frontMarker = frontPrimary || frontFallback;
+  if (frontMarker && frontMarker.index !== undefined) {
+    normalized = frontSample.slice(frontMarker.index) + normalized.slice(scopeLength);
+  }
+
+  const refreshedScopeLength = Math.max(1, Math.floor(normalized.length * 0.1));
+  const refreshedBackSample = normalized.slice(-refreshedScopeLength);
+  const backPrimary = findStandaloneLineMatch(refreshedBackSample, [/^[\t \u3000]*THE END\.?[\t \u3000]*$/im]);
+  const backSecondary = backPrimary
+    ? null
+    : findStandaloneLineMatch(refreshedBackSample, [/^[\t \u3000]*END\.?[\t \u3000]*$/im]);
+  const backFallback = backPrimary || backSecondary
+    ? null
+    : findStandaloneLineMatch(refreshedBackSample, [
+        /^[\t \u3000]*Transcriber[’'`]s Notes[\t \u3000]*$/im,
+        /^[\t \u3000]*E[nN][dD]\s+[oO][fF].*[\t \u3000]*$/m,
+      ]);
+
+  if (backPrimary && backPrimary.index !== undefined) {
+    const absoluteIndex = normalized.length - refreshedBackSample.length + backPrimary.index;
+    normalized = normalized.slice(0, absoluteIndex + backPrimary[0].length).trimEnd();
+  } else if (backSecondary && backSecondary.index !== undefined) {
+    const absoluteIndex = normalized.length - refreshedBackSample.length + backSecondary.index;
+    normalized = normalized.slice(0, absoluteIndex + backSecondary[0].length).trimEnd();
+  } else if (backFallback && backFallback.index !== undefined) {
+    const absoluteIndex = normalized.length - refreshedBackSample.length + backFallback.index;
+    normalized = normalized.slice(0, absoluteIndex).trimEnd();
+  }
+
+  return normalized;
+}
+
+function trimPureSourceBoundaries(text: string) {
+  let normalized = applyLineBoundaryTrim(normalizeTextNewlines(text));
+
+  const frontSample = normalized.slice(0, 5000);
+  const frontIllustration = frontSample.match(/illustration/i);
+  if (frontIllustration && frontIllustration.index !== undefined) {
+    normalized = normalized.slice(frontIllustration.index).trimStart();
+  }
+
+  return normalized;
+}
+
+function isSentenceEndingChar(char: string) {
+  return /[。！？!?；;…]/.test(char);
+}
+
+function findSentenceBoundary(text: string, start: number) {
+  let index = start;
+
+  while (index < text.length) {
+    const char = text[index];
+    const nextChar = text[index + 1] || "";
+    const previousChar = text[index - 1] || "";
+
+    if (char === "\n" && nextChar === "\n") {
+      let end = index + 2;
+      while (end < text.length && /[\s\u3000]/.test(text[end])) {
+        end += 1;
+      }
+      return end;
+    }
+
+    if (char === "." && previousChar === "." && nextChar === ".") {
+      let end = index + 2;
+      while (end < text.length && /["'”’）)\]\s]/.test(text[end])) {
+        end += 1;
+      }
+      while (end < text.length && /[\s\u3000]/.test(text[end])) {
+        end += 1;
+      }
+      return end;
+    }
+
+    if (char === ".") {
+      const isDecimalPoint = /\d/.test(previousChar) && /\d/.test(nextChar);
+      const nextLooksLikeSentenceBreak = !nextChar || /[\s\u3000\n"'”’）)\]]/.test(nextChar);
+      if (!isDecimalPoint && nextLooksLikeSentenceBreak) {
+        let end = index + 1;
+        while (end < text.length && /["'”’）)\]\s]/.test(text[end])) {
+          end += 1;
+        }
+        while (end < text.length && /[\s\u3000]/.test(text[end])) {
+          end += 1;
+        }
+        return end;
+      }
+    }
+
+    if (isSentenceEndingChar(char)) {
+      let end = index + 1;
+      while (end < text.length && /["'”’）)\]】》」』]/.test(text[end])) {
+        end += 1;
+      }
+      while (end < text.length && /[\s\u3000]/.test(text[end])) {
+        end += 1;
+      }
+      return end;
+    }
+
+    index += 1;
+  }
+
+  return text.length;
+}
+
+function collectSentenceUnits(text: string) {
+  const units: Array<{ start: number; end: number; text: string }> = [];
+  let start = 0;
+
+  while (start < text.length) {
+    const end = findSentenceBoundary(text, start);
+    if (end <= start) {
+      break;
+    }
+    units.push({ start, end, text: text.slice(start, end) });
+    start = end;
+  }
+
+  return units;
+}
+
+function splitTextIntoSegments(text: string, segmentSize: number): SegmentRecord[] {
+  const content = text ?? "";
+  const size = Math.max(1, Math.floor(segmentSize || 1));
+  const segments: SegmentRecord[] = [];
+
+  if (!content.length) {
+    return segments;
+  }
+
+  const sentences = collectSentenceUnits(content);
+  let currentStart = -1;
+  let currentEnd = -1;
+  let currentText = "";
+  let index = 1;
+
+  function pushCurrentSegment() {
+    if (currentStart < 0 || currentEnd < 0) {
+      return;
+    }
+
+    segments.push({
+      index,
+      start: currentStart,
+      end: currentEnd,
+      source: currentText,
+      output: "",
+      status: "pending",
+      parseMode: "sentence-safe",
+      records: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      error: "",
+      lastUpdatedAt: "",
+    });
+
+    index += 1;
+    currentStart = -1;
+    currentEnd = -1;
+    currentText = "";
+  }
+
+  for (const sentence of sentences) {
+    if (currentStart < 0) {
+      currentStart = sentence.start;
+      currentEnd = sentence.end;
+      currentText = sentence.text;
+      continue;
+    }
+
+    if (currentText.length + sentence.text.length > size) {
+      pushCurrentSegment();
+      currentStart = sentence.start;
+      currentEnd = sentence.end;
+      currentText = sentence.text;
+      continue;
+    }
+
+    currentEnd = sentence.end;
+    currentText += sentence.text;
+  }
+
+  pushCurrentSegment();
+
+  return segments;
+}
+
+function mergeSegments(base: SegmentRecord[], existing: SegmentRecord[]) {
+  const map = new Map(existing.map((item) => [`${item.start}:${item.end}:${item.source}`, item]));
+
+  return base.map((segment) => {
+    const matched = map.get(`${segment.start}:${segment.end}:${segment.source}`);
+    if (!matched) {
+      return segment;
+    }
+
+    return {
+      ...segment,
+      output: matched.output,
+      status: matched.status,
+      parseMode: matched.parseMode,
+      records: matched.records,
+      promptTokens: matched.promptTokens,
+      completionTokens: matched.completionTokens,
+      totalTokens: matched.totalTokens,
+      error: matched.error,
+      lastUpdatedAt: matched.lastUpdatedAt,
+    };
+  });
+}
+
+function buildMergedText(segments: SegmentRecord[]) {
+  return [...segments]
+    .sort((a, b) => a.index - b.index)
+    .map((segment) => (segment.output ? segment.output : segment.source))
+    .join("");
+}
+
+function parseSelectionInput(input: string, max: number) {
+  const values = new Set<number>();
+  const parts = input.split(/[，,\s]+/).map((item) => item.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    if (part.includes("-")) {
+      const [rawStart, rawEnd] = part.split("-");
+      const start = Number(rawStart);
+      const end = Number(rawEnd);
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        const min = Math.min(start, end);
+        const maxValue = Math.max(start, end);
+        for (let value = min; value <= maxValue; value += 1) {
+          if (value >= 1 && value <= max) {
+            values.add(value);
+          }
+        }
+      }
+    } else {
+      const value = Number(part);
+      if (Number.isFinite(value) && value >= 1 && value <= max) {
+        values.add(value);
+      }
+    }
+  }
+
+  return [...values].sort((a, b) => a - b);
+}
+
+function levelDot(level: LogLevel) {
+  if (level === "success") return "●";
+  if (level === "warn") return "▲";
+  if (level === "error") return "■";
+  return "◆";
+}
+
+async function copyText(text: string) {
+  await navigator.clipboard.writeText(text);
+}
+
+function downloadText(filename: string, content: string, type = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function readLocalText(file: File) {
+  return await file.text();
+}
+
+function escapeTemplateLiteralContent(text: string) {
+  return text.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+}
+
+function syncWorkspaceConfigToScript(script: string, config: {
+  modelValue: string;
+  segmentSize: number;
+  temperature: number;
+  segmentDelayMs: number;
+  systemPrompt: string;
+}) {
+  let next = script || "";
+
+  next = next.replace(
+    /const\s+PRIMARY_MODEL_NAME\s*=\s*['"][^'"]+['"]\s*;/,
+    `const PRIMARY_MODEL_NAME = '${config.modelValue.trim() || "gemini-3-flash-preview"}';`
+  );
+  next = next.replace(
+    /const\s+FALLBACK_MODEL_NAME\s*=\s*['"][^'"]+['"]\s*;/,
+    `const FALLBACK_MODEL_NAME = '${config.modelValue.trim() || "gemini-3-flash-preview"}';`
+  );
+  next = next.replace(/const\s+MAX_CHUNK_SIZE\s*=\s*\d+\s*;/, `const MAX_CHUNK_SIZE = ${config.segmentSize};`);
+  next = next.replace(/const\s+CHUNK_DELAY_MS\s*=\s*\d+\s*;/, `const CHUNK_DELAY_MS = ${config.segmentDelayMs};`);
+  next = next.replace(
+    /temperature:\s*modelType\s*===\s*['"]PLANNER['"]\s*\?\s*0\s*:\s*[-\d.]+\s*,/,
+    `temperature: modelType === 'PLANNER' ? 0 : ${config.temperature},`
+  );
+  next = next.replace(
+    /generationConfig:\s*\{\s*temperature:\s*modelType\s*===\s*['"]PLANNER['"]\s*\?\s*0\s*:\s*[^}]+\}/,
+    `generationConfig: { temperature: modelType === 'PLANNER' ? 0 : ${config.temperature} }`
+  );
+  next = next.replace(
+    /const\s+BASE_SYSTEM_INSTRUCTION\s*=\s*`[\s\S]*?`;/,
+    `const BASE_SYSTEM_INSTRUCTION = \`${escapeTemplateLiteralContent(config.systemPrompt)}\`;`
+  );
+  next = next.replace(/const\s+OUTPUT_FORMAT\s*=\s*['"][^'"]+['"]\s*;/, "const OUTPUT_FORMAT = 'txt';");
+
+  return next;
+}
+
+function extractAssignedString(script: string, variableName: string) {
+  const match = script.match(new RegExp(`${variableName}\\s*=\\s*['\"]([^'\"]+)['\"]`));
+  return match?.[1] || "未识别";
+}
+
+function countApiKeysInScript(script: string) {
+  const block = script.match(/API_KEYS\s*=\s*\[([\s\S]*?)\]/)?.[1] || "";
+  return block
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^['"][^'"]+['"],?$/.test(line)).length;
+}
+
+function inspectScript(script: string) {
+  const normalized = script || "";
+  const lines = normalized ? normalized.split(/\r?\n/).length : 0;
+  const chars = normalized.length;
+  const primaryModel = extractAssignedString(normalized, "PRIMARY_MODEL_NAME");
+  const fallbackModel = extractAssignedString(normalized, "FALLBACK_MODEL_NAME");
+  const plannerModel = extractAssignedString(normalized, "PLANNER_MODEL_NAME");
+  const outputFormat = extractAssignedString(normalized, "OUTPUT_FORMAT");
+  const hasOldProPreview = /gemini-3-pro-preview/.test(normalized);
+  const txtReady = /OUTPUT_FORMAT\s*=\s*['"]txt['"]/.test(normalized) || /MERGE_TO_EPUB\s*=\s*false/.test(normalized);
+  const stillDependsOnEpubGen = /require\(['"]epub-gen['"]\)/.test(normalized);
+  const chunkDelay = normalized.match(/CHUNK_DELAY_MS\s*=\s*(\d+)/)?.[1] || "未识别";
+  const maxChunk = normalized.match(/MAX_CHUNK_SIZE\s*=\s*(\d+)/)?.[1] || "未识别";
+  const loadsApiKeyFile = /loadApiKeysFromFile\(path\.join\(__dirname,\s*['"]api0\.txt['"]\)\)/.test(normalized);
+  const apiKeyCount = countApiKeysInScript(normalized);
+
+  return {
+    lines,
+    chars,
+    apiKeyCount,
+    apiKeySource: loadsApiKeyFile ? "api0.txt" : `${apiKeyCount} 个内置 Key`,
+    primaryModel,
+    fallbackModel,
+    plannerModel,
+    outputFormat,
+    hasOldProPreview,
+    txtReady,
+    stillDependsOnEpubGen,
+    chunkDelay,
+    maxChunk,
+  };
+}
+
+async function requestKeyAvailability(apiKey: string) {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Key 不可用：HTTP ${response.status}`);
+  }
+
+  return data;
+}
+
+async function requestGemini(params: {
+  apiKey: string;
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  temperature: number;
+  maxOutputTokens: number;
+}): Promise<GeminiResponse> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(params.model)}:generateContent?key=${encodeURIComponent(params.apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          role: "system",
+          parts: [{ text: params.systemPrompt }],
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: params.userPrompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: params.temperature,
+          maxOutputTokens: params.maxOutputTokens,
+        },
+      }),
+    }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `请求失败：HTTP ${response.status}`);
+  }
+
+  const text =
+    data?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text || "")
+      .join("")
+      ?.trim() || "";
+
+  if (!text) {
+    const blockMessage = data?.promptFeedback?.blockReason
+      ? `请求被拦截：${data.promptFeedback.blockReason}`
+      : "模型返回空内容";
+    throw new Error(blockMessage);
+  }
+
+  return {
+    text,
+    promptTokens: data?.usageMetadata?.promptTokenCount ?? 0,
+    completionTokens: data?.usageMetadata?.candidatesTokenCount ?? 0,
+    totalTokens: data?.usageMetadata?.totalTokenCount ?? 0,
+  };
+}
+
+function Panel(props: {
+  badge: string;
+  title: string;
+  titleHint?: string;
+  subtitle?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={[
+        "rounded-[26px] border border-white/10 bg-slate-900/75 shadow-[0_20px_70px_rgba(15,23,42,0.45)] backdrop-blur",
+        props.className || "",
+      ].join(" ")}
+    >
+      <div className="border-b border-white/10 px-4 py-3 sm:px-5">
+        <div className="mb-2 inline-flex rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-medium tracking-[0.18em] text-cyan-200 uppercase">
+          {props.badge}
+        </div>
+        <div className="space-y-1">
+          <h2
+            className="text-base font-semibold text-white outline-none sm:text-lg"
+            title={props.titleHint}
+            tabIndex={props.titleHint ? 0 : undefined}
+          >
+            {props.title}
+          </h2>
+          {props.subtitle ? <p className="text-xs leading-5 text-slate-400 sm:text-sm">{props.subtitle}</p> : null}
+        </div>
+      </div>
+      <div className="p-4 sm:p-5">{props.children}</div>
+    </section>
+  );
+}
+
+function BoxHeader(props: {
+  title: string;
+  subtitle?: string;
+  copyTextValue?: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <div className="text-sm font-medium text-slate-100">{props.title}</div>
+        {props.subtitle ? <div className="text-xs text-slate-400">{props.subtitle}</div> : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {props.copyTextValue !== undefined ? <CopyButton text={props.copyTextValue} /> : null}
+        {props.actions}
+      </div>
+    </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await copyText(text);
+          window.alert("已复制框内内容。");
+        } catch {
+          window.alert("复制失败，请检查浏览器剪贴板权限。");
+        }
+      }}
+      className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-200 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+    >
+      复制框内内容
+    </button>
+  );
+}
+
+function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">{label}</div>
+      <div className="mt-1.5 text-lg font-semibold text-white sm:text-xl">{value}</div>
+      {hint ? <div className="mt-1 text-[11px] leading-5 text-slate-500">{hint}</div> : null}
+    </div>
+  );
+}
+
+export function App() {
+  const initialWorkspace = safeJsonParse<WorkspaceSnapshot | null>(
+    typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEYS.workspace) : null,
+    null
+  );
+  const initialHistories = safeJsonParse<HistoryEntry[]>(
+    typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEYS.histories) : null,
+    []
+  );
+  const initialLayout = safeJsonParse<LayoutSnapshot | null>(
+    typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEYS.layout) : null,
+    null
+  );
+  const initialModelValue = initialWorkspace?.modelValue ?? MODEL_PRESETS[0].value;
+  const initialModelRecommendation = getModelRecommendation(initialModelValue);
+
+  const [apiKeysInput, setApiKeysInput] = useState("");
+  const [isEditingApiKeys, setIsEditingApiKeys] = useState(false);
+  const [selectedModelPreset, setSelectedModelPreset] = useState(
+    initialWorkspace?.selectedModelPreset ?? MODEL_PRESETS[0].value
+  );
+  const [modelValue, setModelValue] = useState(initialModelValue);
+  const [segmentSizeInput, setSegmentSizeInput] = useState(
+    toInputValue(initialWorkspace?.segmentSize, initialModelRecommendation.segmentSize)
+  );
+  const [maxOutputTokensInput, setMaxOutputTokensInput] = useState(
+    toInputValue(initialWorkspace?.maxOutputTokens, initialModelRecommendation.maxOutputTokens)
+  );
+  const [temperatureInput, setTemperatureInput] = useState(
+    toInputValue(initialWorkspace?.temperature, initialModelRecommendation.temperature)
+  );
+  const [segmentDelayMsInput, setSegmentDelayMsInput] = useState(
+    toInputValue(initialWorkspace?.segmentDelayMs, initialModelRecommendation.segmentDelayMs)
+  );
+  const [systemPrompt, setSystemPrompt] = useState(initialWorkspace?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT);
+  const [sourceText, setSourceText] = useState(initialWorkspace?.sourceText ?? DEFAULT_SOURCE_TEXT);
+  const [sourceFileName, setSourceFileName] = useState(initialWorkspace?.sourceFileName ?? "未命名TXT");
+  const [sourceImportKind, setSourceImportKind] = useState<SourceImportKind>(initialWorkspace?.sourceImportKind ?? "manual");
+  const [sourceCleanedFileName, setSourceCleanedFileName] = useState(initialWorkspace?.sourceCleanedFileName ?? "");
+  const [sourceOriginalLength, setSourceOriginalLength] = useState(initialWorkspace?.sourceOriginalLength ?? 0);
+  const [outputPreview, setOutputPreview] = useState(initialWorkspace?.outputPreview ?? "");
+  const [fullScript, setFullScript] = useState(initialWorkspace?.fullScript ?? "");
+  const [scriptContent, setScriptContent] = useState(initialWorkspace?.scriptContent ?? defaultNodeScriptTemplate);
+  const [rerunSelection, setRerunSelection] = useState(initialWorkspace?.rerunSelection ?? "");
+  const [precheckResults, setPrecheckResults] = useState<PrecheckResult[]>(
+    initialWorkspace?.precheckResults ?? []
+  );
+  const [runLogs, setRunLogs] = useState<RunLog[]>(initialWorkspace?.runLogs ?? []);
+  const [segments, setSegments] = useState<SegmentRecord[]>(initialWorkspace?.segments ?? []);
+  const [executionDetails, setExecutionDetails] = useState<ExecutionDetail[]>(
+    initialWorkspace?.executionDetails ?? []
+  );
+  const [histories, setHistories] = useState<HistoryEntry[]>(initialHistories);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPrechecking, setIsPrechecking] = useState(false);
+  const [autoSaveTick, setAutoSaveTick] = useState(0);
+  const [segmentViewFilter, setSegmentViewFilter] = useState<SegmentViewFilter>("all");
+  const [executionDetailFilter, setExecutionDetailFilter] = useState<ExecutionDetailFilter>("all");
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState(initialWorkspace?.segments?.[0]?.index ?? 1);
+  const [layoutSnapshot, setLayoutSnapshot] = useState<LayoutSnapshot | null>(initialLayout);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scriptFileInputRef = useRef<HTMLInputElement | null>(null);
+  const abortRef = useRef(false);
+
+  const apiKeys = useMemo(() => parseKeys(apiKeysInput), [apiKeysInput]);
+  const segmentSize = useMemo(
+    () => Math.max(1, Math.floor(toNumber(segmentSizeInput, initialModelRecommendation.segmentSize))),
+    [segmentSizeInput, initialModelRecommendation.segmentSize]
+  );
+  const maxOutputTokens = useMemo(
+    () => Math.max(1, Math.floor(toNumber(maxOutputTokensInput, initialModelRecommendation.maxOutputTokens))),
+    [maxOutputTokensInput, initialModelRecommendation.maxOutputTokens]
+  );
+  const temperature = useMemo(
+    () => toNumber(temperatureInput, initialModelRecommendation.temperature),
+    [temperatureInput, initialModelRecommendation.temperature]
+  );
+  const segmentDelayMs = useMemo(
+    () => Math.max(0, Math.floor(toNumber(segmentDelayMsInput, initialModelRecommendation.segmentDelayMs))),
+    [segmentDelayMsInput, initialModelRecommendation.segmentDelayMs]
+  );
+
+  const preparedSourceText = useMemo(
+    () => (sourceImportKind === "epub" ? sourceText : trimPureSourceBoundaries(sourceText)),
+    [sourceImportKind, sourceText]
+  );
+  const segmentedDraft = useMemo(() => splitTextIntoSegments(preparedSourceText, segmentSize), [preparedSourceText, segmentSize]);
+
+  const mergedSegments = useMemo(() => mergeSegments(segmentedDraft, segments), [segmentedDraft, segments]);
+
+  const runtimeSummary = useMemo(() => {
+    const completed = mergedSegments.filter((item) => item.status === "done" && item.output.trim()).length;
+    const failed = mergedSegments.filter((item) => item.status === "error").length;
+    const promptTokens = mergedSegments.reduce((sum, item) => sum + item.promptTokens, 0);
+    const completionTokens = mergedSegments.reduce((sum, item) => sum + item.completionTokens, 0);
+    const totalTokens = mergedSegments.reduce((sum, item) => sum + item.totalTokens, 0);
+
+    return {
+      completed,
+      failed,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+    };
+  }, [mergedSegments]);
+
+  const workspaceSnapshot = useMemo<WorkspaceSnapshot>(
+    () => ({
+      selectedModelPreset,
+      modelValue,
+      segmentSize: segmentSizeInput,
+      maxOutputTokens: maxOutputTokensInput,
+      temperature: temperatureInput,
+      segmentDelayMs: segmentDelayMsInput,
+      systemPrompt,
+      sourceText,
+      sourceFileName,
+      sourceImportKind,
+      sourceCleanedFileName,
+      sourceOriginalLength,
+      outputPreview,
+      fullScript,
+      scriptContent,
+      rerunSelection,
+      precheckResults,
+      runLogs,
+      segments: mergedSegments,
+      executionDetails,
+    }),
+    [
+      selectedModelPreset,
+      modelValue,
+      segmentSizeInput,
+      maxOutputTokensInput,
+      temperatureInput,
+      segmentDelayMsInput,
+      systemPrompt,
+      sourceText,
+      sourceFileName,
+      sourceImportKind,
+      sourceCleanedFileName,
+      sourceOriginalLength,
+      outputPreview,
+      fullScript,
+      scriptContent,
+      rerunSelection,
+      precheckResults,
+      runLogs,
+      mergedSegments,
+      executionDetails,
+    ]
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.workspace, JSON.stringify(workspaceSnapshot));
+    } catch {
+      // ignore localStorage quota errors in UI persistence
+    }
+  }, [workspaceSnapshot]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.histories, JSON.stringify(histories));
+    } catch {
+      // ignore localStorage quota errors in history persistence
+    }
+  }, [histories]);
+
+  useEffect(() => {
+    if (autoSaveTick === 0) {
+      return;
+    }
+
+    saveCurrentToHistory(buildHistoryLabel("自动保存", sourceFileName, runtimeSummary.completed, mergedSegments.length));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSaveTick]);
+
+  useEffect(() => {
+    if (!mergedSegments.length) {
+      return;
+    }
+
+    if (!mergedSegments.some((item) => item.index === activeSegmentIndex)) {
+      setActiveSegmentIndex(mergedSegments[0].index);
+    }
+  }, [mergedSegments, activeSegmentIndex]);
+
+  function appendLog(level: LogLevel, message: string) {
+    setRunLogs((current) => {
+      const next = [...current, { id: createId(), time: formatTimestamp(), level, message }];
+      return next.slice(-500);
+    });
+  }
+
+  function getSavedLayoutStyle(layoutId: string): CSSProperties | undefined {
+    const box = layoutSnapshot?.boxes?.[layoutId];
+    if (!box) {
+      return undefined;
+    }
+
+    return {
+      width: `${box.width}px`,
+      height: `${box.height}px`,
+      maxWidth: "100%",
+    };
+  }
+
+  function saveCurrentLayout() {
+    const elements = Array.from(document.querySelectorAll<HTMLElement>("[data-layout-id]"));
+    if (!elements.length) {
+      appendLog("warn", "当前页面没有可保存的布局框。\n");
+      return;
+    }
+
+    const boxes: Record<string, LayoutBoxSnapshot> = {};
+    elements.forEach((element) => {
+      const layoutId = element.dataset.layoutId;
+      if (!layoutId) {
+        return;
+      }
+      const rect = element.getBoundingClientRect();
+      boxes[layoutId] = {
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+    });
+
+    const nextLayoutSnapshot: LayoutSnapshot = {
+      savedAt: formatTimestamp(),
+      boxes,
+    };
+
+    setLayoutSnapshot(nextLayoutSnapshot);
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.layout, JSON.stringify(nextLayoutSnapshot));
+    } catch {
+      // ignore localStorage quota errors in layout persistence
+    }
+    appendLog("success", `页面布局已保存：${Object.keys(boxes).length} 个框体尺寸已记住，下次打开会自动恢复。`);
+  }
+
+  function applyRecommendedConfig(model: string) {
+    const recommendation = getModelRecommendation(model);
+    setSegmentSizeInput(String(recommendation.segmentSize));
+    setMaxOutputTokensInput(String(recommendation.maxOutputTokens));
+    setTemperatureInput(String(recommendation.temperature));
+    setSegmentDelayMsInput(String(recommendation.segmentDelayMs));
+  }
+
+  function saveCurrentToHistory(label?: string) {
+    const entry: HistoryEntry = {
+      id: createId(),
+      createdAt: formatTimestamp(),
+      label: label || buildHistoryLabel("手动保存", sourceFileName, runtimeSummary.completed, mergedSegments.length),
+      snapshot: workspaceSnapshot,
+    };
+
+    setHistories((current) => [entry, ...current].slice(0, 12));
+    appendLog("success", `历史记录已保存：${entry.label}`);
+  }
+
+  function updateSegmentOutput(segmentIndex: number, nextOutput: string) {
+    const nextSegments = mergedSegments.map((segment) =>
+      segment.index === segmentIndex
+        ? {
+            ...segment,
+            output: nextOutput,
+            status: nextOutput.trim() ? (segment.status === "pending" ? "done" : segment.status) : segment.status,
+            lastUpdatedAt: formatTimestamp(),
+          }
+        : segment
+    );
+    const mergedText = buildMergedText(nextSegments);
+    setSegments(nextSegments);
+    setOutputPreview(mergedText);
+    setFullScript(mergedText);
+  }
+
+  function loadHistory(entry: HistoryEntry) {
+    setSelectedModelPreset(entry.snapshot.selectedModelPreset);
+    setModelValue(entry.snapshot.modelValue);
+    setSegmentSizeInput(toInputValue(entry.snapshot.segmentSize, initialModelRecommendation.segmentSize));
+    setMaxOutputTokensInput(toInputValue(entry.snapshot.maxOutputTokens, initialModelRecommendation.maxOutputTokens));
+    setTemperatureInput(toInputValue(entry.snapshot.temperature, initialModelRecommendation.temperature));
+    setSegmentDelayMsInput(toInputValue(entry.snapshot.segmentDelayMs, initialModelRecommendation.segmentDelayMs));
+    setSystemPrompt(entry.snapshot.systemPrompt);
+    setSourceText(entry.snapshot.sourceText);
+    setSourceFileName(entry.snapshot.sourceFileName || "未命名TXT");
+    setSourceImportKind(entry.snapshot.sourceImportKind || "manual");
+    setSourceCleanedFileName(entry.snapshot.sourceCleanedFileName || "");
+    setSourceOriginalLength(entry.snapshot.sourceOriginalLength || 0);
+    setOutputPreview(entry.snapshot.outputPreview);
+    setFullScript(entry.snapshot.fullScript);
+    setScriptContent(entry.snapshot.scriptContent || defaultNodeScriptTemplate);
+    setRerunSelection(entry.snapshot.rerunSelection);
+    setPrecheckResults(entry.snapshot.precheckResults);
+    setRunLogs(entry.snapshot.runLogs);
+    setSegments(entry.snapshot.segments);
+    setExecutionDetails(entry.snapshot.executionDetails);
+    setActiveSegmentIndex(entry.snapshot.segments[0]?.index ?? 1);
+    appendLog("info", `已切换到历史记录：${entry.label}（当前 API Key 输入不会被覆盖）`);
+  }
+
+  function removeHistory(id: string) {
+    setHistories((current) => current.filter((item) => item.id !== id));
+    appendLog("warn", "已删除一条历史记录。");
+  }
+
+  async function handleImportText(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+
+    try {
+      if (lowerName.endsWith(".epub")) {
+        const epub = await parseLocalEpub(file);
+        setSourceText(epub.text);
+        setSourceFileName(file.name);
+        setSourceImportKind("epub");
+        setSourceCleanedFileName(buildPureSourceArchiveName());
+        setSourceOriginalLength(epub.length);
+        appendLog("success", `已导入 EPUB：${file.name}，已按章节解析载入待处理文本。`);
+      } else {
+        const text = await readLocalText(file);
+        const cleanedText = trimPureSourceBoundaries(text);
+        const cleanedFileName = buildPureSourceArchiveName();
+        setSourceText(cleanedText);
+        setSourceFileName(file.name);
+        setSourceImportKind("txt");
+        setSourceCleanedFileName(cleanedFileName);
+        setSourceOriginalLength(text.length);
+        appendLog(
+          "success",
+          `已导入 TXT：${file.name}，已按纯净原文逻辑清洗为 ${cleanedFileName} 并载入待处理文本。`
+        );
+      }
+    } catch {
+      appendLog("error", `文件导入失败：${file.name}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function handleImportScript(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await readLocalText(file);
+      setScriptContent(text);
+      appendLog("success", `已导入 JS 脚本：${file.name}`);
+    } catch {
+      appendLog("error", `JS 脚本导入失败：${file.name}`);
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  function loadDefaultScriptTemplate() {
+    setScriptContent(defaultNodeScriptTemplate);
+    appendLog("success", "已载入默认 Ubuntu / TXT 调试版脚本模板。");
+  }
+
+  function syncCurrentConfigToScript() {
+    setScriptContent((current: string) =>
+      syncWorkspaceConfigToScript(current, {
+        modelValue,
+        segmentSize,
+        temperature,
+        segmentDelayMs,
+        systemPrompt,
+      })
+    );
+    appendLog("success", "已把当前页面配置同步到 JS 脚本。\n");
+  }
+
+  async function handlePrecheck() {
+    if (!apiKeys.length) {
+      window.alert("请先填写至少一个 API Key。\n\n提示：每行一个，支持轮换。\nKey 不会写入历史记录。");
+      return;
+    }
+
+    const nextResults: PrecheckResult[] = [];
+
+    setIsPrechecking(true);
+    appendLog("info", `开始预检：仅测试 ${apiKeys.length} 个 Key 是否可用，不测试模型。`);
+
+    for (const key of apiKeys) {
+      const startedAt = performance.now();
+      try {
+        await requestKeyAvailability(key);
+
+        const latencyMs = Math.round(performance.now() - startedAt);
+        const result: PrecheckResult = {
+          id: createId(),
+          time: formatTimestamp(),
+          keyPreview: maskKey(key),
+          model: "仅 Key",
+          ok: true,
+          latencyMs,
+          message: "Key 可用",
+        };
+        nextResults.push(result);
+        appendLog("success", `[预检成功] ${result.keyPreview} / Key 可用 / ${latencyMs}ms`);
+      } catch (error) {
+        const latencyMs = Math.round(performance.now() - startedAt);
+        const message = error instanceof Error ? error.message : "Key 预检失败";
+        const result: PrecheckResult = {
+          id: createId(),
+          time: formatTimestamp(),
+          keyPreview: maskKey(key),
+          model: "仅 Key",
+          ok: false,
+          latencyMs,
+          message,
+        };
+        nextResults.push(result);
+        appendLog("error", `[预检失败] ${result.keyPreview} / ${message}`);
+      }
+
+      await sleep(120);
+    }
+
+    setPrecheckResults(nextResults);
+    setIsPrechecking(false);
+    appendLog("info", `预检完成：成功 ${nextResults.filter((item) => item.ok).length}，失败 ${nextResults.filter((item) => !item.ok).length}`);
+  }
+
+  async function runSegments(targetIndices?: number[]) {
+    if (!preparedSourceText.trim()) {
+      window.alert("请先输入或导入需要翻译 / 润色的文本内容。\n\n可直接粘贴小说片段、代码文本，或导入本地 TXT。\n");
+      return;
+    }
+
+    if (!modelValue.trim()) {
+      window.alert("请先确认模型 ID。\n\n可直接使用默认 gemini-3-flash-preview，或在下方手动修改。\n");
+      return;
+    }
+
+    if (!apiKeys.length) {
+      window.alert("请先填写 API Key。\n\n支持多 Key 每行一个轮换。\n");
+      return;
+    }
+
+    abortRef.current = false;
+    setIsRunning(true);
+
+    let workingSegments = mergeSegments(splitTextIntoSegments(preparedSourceText, segmentSize), segments);
+    setSegments(workingSegments);
+
+    let indicesToRun = targetIndices?.length
+      ? targetIndices
+      : workingSegments.every((item) => item.status === "done" && item.output.trim())
+        ? workingSegments.map((item) => item.index)
+        : workingSegments
+            .filter((item) => item.status !== "done" || !item.output.trim())
+            .map((item) => item.index);
+
+    if (!indicesToRun.length) {
+      indicesToRun = workingSegments.map((item) => item.index);
+    }
+
+    appendLog("info", `开始执行翻译：目标 ${indicesToRun.length} 段，当前模型 ${modelValue}`);
+
+    let detailBuffer = [...executionDetails];
+    let usedKeyIndex = 0;
+
+    for (const segmentIndex of indicesToRun) {
+      if (abortRef.current) {
+        appendLog("warn", "收到停止请求，当前段结束后已中断剩余任务。");
+        break;
+      }
+
+      const position = workingSegments.findIndex((item) => item.index === segmentIndex);
+      if (position < 0) {
+        continue;
+      }
+
+      const currentSegment = workingSegments[position];
+      const maxAttempts = Math.max(1, Math.min(apiKeys.length, 3));
+      let completed = false;
+      let lastError = "";
+
+      workingSegments[position] = {
+        ...currentSegment,
+        status: "running",
+        error: "",
+        lastUpdatedAt: formatTimestamp(),
+      };
+      setSegments([...workingSegments]);
+
+      let attempt = 1;
+      let totalTries = 0;
+      const MAX_TOTAL_TRIES = Math.max(30, apiKeys.length * 5);
+
+      while (attempt <= maxAttempts && totalTries < MAX_TOTAL_TRIES) {
+        if (abortRef.current) break;
+        totalTries += 1;
+        const apiKey = apiKeys[usedKeyIndex % apiKeys.length];
+        usedKeyIndex += 1;
+        
+        appendLog(
+          "info",
+          `处理第 ${currentSegment.index} 段，范围 ${currentSegment.start}-${currentSegment.end}，第 ${attempt}/${maxAttempts} 次尝试，使用 ${maskKey(apiKey)}`
+        );
+
+        const startedAt = performance.now();
+
+        try {
+          const response = await requestGemini({
+            apiKey,
+            model: modelValue.trim(),
+            systemPrompt,
+            userPrompt: buildSegmentPrompt(currentSegment, workingSegments.length),
+            temperature,
+            maxOutputTokens,
+          });
+
+          const output = normalizeModelOutput(response.text);
+          const selfCheck = runTranslationSelfCheck(currentSegment.source, output);
+          const finishedAt = Math.round(performance.now() - startedAt);
+
+          if (!selfCheck.ok) {
+            throw new Error(`Self-Check 失败：${selfCheck.reason}`);
+          }
+
+          const updated: SegmentRecord = {
+            ...currentSegment,
+            output,
+            status: "done",
+            parseMode: "plain-text",
+            records: currentSegment.records + totalTries,
+            promptTokens: response.promptTokens,
+            completionTokens: response.completionTokens,
+            totalTokens: response.totalTokens,
+            error: "",
+            lastUpdatedAt: formatTimestamp(),
+          };
+
+          workingSegments[position] = updated;
+          setSegments([...workingSegments]);
+
+          const detail: ExecutionDetail = {
+            id: createId(),
+            timestamp: formatTimestamp(),
+            segmentIndex: updated.index,
+            start: updated.start,
+            end: updated.end,
+            keyPreview: maskKey(apiKey),
+            model: modelValue.trim(),
+            status: "done",
+            parseMode: `${updated.parseMode} / ${selfCheck.reason}`,
+            promptTokens: response.promptTokens,
+            completionTokens: response.completionTokens,
+            totalTokens: response.totalTokens,
+            durationMs: finishedAt,
+            fileSizeKb: selfCheck.sizeKb,
+            error: "",
+            preview: output.slice(0, 120),
+          };
+
+          detailBuffer = [detail, ...detailBuffer].slice(0, 1000);
+          setExecutionDetails(detailBuffer);
+
+          const merged = buildMergedText(workingSegments);
+          setOutputPreview(merged);
+          setFullScript(merged);
+          appendLog(
+            "success",
+            `第 ${updated.index} 段完成：${response.totalTokens} Tokens / ${finishedAt}ms / ${selfCheck.sizeKb.toFixed(2)}K / 长度比 ${selfCheck.ratio.toFixed(1)}%`
+          );
+          completed = true;
+          break;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "执行失败";
+          const finishedAt = Math.round(performance.now() - startedAt);
+          lastError = message;
+
+          const isRateLimitOrServerErr = /(429|503)/.test(message) || /(Too Many Requests|Service Unavailable|quota)/i.test(message);
+
+          const detail: ExecutionDetail = {
+            id: createId(),
+            timestamp: formatTimestamp(),
+            segmentIndex: currentSegment.index,
+            start: currentSegment.start,
+            end: currentSegment.end,
+            keyPreview: maskKey(apiKey),
+            model: modelValue.trim(),
+            status: "error",
+            parseMode: currentSegment.parseMode || "plain-text",
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+            durationMs: finishedAt,
+            fileSizeKb: 0,
+            error: message,
+            preview: message,
+          };
+
+          detailBuffer = [detail, ...detailBuffer].slice(0, 1000);
+          setExecutionDetails(detailBuffer);
+
+          const isFinalTry = attempt >= maxAttempts && !isRateLimitOrServerErr;
+
+          appendLog(
+            isFinalTry ? "error" : "warn",
+            `第 ${currentSegment.index} 段第 ${attempt}/${maxAttempts} 次尝试失败${isRateLimitOrServerErr ? " (遇到 429/503 触发 Key 轮换)" : ""}：${message}`
+          );
+
+          if (!isRateLimitOrServerErr) {
+            attempt += 1;
+          }
+
+          if (attempt <= maxAttempts && totalTries < MAX_TOTAL_TRIES) {
+            let waitMs = Math.min(800, Math.max(120, segmentDelayMs || 120));
+            if (isRateLimitOrServerErr) {
+              waitMs = Math.max(waitMs, 1200);
+            }
+            await sleep(waitMs);
+          }
+        }
+      }
+
+      if (!completed) {
+        const updated: SegmentRecord = {
+          ...currentSegment,
+          status: "error",
+          records: currentSegment.records + totalTries,
+          error: lastError || "执行失败",
+          lastUpdatedAt: formatTimestamp(),
+          parseMode: currentSegment.parseMode || "plain-text",
+        };
+        workingSegments[position] = updated;
+        setSegments([...workingSegments]);
+      }
+
+      if (segmentDelayMs > 0) {
+        await sleep(segmentDelayMs);
+      }
+    }
+
+    const merged = buildMergedText(workingSegments);
+    setOutputPreview(merged);
+    if (merged.trim()) {
+      setFullScript(merged);
+    }
+    setSegments([...workingSegments]);
+    setIsRunning(false);
+    appendLog("info", "本轮任务执行结束。");
+    setAutoSaveTick((value) => value + 1);
+  }
+
+  async function handleRerunSelected() {
+    const selected = parseSelectionInput(rerunSelection, mergedSegments.length);
+    if (!selected.length) {
+      window.alert("请先填写要重翻的分段号，例如：1,3,5-7");
+      return;
+    }
+
+    await runSegments(selected);
+  }
+
+  const precheckSummaryText = precheckResults.length
+    ? precheckResults
+        .map(
+          (item) => `[${item.time}] ${item.keyPreview} / ${item.ok ? "可用" : "失败"} / ${item.latencyMs}ms / ${item.message}`
+        )
+        .join("\n")
+    : "暂无预检结果";
+
+  const runLogText = runLogs.length
+    ? runLogs.map((item) => `${levelDot(item.level)} [${item.time}] ${item.message}`).join("\n")
+    : "暂无运行日志";
+
+  const latestPreviewRecords = executionDetails.slice(0, 6);
+  const combinedOutput = fullScript || outputPreview || buildMergedText(mergedSegments);
+  const txtDownloadName = buildTxtDownloadName(sourceFileName);
+  const filteredExecutionDetails = executionDetails.filter((item) =>
+    executionDetailFilter === "all" ? true : item.status === executionDetailFilter
+  );
+  const apiKeyDisplayValue = isEditingApiKeys ? apiKeysInput : apiKeys.map(maskKey).join("\n");
+  const modelRecommendation = getModelRecommendation(modelValue || selectedModelPreset);
+  const promptStatus = systemPrompt.trim() === DEFAULT_SYSTEM_PROMPT.trim() ? "默认" : "已修改";
+  const filteredSegments = mergedSegments.filter((segment) =>
+    segmentViewFilter === "all" ? true : segment.status === segmentViewFilter
+  );
+  const segmentList = filteredSegments.length ? filteredSegments : mergedSegments;
+  const activeSegment = mergedSegments.find((item) => item.index === activeSegmentIndex) || mergedSegments[0] || null;
+  const sourceTextTitle =
+    sourceImportKind === "manual" || !sourceFileName.trim() ? "待处理文本" : `待处理文本-${sourceFileName.trim()}`;
+  const scriptInspection = inspectScript(scriptContent);
+  const segmentFilterTabs: { label: string; value: SegmentViewFilter; count: number }[] = [
+    { label: "全部", value: "all", count: mergedSegments.length },
+    { label: "待处理", value: "pending", count: mergedSegments.filter((item) => item.status === "pending").length },
+    { label: "执行中", value: "running", count: mergedSegments.filter((item) => item.status === "running").length },
+    { label: "已完成", value: "done", count: mergedSegments.filter((item) => item.status === "done").length },
+    { label: "失败", value: "error", count: mergedSegments.filter((item) => item.status === "error").length },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#07111f_0%,_#020617_100%)] text-slate-100">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-3.5 px-4 py-5 sm:px-5 lg:px-6">
+        <Panel badge="模块 0" title="功能与更新日志" titleHint={MODULE0_TOOLTIP} className="w-full">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="运行时 Key" value={`${apiKeys.length} 个`} hint="多个 Key 将按段轮换调用" />
+            <StatCard label="当前模型" value={modelValue || "未设置"} hint="默认 gemini-3-flash-preview" />
+            <StatCard
+              label="分段数"
+              value={`${segmentedDraft.length} 段`}
+              hint={`${sourceCleanedFileName || "当前纯净原文"} · ${preparedSourceText.length} 字符`}
+            />
+            <StatCard label="已完成" value={`${runtimeSummary.completed} 段`} hint={`失败 ${runtimeSummary.failed} 段`} />
+          </div>
+        </Panel>
+
+        <div className="flex flex-wrap gap-3.5">
+          <Panel
+            badge="模块 1"
+            title="API 与模型配置"
+            subtitle="参数会根据所选模型给出合理推荐值；可继续手动修改，鼠标停在输入框上可查看填写影响。"
+            className="min-w-[340px] flex-1 basis-[760px]"
+          >
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <BoxHeader
+                  title="API Keys（每行一个，多个轮换）"
+                  subtitle="聚焦时显示原始 Key，失焦后自动隐藏中间内容；历史不会覆盖当前 Key 输入。"
+                  copyTextValue={apiKeysInput}
+                />
+                <textarea
+                  data-layout-id="api-keys"
+                  style={getSavedLayoutStyle("api-keys")}
+                  value={apiKeyDisplayValue}
+                  onFocus={() => setIsEditingApiKeys(true)}
+                  onBlur={() => setIsEditingApiKeys(false)}
+                  onChange={(event) => setApiKeysInput(event.target.value)}
+                  title="可直接粘贴或编辑 API Key；聚焦时显示原始内容，失焦后自动脱敏。每行一个，运行时按段轮换。"
+                  placeholder="直接粘贴 API Key，每行一个。"
+                  className="min-h-[92px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2.5 font-mono text-sm text-slate-200 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+                />
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <div className="grid gap-3 xl:grid-cols-[0.92fr_1.08fr]">
+                  <div>
+                    <BoxHeader title="模型选择" copyTextValue={selectedModelPreset} />
+                    <select
+                      value={selectedModelPreset}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setSelectedModelPreset(next);
+                        setModelValue(next);
+                        applyRecommendedConfig(next);
+                      }}
+                      title="切换模型预设时，会自动填入当前模型对应的默认参数。"
+                      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400/50"
+                    >
+                      {MODEL_PRESETS.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <BoxHeader
+                      title="当前模型 ID（可修改）"
+                      copyTextValue={modelValue}
+                      actions={
+                        <button
+                          type="button"
+                          onClick={() => applyRecommendedConfig(modelValue || selectedModelPreset)}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                          title={`按当前模型重新填入推荐参数：分段 ${modelRecommendation.segmentSize}，最大输出 ${modelRecommendation.maxOutputTokens}，Temperature ${modelRecommendation.temperature}，间隔 ${modelRecommendation.segmentDelayMs}ms。`}
+                        >
+                          填入推荐参数
+                        </button>
+                      }
+                    />
+                    <input
+                      value={modelValue}
+                      onChange={(event) => setModelValue(event.target.value)}
+                      title={`真实请求使用的模型 ID。当前推荐：分段 ${modelRecommendation.segmentSize}，最大输出 ${modelRecommendation.maxOutputTokens}，Temperature ${modelRecommendation.temperature}，间隔 ${modelRecommendation.segmentDelayMs}ms。`}
+                      placeholder="例如：gemini-3-flash-preview"
+                      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-2.5">
+                    <BoxHeader title="分段大小" copyTextValue={segmentSizeInput} />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={segmentSizeInput}
+                      onChange={(event) => setSegmentSizeInput(event.target.value)}
+                      title={`按字符分段。这里只提供推荐值，不限制你输入；默认恢复到接近旧脚本的长分段逻辑。当前推荐 ${modelRecommendation.segmentSize}。`}
+                      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm outline-none focus:border-cyan-400/50"
+                    />
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-2.5">
+                    <BoxHeader title="最大输出" copyTextValue={maxOutputTokensInput} />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={maxOutputTokensInput}
+                      onChange={(event) => setMaxOutputTokensInput(event.target.value)}
+                      title={`单段请求允许的最大输出 Token。这里只给推荐值，不强行限制输入。当前推荐 ${modelRecommendation.maxOutputTokens}。`}
+                      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm outline-none focus:border-cyan-400/50"
+                    />
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-2.5">
+                    <BoxHeader title="Temperature" copyTextValue={temperatureInput} />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={temperatureInput}
+                      onChange={(event) => setTemperatureInput(event.target.value)}
+                      title={`控制输出自由度。这里只给推荐值，不限制你输入。当前推荐 ${modelRecommendation.temperature}。`}
+                      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm outline-none focus:border-cyan-400/50"
+                    />
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-2.5">
+                    <BoxHeader title="分段间隔（ms）" copyTextValue={segmentDelayMsInput} />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={segmentDelayMsInput}
+                      onChange={(event) => setSegmentDelayMsInput(event.target.value)}
+                      title={`每段请求之间的等待时间。这里只给推荐值，不限制你输入。当前推荐 ${modelRecommendation.segmentDelayMs}ms。`}
+                      className="h-10 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm outline-none focus:border-cyan-400/50"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handlePrecheck}
+                  disabled={isPrechecking || isRunning}
+                  title="仅测试每个 API Key 是否可用，不测试模型。"
+                  className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPrechecking ? "预检中..." : "预检 API Key"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runSegments()}
+                  disabled={isRunning || isPrechecking}
+                  className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isRunning ? "执行中..." : "执行翻译"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => saveCurrentToHistory()}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                >
+                  保存当前为历史记录
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    abortRef.current = true;
+                  }}
+                  disabled={!isRunning}
+                  className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  停止当前任务
+                </button>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <BoxHeader
+                  title="历史记录"
+                  subtitle="保存当前所有文本框、日志、结果与脚本内容，但不会保存 API Key。"
+                  copyTextValue={histories.map((item) => `${item.createdAt}｜${item.label}`).join("\n") || "暂无历史记录"}
+                />
+                <div className="max-h-[320px] space-y-3 overflow-auto pr-1">
+                  {histories.length ? (
+                    histories.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-medium text-slate-100">{entry.label}</div>
+                          <div className="text-xs text-slate-500">{entry.createdAt}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => loadHistory(entry)}
+                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                          >
+                            切换历史
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm("确认删除这条历史记录吗？")) {
+                                removeHistory(entry.id);
+                              }
+                            }}
+                            className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-xs text-rose-100 transition hover:bg-rose-400/20"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/30 p-4 text-sm text-slate-500">
+                      暂无历史记录。运行一次任务后会自动保存当前快照。
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            badge="模块 2"
+            title="预检结果与运行日志"
+            subtitle="包含 API Key 预检面板与可横向/纵向拉伸的运行日志框。"
+            className="min-w-[340px] flex-1 basis-[500px]"
+          >
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                <BoxHeader title="Key 预检面板" subtitle="只测试每个 API Key 是否可用，不测试模型。" copyTextValue={precheckSummaryText} />
+                <div className="max-h-[250px] space-y-2.5 overflow-auto pr-1">
+                  {precheckResults.length ? (
+                    precheckResults.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`rounded-2xl border p-3 text-sm ${
+                          item.ok
+                            ? "border-emerald-400/20 bg-emerald-400/10"
+                            : "border-rose-400/20 bg-rose-400/10"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-medium text-slate-100">{item.keyPreview}</div>
+                          <div className="text-xs text-slate-400">{item.time}</div>
+                        </div>
+                        <div className="mt-1 text-xs text-slate-300">
+                          状态：{item.ok ? "可用" : "失败"} / 延迟：{item.latencyMs}ms
+                        </div>
+                        <div className="mt-2 break-words text-xs text-slate-400">{item.message}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/30 p-4 text-sm text-slate-500">
+                      尚未执行预检。
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                <BoxHeader title="运行日志" subtitle="支持手动拉伸，便于查看长日志。" copyTextValue={runLogText} />
+                <textarea
+                  data-layout-id="run-logs"
+                  style={getSavedLayoutStyle("run-logs")}
+                  readOnly
+                  value={runLogText}
+                  className="min-h-[210px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-3.5 py-3 font-mono text-sm text-slate-200 outline-none"
+                />
+                <div className="mt-2.5 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                  <span className="rounded-full bg-white/5 px-3 py-1">成功：{precheckResults.filter((item) => item.ok).length}</span>
+                  <span className="rounded-full bg-white/5 px-3 py-1">失败：{precheckResults.filter((item) => !item.ok).length}</span>
+                  <span className="rounded-full bg-white/5 px-3 py-1">日志：{runLogs.length} 条</span>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            badge="模块 3"
+            title="测试翻译文本与提示词"
+            subtitle="可直接粘贴小说片段或导入 TXT；右侧实时展示当前拼接结果与最近记录。"
+            className="w-full"
+          >
+            <div className="grid gap-3.5 xl:grid-cols-[1.08fr_0.92fr]">
+              <div className="space-y-3.5">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                  <BoxHeader
+                    title={sourceTextTitle}
+                    subtitle="可用于小说、TXT、代码注释与文案翻译测试。"
+                    copyTextValue={sourceText}
+                    actions={
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                        >
+                          导入本地 TXT / EPUB
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSourceText("");
+                            setSourceFileName("未命名TXT");
+                            setSourceImportKind("manual");
+                            setSourceCleanedFileName("");
+                            setSourceOriginalLength(0);
+                          }}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                        >
+                          清空文本
+                        </button>
+                      </div>
+                    }
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.epub,text/plain,application/epub+zip"
+                    className="hidden"
+                    onChange={handleImportText}
+                  />
+                  <textarea
+                    data-layout-id="source-text"
+                    style={getSavedLayoutStyle("source-text")}
+                    value={sourceText}
+                    onChange={(event) => setSourceText(event.target.value)}
+                    title="可直接粘贴文本，也可导入 TXT / EPUB。TXT 会先按纯净原文规则清洗，EPUB 会按章节解析后载入。"
+                    placeholder="可直接粘贴小说片段、TXT 内容、EPUB 解析结果或 JS 代码文本。"
+                    className="min-h-[220px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/50"
+                  />
+                  <div className="mt-2 space-y-1 text-[11px] text-slate-500">
+                    {sourceCleanedFileName ? (
+                      <div>
+                        已导入文件：{sourceFileName}（原始 {sourceOriginalLength || sourceText.length} 字符）→ {sourceCleanedFileName}
+                        （纯净原文 {preparedSourceText.length} 字符，预计 {segmentedDraft.length} 段）
+                      </div>
+                    ) : (
+                      <div>当前纯净文本 {preparedSourceText.length} 字符，预计分段 {segmentedDraft.length} 段。</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <BoxHeader
+                    title="系统提示词"
+                    subtitle={`当前状态：${promptStatus}`}
+                    copyTextValue={systemPrompt}
+                  />
+                  <textarea
+                    data-layout-id="system-prompt"
+                    style={getSavedLayoutStyle("system-prompt")}
+                    value={systemPrompt}
+                    onChange={(event) => setSystemPrompt(event.target.value)}
+                    title="这里是默认提示词，可直接覆盖修改。鼠标聚焦时查看并编辑，不再保留模板切换区。"
+                    className="min-h-[150px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/50"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3.5">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                  <BoxHeader
+                    title="润色 / 翻译效果预览"
+                    subtitle="开始执行后，这里展示当前拼接结果。"
+                    copyTextValue={combinedOutput || "暂无结果"}
+                    actions={
+                      <button
+                        type="button"
+                        onClick={() => downloadText(txtDownloadName, fullScript || combinedOutput || sourceText)}
+                        title="按上传 TXT 名称 + 时间戳导出；若整稿编辑器已有内容，会优先导出整稿编辑器里的文本。"
+                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                      >
+                        下载翻译后小说 / TXT
+                      </button>
+                    }
+                  />
+                  <textarea
+                    data-layout-id="preview-output"
+                    style={getSavedLayoutStyle("preview-output")}
+                    readOnly
+                    value={combinedOutput || "暂无结果，执行后会在这里显示当前整稿。"}
+                    className="min-h-[250px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 outline-none"
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <BoxHeader
+                    title="最近记录"
+                    subtitle="显示最近分段执行明细，用于快速观察结果质量。"
+                    copyTextValue={
+                      latestPreviewRecords.length
+                        ? latestPreviewRecords
+                            .map(
+                              (item) =>
+                                `[${item.timestamp}] 第${item.segmentIndex}段 / ${item.status} / ${item.totalTokens} Tokens / ${item.preview}`
+                            )
+                            .join("\n")
+                        : "暂无记录"
+                    }
+                  />
+                  <div className="max-h-[260px] space-y-3 overflow-auto pr-1">
+                    {latestPreviewRecords.length ? (
+                      latestPreviewRecords.map((item) => (
+                        <div key={item.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-medium text-slate-100">第 {item.segmentIndex} 段</div>
+                            <div className="text-xs text-slate-500">{item.timestamp}</div>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-400">
+                            {item.status} / {item.model} / {item.totalTokens} Tokens / {item.durationMs}ms
+                          </div>
+                          <div className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-300">{item.preview || item.error}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/30 p-4 text-sm text-slate-500">
+                        还没有执行记录。
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            badge="模块 4"
+            title="翻译结果总览"
+            subtitle="汇总已完成分段、提示词状态、输入 / 输出 / 总 Token。"
+            className="min-w-[320px] flex-1 basis-[420px]"
+          >
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <StatCard label="已完成分段" value={`${runtimeSummary.completed}/${mergedSegments.length}`} />
+              <StatCard label="提示词状态" value={promptStatus} hint={`${systemPrompt.length} 字符`} />
+              <StatCard label="输入 Token" value={String(runtimeSummary.promptTokens)} />
+              <StatCard label="输出 Token" value={String(runtimeSummary.completionTokens)} />
+              <StatCard label="总 Token" value={String(runtimeSummary.totalTokens)} />
+            </div>
+          </Panel>
+
+          <Panel
+            badge="模块 5"
+            title="指定分段重翻译"
+            subtitle="可填写单个、多选或范围，例如：2,5,8-12。"
+            className="min-w-[320px] flex-1 basis-[420px]"
+          >
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <BoxHeader title="要重新处理的分段号" subtitle="支持中文逗号、英文逗号和范围写法。" copyTextValue={rerunSelection} />
+                <input
+                  value={rerunSelection}
+                  onChange={(event) => setRerunSelection(event.target.value)}
+                  placeholder="例如：1,3,5-7"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/50"
+                />
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleRerunSelected}
+                  disabled={isRunning || !mergedSegments.length}
+                  className="rounded-2xl bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  执行所选分段重翻
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRerunSelection(mergedSegments.filter((item) => item.status === "error").map((item) => item.index).join(","))}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                >
+                  填入全部失败段
+                </button>
+              </div>
+            </div>
+          </Panel>
+
+          <Panel
+            badge="模块 6"
+            title="原文 / 翻译后 对照"
+            subtitle="改为紧凑模式：先筛选分段，再在右侧查看当前段的完整内容、Token 与错误信息。"
+            className="w-full"
+          >
+            {mergedSegments.length ? (
+              <div className="space-y-3.5">
+                <div className="flex flex-wrap gap-2">
+                  {segmentFilterTabs.map((tab) => (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setSegmentViewFilter(tab.value)}
+                      className={`rounded-full px-3 py-1.5 text-xs transition ${
+                        segmentViewFilter === tab.value
+                          ? "bg-cyan-400 text-slate-950"
+                          : "border border-white/10 bg-white/5 text-slate-300 hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                      }`}
+                    >
+                      {tab.label} · {tab.count}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid gap-3.5 xl:grid-cols-[320px_1fr]">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                    <BoxHeader
+                      title="分段列表"
+                      subtitle={`当前筛选：${segmentFilterTabs.find((tab) => tab.value === segmentViewFilter)?.label || "全部"}`}
+                      copyTextValue={segmentList.map((item) => `第 ${item.index} 段｜${item.status}｜${item.start}-${item.end}`).join("\n") || "暂无分段"}
+                    />
+                    <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
+                      {segmentList.map((segment) => (
+                        <button
+                          key={`${segment.start}-${segment.end}`}
+                          type="button"
+                          onClick={() => setActiveSegmentIndex(segment.index)}
+                          className={`w-full rounded-2xl border p-3 text-left transition ${
+                            activeSegment?.index === segment.index
+                              ? "border-cyan-400/50 bg-cyan-400/10"
+                              : "border-white/10 bg-slate-950/40 hover:border-cyan-400/30 hover:bg-cyan-400/5"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-medium text-slate-100">第 {segment.index} 段</div>
+                            <span className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-slate-300">{segment.status}</span>
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-400">
+                            {segment.start}-{segment.end} · {segment.source.length} 字符 · {segment.totalTokens} Tokens
+                          </div>
+                          <div className="mt-1 line-clamp-2 text-xs text-slate-500">
+                            {(segment.output || segment.source).replace(/\s+/g, " ")}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                    {activeSegment ? (
+                      <div className="space-y-3.5">
+                        <div>
+                          <div className="text-sm font-semibold text-white">
+                            第 {activeSegment.index} 段 · 字符 {activeSegment.start}-{activeSegment.end}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
+                            <span className="rounded-full bg-white/5 px-3 py-1">状态：{activeSegment.status}</span>
+                            <span className="rounded-full bg-white/5 px-3 py-1">解析：{activeSegment.parseMode}</span>
+                            <span className="rounded-full bg-white/5 px-3 py-1">记录数：{activeSegment.records}</span>
+                            <span className="rounded-full bg-white/5 px-3 py-1">输入：{activeSegment.promptTokens}</span>
+                            <span className="rounded-full bg-white/5 px-3 py-1">输出：{activeSegment.completionTokens}</span>
+                            <span className="rounded-full bg-white/5 px-3 py-1">总 Token：{activeSegment.totalTokens}</span>
+                            {activeSegment.lastUpdatedAt ? <span className="rounded-full bg-white/5 px-3 py-1">更新：{activeSegment.lastUpdatedAt}</span> : null}
+                          </div>
+                          {activeSegment.error ? <div className="mt-2 text-sm text-rose-300">错误：{activeSegment.error}</div> : null}
+                        </div>
+
+                        <div className="grid gap-3.5 xl:grid-cols-2">
+                          <div>
+                            <BoxHeader title="原文" subtitle={`长度 ${activeSegment.source.length} 字符`} copyTextValue={activeSegment.source} />
+                            <textarea
+                              data-layout-id="segment-source"
+                              style={getSavedLayoutStyle("segment-source")}
+                              readOnly
+                              value={activeSegment.source}
+                              className="min-h-[300px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <BoxHeader
+                              title="翻译后 / 润色后"
+                              subtitle={activeSegment.output ? `长度 ${activeSegment.output.length} 字符，可直接编辑并同步整稿` : "尚未生成结果，可直接在这里手动填写"}
+                              copyTextValue={activeSegment.output || ""}
+                            />
+                            <textarea
+                              data-layout-id="segment-output"
+                              style={getSavedLayoutStyle("segment-output")}
+                              value={activeSegment.output}
+                              onChange={(event) => updateSegmentOutput(activeSegment.index, event.target.value)}
+                              title="可直接修改本段翻译结果；修改后会立即同步到下方整稿 TXT 编辑器，并作为下载完整 TXT 的内容来源。"
+                              placeholder="尚未生成结果，可直接在这里手动填写或粘贴本段译文。"
+                              className="min-h-[300px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/30 p-6 text-sm text-slate-500">
+                        当前筛选下没有可查看的分段。
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-dashed border-white/10 bg-slate-950/30 p-6 text-sm text-slate-500">
+                还没有分段结果。请先在模块 3 输入文本，然后执行翻译。
+              </div>
+            )}
+          </Panel>
+
+          <Panel
+            badge="模块 7"
+            title="分段执行明细"
+            subtitle="记录每个分段执行时使用的 Key、模型、耗时、Token 与错误；下方框体可横向和纵向拉伸。"
+            className="w-full"
+          >
+            <BoxHeader
+              title="执行明细表"
+              subtitle={`当前显示 ${filteredExecutionDetails.length} / ${executionDetails.length} 条记录`}
+              actions={
+                <select
+                  value={executionDetailFilter}
+                  onChange={(event) => setExecutionDetailFilter(event.target.value as ExecutionDetailFilter)}
+                  title="筛选执行明细状态：可查看全部、成功或失败记录。"
+                  className="h-10 rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm text-slate-100 outline-none transition focus:border-cyan-400/50"
+                >
+                  <option value="all">全部记录</option>
+                  <option value="done">仅成功</option>
+                  <option value="error">仅失败</option>
+                </select>
+              }
+            />
+            <div
+              data-layout-id="execution-details"
+              className="h-[150px] min-h-[150px] w-full overflow-auto rounded-2xl border border-white/10 bg-slate-950/40"
+              style={{ resize: "both", ...getSavedLayoutStyle("execution-details") }}
+              title="这个明细框支持横向与纵向拉伸，默认高度压缩到与系统提示词框一致，方便按需手动拉大。"
+            >
+              <table className="min-w-[1180px] divide-y divide-white/10 text-left text-sm">
+                <thead className="bg-white/[0.04] text-slate-300">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">时间</th>
+                    <th className="px-4 py-3 font-medium">分段</th>
+                    <th className="px-4 py-3 font-medium">范围</th>
+                    <th className="px-4 py-3 font-medium">Key</th>
+                    <th className="px-4 py-3 font-medium">文件大小</th>
+                    <th className="px-4 py-3 font-medium">模型</th>
+                    <th className="px-4 py-3 font-medium">状态</th>
+                    <th className="px-4 py-3 font-medium">解析</th>
+                    <th className="px-4 py-3 font-medium">耗时</th>
+                    <th className="px-4 py-3 font-medium">Tokens</th>
+                    <th className="px-4 py-3 font-medium">错误 / 预览</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 text-slate-200">
+                  {filteredExecutionDetails.length ? (
+                    filteredExecutionDetails.map((item) => (
+                      <tr key={item.id} className="align-top">
+                        <td className="px-4 py-3 text-xs text-slate-400">{item.timestamp}</td>
+                        <td className="px-4 py-3">{item.segmentIndex}</td>
+                        <td className="px-4 py-3 text-xs text-slate-400">
+                          {item.start}-{item.end}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs">{item.keyPreview}</td>
+                        <td className="px-4 py-3 text-xs text-slate-400">{item.fileSizeKb ? `${item.fileSizeKb.toFixed(2)}K` : "-"}</td>
+                        <td className="px-4 py-3 text-xs">{item.model}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs ${
+                              item.status === "done"
+                                ? "bg-emerald-400/15 text-emerald-200"
+                                : "bg-rose-400/15 text-rose-200"
+                            }`}
+                          >
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-400">{item.parseMode}</td>
+                        <td className="px-4 py-3 text-xs text-slate-400">{item.durationMs}ms</td>
+                        <td className="px-4 py-3 text-xs text-slate-400">{item.totalTokens}</td>
+                        <td className="max-w-[520px] px-4 py-3 text-xs text-slate-300">
+                          <div className="whitespace-pre-wrap break-words">{item.error || item.preview}</div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={11} className="px-4 py-8 text-center text-sm text-slate-500">
+                        当前筛选下暂无分段执行明细。
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+
+          <Panel
+            badge="模块 8"
+            title="整稿与 Ubuntu JS 脚本修改下载"
+            subtitle="左侧处理翻译后的完整 TXT，右侧用于调试 Ubuntu 环境里的 Node / Gemini 翻译脚本。"
+            className="w-full"
+          >
+            <div className="grid gap-3.5 xl:grid-cols-[0.95fr_1.05fr]">
+              <div className="space-y-3.5">
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFullScript(buildMergedText(mergedSegments))}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                  >
+                    同步当前结果到整稿 TXT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadText(txtDownloadName, fullScript || "")}
+                    title="按上传 TXT 名称 + 时间戳下载，下载内容严格取自“整稿 TXT 编辑器”当前文本。"
+                    className="rounded-2xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                  >
+                    下载完整 TXT
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      downloadText(
+                        `workspace-${Date.now()}.json`,
+                        JSON.stringify(workspaceSnapshot, null, 2),
+                        "application/json;charset=utf-8"
+                      )
+                    }
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                  >
+                    下载完整 JSON 快照
+                  </button>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <BoxHeader title="整稿 TXT 编辑器" subtitle="执行任务后会自动同步整稿；模块 6 的译文编辑也会实时同步到这里，下载完整 TXT 以这里的内容为准。" copyTextValue={fullScript} />
+                  <textarea
+                    data-layout-id="full-txt"
+                    style={getSavedLayoutStyle("full-txt")}
+                    value={fullScript}
+                    onChange={(event) => setFullScript(event.target.value)}
+                    title="这里是最终下载的完整 TXT 内容来源。你可以直接改整稿，或在模块 6 修改单段后自动同步到这里。"
+                    className="min-h-[360px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/50"
+                    placeholder="执行任务后，整稿会自动同步到这里；也可以手动修改。"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3.5">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <BoxHeader
+                    title="脚本体检"
+                    subtitle="用于检查旧模型、TXT 输出开关、分块大小和 Ubuntu 调试模板是否到位。"
+                    copyTextValue={[
+                      `行数：${scriptInspection.lines}`,
+                      `字符数：${scriptInspection.chars}`,
+                      `Key 来源：${scriptInspection.apiKeySource}`,
+                      `主模型：${scriptInspection.primaryModel}`, 
+                      `回退模型：${scriptInspection.fallbackModel}`,
+                      `规划模型：${scriptInspection.plannerModel}`,
+                      `输出格式：${scriptInspection.outputFormat}`,
+                      `最大分块：${scriptInspection.maxChunk}`,
+                      `分段间隔：${scriptInspection.chunkDelay}`,
+                      `旧 pro preview：${scriptInspection.hasOldProPreview ? "是" : "否"}`,
+                      `epub-gen 依赖：${scriptInspection.stillDependsOnEpubGen ? "存在" : "已移除"}`,
+                    ].join("\n")}
+                  />
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    <StatCard label="脚本行数" value={String(scriptInspection.lines)} />
+                    <StatCard label="Key 来源" value={scriptInspection.apiKeySource} />
+                    <StatCard label="输出模式" value={scriptInspection.txtReady ? "TXT 就绪" : scriptInspection.outputFormat} />
+                    <StatCard label="主模型" value={scriptInspection.primaryModel} />
+                    <StatCard label="规划模型" value={scriptInspection.plannerModel} />
+                    <StatCard label="分块大小" value={String(scriptInspection.maxChunk)} hint={`间隔 ${scriptInspection.chunkDelay}ms`} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className={`rounded-full px-3 py-1 ${scriptInspection.hasOldProPreview ? "bg-rose-400/15 text-rose-200" : "bg-emerald-400/15 text-emerald-200"}`}>
+                      {scriptInspection.hasOldProPreview ? "检测到旧 gemini-3-pro-preview" : "未检测到旧 pro preview"}
+                    </span>
+                    <span className={`rounded-full px-3 py-1 ${scriptInspection.txtReady ? "bg-emerald-400/15 text-emerald-200" : "bg-amber-400/15 text-amber-200"}`}>
+                      {scriptInspection.txtReady ? "TXT 输出已配置" : "请检查 TXT 输出配置"}
+                    </span>
+                    <span className={`rounded-full px-3 py-1 ${scriptInspection.stillDependsOnEpubGen ? "bg-amber-400/15 text-amber-200" : "bg-emerald-400/15 text-emerald-200"}`}>
+                      {scriptInspection.stillDependsOnEpubGen ? "仍包含 epub-gen 依赖" : "已移除最终 EPUB 依赖"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={loadDefaultScriptTemplate}
+                    title="载入默认的 Ubuntu / TXT 调试版脚本模板。"
+                    className="rounded-2xl bg-violet-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-violet-300"
+                  >
+                    载入默认 TXT 调试版脚本
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scriptFileInputRef.current?.click()}
+                    title="导入本地 JS / CJS / MJS 脚本到右侧编辑器。"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                  >
+                    导入本地 JS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={syncCurrentConfigToScript}
+                    title="把当前页面里的模型、分段大小、Temperature、分段间隔和系统提示词同步写回右侧 JS 脚本。"
+                    className="rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-4 py-3 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20"
+                  >
+                    同步配置到 JS 脚本
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadText(`ubuntu-gemini-translator-${Date.now()}.js`, scriptContent, "text/javascript;charset=utf-8")}
+                    title="下载右侧当前脚本内容。若刚改过页面参数，建议先点“同步配置到 JS 脚本”。"
+                    className="rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
+                  >
+                    下载当前 JS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveCurrentLayout}
+                    title="保存当前页面所有可拉伸框的尺寸布局为最后一次记录。下次打开页面会自动恢复这些框体大小。"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-100 transition hover:border-cyan-400/40 hover:bg-cyan-400/10"
+                  >
+                    保存布局
+                  </button>
+                </div>
+
+                <input ref={scriptFileInputRef} type="file" accept=".js,.cjs,.mjs,text/javascript" className="hidden" onChange={handleImportScript} />
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <BoxHeader
+                    title="Ubuntu Node / Gemini 脚本编辑器"
+                    subtitle="默认提供 TXT 调试版模板，可继续改模型、分块策略、输出目录与日志逻辑。"
+                    copyTextValue={scriptContent}
+                  />
+                  <textarea
+                    data-layout-id="script-editor"
+                    style={getSavedLayoutStyle("script-editor")}
+                    value={scriptContent}
+                    onChange={(event) => setScriptContent(event.target.value)}
+                    title="这里是要在 Ubuntu 系统中运行的完整 JS 脚本。可以直接调整模型、TXT 输出、延时、分块策略和日志逻辑。"
+                    className="min-h-[520px] w-full resize rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 font-mono text-[13px] leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-400/50"
+                    placeholder="在这里编辑完整 JS 脚本。"
+                  />
+                </div>
+              </div>
+            </div>
+          </Panel>
+        </div>
+
+        <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-4 text-sm text-slate-400">
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <span>当前 Key：{apiKeys.length} 个</span>
+            <span>当前模型：{modelValue || "未设置"}</span>
+            <span>分段数：{segmentedDraft.length}</span>
+            <span>当前纯净文本 {preparedSourceText.length} 字符</span>
+            <span>脚本行数：{scriptInspection.lines}</span>
+            <span>脚本输出：{scriptInspection.txtReady ? "TXT 就绪" : scriptInspection.outputFormat}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+===== src/index.css =====
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #020617;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.45);
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: white;
+}
+
+
+===== src/utils 中包含的文件 =====
+src/utils/cn.ts
+
+===== src/utils/cn.ts =====
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+
+===== src/defaults 中已包含的功能相关文件 =====
+src/defaults/gemini-v49.7-txt.js
+
+===== src/defaults/gemini-v49.7-txt.js =====
+/**
+ * 📚 Gemini 翻译机 V49.13 (EPUB 精修双输出版)
+ *
+ * 主要调整:
+ * 1. 默认主模型保持 gemini-3-flash-preview，默认 Temperature 保持 0。
+ * 2. TXT 输入继续按纯净原文边界规则清洗；EPUB 输入继续走旧的章节清洗流程。
+ * 3. 分块逻辑继续严格整句分段，不再把一句话切到两个分块里。
+ * 4. TXT 边界清洗新增 End of... 行匹配；尾部优先识别 THE END / THE END.、END / END.、Transcriber’s Notes、End of...
+ * 5. EPUB 输入完成翻译后，会先生成 EPUB，再由该 EPUB 回读生成 TXT，最终同时产出 EPUB 与 TXT 两个文件。
+ */
+
+// ==========================================
+// 📝 [配置] 版本与更新日志
+// ==========================================
+const VERSION = 'V49.13 (EPUB 精修双输出版)';
+const UPDATE_LOG = `
+1. [Boundary]: 纯净原文新增前 10% / 后 10% 的行级边界清洗；优先识别 CONTENTS、INTRODUCTION / PREFACE / PROLOGUE、THE END / THE END. / END / END. / Transcriber’s Notes / End of...
+2. [Pure TXT]: 保留前 5000 字符内第一个 Illustration 之前的内容清理逻辑。
+3. [EPUB Dual Output]: EPUB 输入完成翻译后，会先生成 EPUB，再由生成后的 EPUB 回读导出 TXT，保留 EPUB 与 TXT 两个最终文件。
+4. [Self-Check]: 新增长度比 + 文件大小双重自检，自动拦截疑似坏块并轮换 Key 重试。
+5. [Defaults]: 默认 Temperature 保持 0，分段间隔保持 650ms。
+`;
+
+const fs = require('fs-extra');
+const path = require('path');
+const { exec } = require('child_process');
+const EPubModule = require('epub');
+const EPub = EPubModule?.default || EPubModule?.EPub || EPubModule;
+const EpubGen = require('epub-gen');
+
+// ==========================================
+// ✅ 配置区
+// ==========================================
+function loadApiKeysFromFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+
+  const raw = fs.readFileSync(filePath, 'utf-8').replace(/^\uFEFF/, '');
+  const keys = [];
+
+  for (const line of raw.split(/\r?\n/)) {
+    const cleaned = line.replace(/["'`,;\[\]\(\)]/g, ' ').trim();
+    const matches = cleaned.match(/AIza[0-9A-Za-z\-_]{20,}/g);
+    if (matches) keys.push(...matches);
+  }
+
+  return [...new Set(keys)];
+}
+
+const API_KEYS = loadApiKeysFromFile(path.join(__dirname, 'api0.txt'));
+if (API_KEYS.length === 0) {
+  throw new Error('api0.txt 未读取到任何有效 API Key。');
+}
+
+const PRIMARY_MODEL_NAME = 'gemini-3-flash-preview';
+const FALLBACK_MODEL_NAME = 'gemini-3-flash-preview';
+const PLANNER_MODEL_NAME = 'gemini-2.5-flash';
+
+const AUTO_SHUTDOWN = false;
+const OUTPUT_FORMAT = 'txt';
+const ENABLE_LARGE_BLOCK_FILTER = true;
+const MAX_CHUNK_SIZE = 28000;
+const CHUNK_DELAY_MS = 650;
+// ==========================================
+
+let currentKeyIndex = 0;
+function getKey() {
+  return API_KEYS[currentKeyIndex];
+}
+function rotateKeyProactively() {
+  currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+  console.log(`      🔑 [Key 切换] Key ${currentKeyIndex + 1}`);
+}
+
+const HarmCategory = {
+  HARM_CATEGORY_HARASSMENT: 'HARM_CATEGORY_HARASSMENT',
+  HARM_CATEGORY_HATE_SPEECH: 'HARM_CATEGORY_HATE_SPEECH',
+  HARM_CATEGORY_SEXUALLY_EXPLICIT: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+  HARM_CATEGORY_DANGEROUS_CONTENT: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+};
+
+const HarmBlockThreshold = {
+  BLOCK_NONE: 'BLOCK_NONE',
+};
+
+function buildSafetySettings() {
+  return [
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  ];
+}
+
+function buildGenerationConfig(modelType = 'PRIMARY', extra = {}) {
+  return {
+    temperature: modelType === 'PLANNER' ? 0 : 0,
+    ...extra,
+  };
+}
+
+function normalizePart(part) {
+  if (typeof part === 'string') return { text: part };
+  if (part && typeof part.text === 'string') return { text: part.text };
+  return { text: '' };
+}
+
+function normalizeContent(content) {
+  if (!content) return null;
+  if (typeof content === 'string') {
+    return { role: 'user', parts: [{ text: content }] };
+  }
+  const role = content.role || 'user';
+  const parts = Array.isArray(content.parts)
+    ? content.parts.map(normalizePart)
+    : [{ text: typeof content.text === 'string' ? content.text : '' }];
+  return { role, parts };
+}
+
+function extractResponseText(rawResponse) {
+  if (!rawResponse) return '';
+
+  if (typeof rawResponse.text === 'function') {
+    return rawResponse.text() || '';
+  }
+  if (typeof rawResponse.text === 'string') {
+    return rawResponse.text;
+  }
+
+  if (Array.isArray(rawResponse.candidates)) {
+    return rawResponse.candidates
+      .map((candidate) => {
+        const parts = candidate?.content?.parts || [];
+        return parts.map((part) => (typeof part?.text === 'string' ? part.text : '')).join('');
+      })
+      .join('\n')
+      .trim();
+  }
+
+  return '';
+}
+
+function wrapLegacyLikeResult(rawResponse) {
+  return {
+    response: {
+      text: () => extractResponseText(rawResponse),
+    },
+  };
+}
+
+async function callGeminiGenerateContent(modelName, contents, options = {}) {
+  const key = getKey();
+  const {
+    modelType = 'PRIMARY',
+    generationConfig = {},
+    systemInstruction = null,
+  } = options;
+
+  const body = {
+    contents: contents.map(normalizeContent).filter(Boolean),
+    generationConfig: buildGenerationConfig(modelType, generationConfig),
+    safetySettings: buildSafetySettings(),
+  };
+
+  if (systemInstruction) {
+    body.systemInstruction = {
+      parts: [{ text: systemInstruction }],
+    };
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(key)}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': key,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const rawText = await response.text();
+  let json;
+  try {
+    json = rawText ? JSON.parse(rawText) : {};
+  } catch (e) {
+    json = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(json ? JSON.stringify(json) : rawText || `HTTP ${response.status}`);
+  }
+
+  return json || {};
+}
+
+function getModel(modelType = 'PRIMARY') {
+  let modelName;
+  if (modelType === 'PLANNER') modelName = PLANNER_MODEL_NAME;
+  else if (modelType === 'FALLBACK') modelName = FALLBACK_MODEL_NAME;
+  else modelName = PRIMARY_MODEL_NAME;
+
+  return {
+    async generateContent(prompt) {
+      const rawResponse = await callGeminiGenerateContent(
+        modelName,
+        [{ role: 'user', parts: [{ text: prompt }] }],
+        { modelType }
+      );
+      return wrapLegacyLikeResult(rawResponse);
+    },
+
+    startChat({ history = [] } = {}) {
+      const localHistory = history.map(normalizeContent).filter(Boolean);
+      return {
+        async sendMessage(text) {
+          const userTurn = { role: 'user', parts: [{ text }] };
+          const rawResponse = await callGeminiGenerateContent(
+            modelName,
+            [...localHistory, userTurn],
+            { modelType }
+          );
+          const modelText = extractResponseText(rawResponse);
+          localHistory.push(userTurn);
+          localHistory.push({ role: 'model', parts: [{ text: modelText }] });
+          return wrapLegacyLikeResult(rawResponse);
+        },
+      };
+    },
+  };
+}
+
+const BASE_SYSTEM_INSTRUCTION = `你是一位拥有二十年经验的资深中文文学翻译家，曾为国内一线出版社（如人民文学出版社、译林出版社、上海译文出版社）翻译过多部畅销外文小说。你的翻译作品以"信、达、雅"著称，深受中国读者喜爱。
+
+## 你的翻译原则
+
+### 忠实与自然
+- 准确传达原文的语义、语气、情感和节奏，不遗漏、不增添原文没有的信息
+- 翻译必须读起来像一位中国作家直接用中文写的小说，而非翻译腔
+- 避免欧化长句，将英文的复杂从句拆分为符合中文阅读习惯的短句
+- 人物对话要符合角色身份、年龄、性格，口语化且鲜活
+
+### 词汇与表达
+- 优先使用当代中国读者熟悉的日常用语，避免生僻词和过度文雅的书面语
+- 严禁堆砌四字成语（如"跌宕起伏""引人入胜""毋庸置疑"），偶尔自然使用即可
+- 禁止使用以下AI高频词汇和句式：
+  · "值得注意的是""不可否认""毫无疑问""事实上""总而言之""综上所述"
+  · "令人叹为观止""恰如其分""应运而生""如火如荼""与此同时"
+  · "不仅……而且……""无论……都……"等过度工整的关联词组合
+  · "这不禁让人……""这无疑是……"等评论式插入语
+  · "“此外”、“然而”、“值得注意的是”、“不可否认”等生硬的书面语
+  ·“以此以此”、“等等等等”、“非常非常”、“某种”等明显啰嗦重复的词语
+- 形容词和副词要克制，不过度渲染情绪
+- 比喻和修辞保留原文的意象，必要时转化为中国读者能理解的等效表达
+
+### 句式与结构
+- 句子长度参差错落，长短句自然交替，营造阅读节奏
+- 段落之间过渡自然，不使用"首先""其次""最后"等机械连接词
+- 保持原文的段落划分，不自行合并或拆分段落
+- 叙述视角、时态与原文保持一致
+- 多余的空格要去掉。润色时也要避免不要出现多余的空格。
+
+### 对话处理
+- 对话使用中文双引号""
+- 根据角色特点赋予不同的说话风格和用词习惯
+- 语气词（"嗯""啊""呢""吧""嘛"）适当使用，不过度
+
+### 专有名词
+- 人名：首次出现时注入术语表，翻译中文译名，强制统一译法
+- 地名：有通行译名的用通行译名，注入术语表，强制统一译法
+- 品牌、书名、歌曲名等：有官方中文名的用官方名
+
+### 格式要求
+- 仅输出译文，不输出任何解释、注释、译者按语或元评论
+- 不要在译文前后添加任何说明性文字
+
+### 内容清洗]
+- 删除所有 Project Gutenberg 版权声明、archive.org 版权声明、standardebooks.org 版权声明，以及其他网站来源的版权信息与法律免责条款。
+- 删除目录、网址、页码。`;
+
+function parseEpubStructure(filePath) {
+  return new Promise((resolve, reject) => {
+    const epub = new EPub(filePath);
+    epub.on('end', async () => {
+      const chapters = [];
+      const bookTitle = epub.metadata.title || 'Unknown';
+      const bookAuthor = epub.metadata.creator || 'Unknown';
+      for (const chapterRef of epub.flow) {
+        await new Promise((r) => {
+          epub.getChapter(chapterRef.id, (err, text) => {
+            if (text) {
+              let clean = text
+                .replace(/<style([\s\S]*?)<\/style>/gi, '')
+                .replace(/<script([\s\S]*?)<\/script>/gi, '')
+                .replace(/<\/p>/gi, '\n\n')
+                .replace(/<\/div>/gi, '\n\n')
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&');
+              clean = clean.replace(/\n\s*\n/g, '\n\n').trim();
+              if (clean.length > 0) chapters.push({ id: chapterRef.id, title: chapterRef.title || chapterRef.id, content: clean });
+            }
+            r();
+          });
+        });
+      }
+      resolve({ chapters, title: bookTitle, author: bookAuthor });
+    });
+    epub.on('error', (err) => reject(err));
+    epub.parse();
+  });
+}
+
+function saveSourceChunks(outputDir, chunks) {
+  const chunkDir = path.join(outputDir, 'source_chunks');
+  if (!fs.existsSync(chunkDir)) fs.ensureDirSync(chunkDir);
+  fs.emptyDirSync(chunkDir);
+  const fingerprint = [];
+  console.log(`   🔒 [Chunk Lock] 正在固化 ${chunks.length} 个分块到 ${chunkDir}...`);
+  chunks.forEach((content, idx) => {
+    const fileName = `chunk_${String(idx + 1).padStart(3, '0')}.txt`;
+    const filePath = path.join(chunkDir, fileName);
+    fs.writeFileSync(filePath, content);
+    fingerprint.push(`${fileName} (${content.length} chars)`);
+  });
+  return fingerprint.join(',');
+}
+
+function loadSourceChunks(outputDir) {
+  const chunkDir = path.join(outputDir, 'source_chunks');
+  if (!fs.existsSync(chunkDir)) return null;
+  const files = fs.readdirSync(chunkDir).filter((f) => f.startsWith('chunk_') && f.endsWith('.txt')).sort();
+  if (files.length === 0) return null;
+  console.log(`   🔓 [Chunk Lock] 检测到已固化分块，直接读取 (共 ${files.length} 个)...`);
+  const chunks = [];
+  files.forEach((f) => {
+    const content = fs.readFileSync(path.join(chunkDir, f), 'utf-8');
+    chunks.push(content);
+  });
+  return chunks;
+}
+
+function generateBookSeed(title) {
+  if (!title) return 12345;
+  const cleanStr = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 50);
+  let hash = 0;
+  for (let i = 0; i < cleanStr.length; i++) hash = cleanStr.charCodeAt(i) + ((hash << 5) - hash);
+  return Math.abs(hash);
+}
+
+async function tryRetrieveDoubanInfo(title, author) {
+  console.log('      🔍 [Tier 1] 正在请求 Gemini 2.5 Flash 检索豆瓣读书 (Douban)...');
+  const model = getModel('PLANNER');
+  const prompt = `
+  Role: Professional Librarian / Douban Editor.
+  Task: Search your internal knowledge base for the book "${title}" by "${author}".
+  Target: Extract standard metadata from "Douban Books" (豆瓣读书).
+  Output JSON ONLY:
+  {
+      "isKnownBook": true,
+      "cnBookName": "Standard Chinese Title",
+      "cnAuthor": "Standard Chinese Author Name",
+      "synopsis": "A detailed summary of the plot (in Chinese, approx 300 words).",
+      "glossary": "List of main characters and key terms (Format: EnglishName=中文名)"
+  }
+  If not found or unsure, return { "isKnownBook": false }.
+  `;
+  try {
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text().trim().replace(/^```json|```$/gi, ''));
+  } catch (e) {
+    return null;
+  }
+}
+
+async function tryRetrieveBaiduInfo(title, author) {
+  console.log('      🔍 [Tier 2] 豆瓣未命中，尝试检索百度百科 (Baidu Baike)...');
+  const model = getModel('PLANNER');
+  const prompt = `
+  Role: Baidu Baike Editor.
+  Task: Search your knowledge base for "${title}" by "${author}".
+  Target: Extract metadata from "Baidu Baike", focusing on character lists and plot.
+  Output JSON ONLY (Same format as above):
+  { "isKnownBook": true, "cnBookName": "...", "cnAuthor": "...", "synopsis": "...", "glossary": "..." }
+  If not found, return { "isKnownBook": false }.
+  `;
+  try {
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text().trim().replace(/^```json|```$/gi, ''));
+  } catch (e) {
+    return null;
+  }
+}
+
+async function analyzeUnknownBookMetadata(title, author, sampleText) {
+  console.log('      🔍 [Tier 3] 启动 AI 虚拟主编 (Virtual Editor) 进行现场分析...');
+  const seed = generateBookSeed(title);
+  console.log(`          ↳ 🔐 指纹锁定 Seed: ${seed}`);
+
+  const prompt = `
+  Role: Senior Literature Editor.
+  Task: Analyze the provided book sample to generate standard metadata.
+  Book: "${title}" by "${author}".
+  Sample Text: """${sampleText.slice(0, 2000)}..."""
+
+  Requirements:
+  1. Translate Title to standard Simplified Chinese. (Must be consistent).
+  2. Translate Author name.
+  3. Write a brief Synopsis based on the sample.
+  4. Extract/Generate a Glossary of Characters found in sample (Format: Name=Translation).
+
+  Output JSON ONLY: { "cnBookName": "...", "cnAuthor": "...", "synopsis": "...", "glossary": "..." }
+  `;
+  try {
+    const result = await callGeminiGenerateContent(
+      PRIMARY_MODEL_NAME,
+      [{ role: 'user', parts: [{ text: prompt }] }],
+      { modelType: 'PRIMARY', generationConfig: { temperature: 0, seed } }
+    );
+    return JSON.parse(extractResponseText(result).trim().replace(/^```json|```$/gi, ''));
+  } catch (e) {
+    return {
+      cnBookName: title,
+      cnAuthor: author,
+      synopsis: '暂无简介 (分析失败)',
+      glossary: '无',
+    };
+  }
+}
+
+async function analyzeBookIdentity(title, author, sampleText) {
+  console.log('   🕵️ [Identity] 正在建立书籍档案 (三级锚定)...');
+  const doubanInfo = await tryRetrieveDoubanInfo(title, author);
+  if (doubanInfo && doubanInfo.isKnownBook) return { ...doubanInfo, source: '🟢 豆瓣读书 (Douban) [Tier 1]' };
+
+  const baiduInfo = await tryRetrieveBaiduInfo(title, author);
+  if (baiduInfo && baiduInfo.isKnownBook) return { ...baiduInfo, source: '🔵 百度百科 (Baidu) [Tier 2]' };
+
+  const aiInfo = await analyzeUnknownBookMetadata(title, author, sampleText);
+  return { ...aiInfo, isKnownBook: false, source: '🟡 AI 虚拟主编 (Generative) [Tier 3]' };
+}
+
+function getReasonCN(reasonCode, isJunk) {
+  if (!isJunk) return '正文内容';
+  const lower = (reasonCode || '').toLowerCase();
+  if (lower.includes('copyright')) return '版权/许可声明';
+  if (lower.includes('toc')) return '目录列表';
+  return '非正文结构 (AI判定)';
+}
+
+async function aiStructureFilter(chapters) {
+  console.log('   ⚖️ [AI Clean] 宏观结构审判 (前5后5)...');
+  const model = getModel('PLANNER');
+  const total = chapters.length;
+  const candidates = [];
+  const checkRange = 5;
+  for (let i = 0; i < total; i++) {
+    if (i < checkRange || i >= total - checkRange) candidates.push({ index: i, title: chapters[i].title });
+  }
+  if (candidates.length === 0) return chapters;
+  const prompt = `Identify "Non-Content" (Junk) to REMOVE. Data: ${JSON.stringify(candidates)}. Return JSON Array of Objects: [{ "index": 0, "reason": "Copyright" }, ...]`;
+  const removeMap = new Map();
+  try {
+    const result = await model.generateContent(prompt);
+    const json = JSON.parse(result.response.text().trim().replace(/^```json|```$/g, ''));
+    if (Array.isArray(json)) json.forEach((item) => removeMap.set(item.index, item.reason));
+  } catch (e) {}
+  console.log('      --------------------------------------------------');
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    const isJunk = removeMap.has(c.index);
+    const reason = getReasonCN(removeMap.get(c.index), isJunk);
+    const preview = (chapters[c.index].content || '').slice(0, 30).replace(/[\r\n]/g, '↵');
+    console.log(`      [审判 ${i + 1}/${candidates.length}] ${isJunk ? '🔴' : '🟢'} ${isJunk ? '剔除' : '保留'}: ${c.title}`);
+    console.log(`          ↳ 预览: "${preview}..."`);
+    console.log(`          ↳ 理由: ${reason}`);
+  }
+  console.log('      --------------------------------------------------');
+  return chapters.filter((_, i) => !removeMap.has(i));
+}
+
+async function aiContentFilter(chapters) {
+  console.log('   ⚖️ [AI Clean] 微观内容审判 (抽样检查)...');
+  const model = getModel('PLANNER');
+  const checkIndices = new Set([0, 1, 2, chapters.length - 1, chapters.length - 2]);
+  const finalChapters = [];
+  let processedCount = 0;
+  const totalCheck = checkIndices.size;
+  console.log('      --------------------------------------------------');
+  for (let i = 0; i < chapters.length; i++) {
+    if (checkIndices.has(i)) {
+      processedCount++;
+      const contentPreview = chapters[i].content.slice(0, 800);
+      const prompt = `Is this chapter "Non-Content" (Junk)? Title: "${chapters[i].title}". Text: """${contentPreview}""". Return JSON: {"isJunk": true, "reason": "Copyright info"} or {"isJunk": false}`;
+      let isJunk = false;
+      let reasonRaw = '';
+      try {
+        const res = await model.generateContent(prompt);
+        const json = JSON.parse(res.response.text().trim().replace(/^```json|```$/g, ''));
+        isJunk = json.isJunk;
+        reasonRaw = json.reason;
+      } catch (e) {}
+      const icon = isJunk ? '🔴' : '🟢';
+      const action = isJunk ? '剔除' : '保留';
+      const reason = getReasonCN(reasonRaw, isJunk);
+      const preview = (chapters[i].content || '').slice(0, 30).replace(/[\r\n]/g, '↵');
+      console.log(`      [审判 ${processedCount}/${totalCheck}] ${icon} ${action}: ${chapters[i].title}`);
+      console.log(`          ↳ 预览: "${preview}..."`);
+      console.log(`          ↳ 理由: ${reason}`);
+      if (!isJunk) finalChapters.push(chapters[i]);
+    } else {
+      finalChapters.push(chapters[i]);
+    }
+  }
+  console.log('      --------------------------------------------------');
+  return finalChapters;
+}
+
+async function fixLongTitlesWithAI(chapters) {
+  const model = getModel('PLANNER');
+  for (let i = 0; i < chapters.length; i++) {
+    const title = chapters[i].title || '';
+    if (title.length > 50) {
+      const prompt = `Analyze this LONG title string: """${title}""". Is it actually Content? Return JSON: {"isContent": true/false}`;
+      try {
+        const result = await model.generateContent(prompt);
+        const judgment = JSON.parse(result.response.text().trim().replace(/^```json|```$/g, ''));
+        if (judgment.isContent) {
+          chapters[i].content = `${title}\n\n${chapters[i].content}`;
+          chapters[i].title = `Chapter ${i + 1}`;
+        } else {
+          chapters[i].title = title.substring(0, 50) + '...';
+        }
+      } catch (e) {
+        chapters[i].title = title.substring(0, 50) + '...';
+      }
+    }
+  }
+  return chapters;
+}
+
+const TXT_BOUNDARY_AUDIT_CHARS = 3000;
+const TXT_BOUNDARY_JUNK_PATTERNS = [
+  /project\s+gutenberg/i,
+  /gutenberg\.org/i,
+  /archive\.org/i,
+  /standardebooks\.org/i,
+  /\bstandard ebooks\b/i,
+  /all rights reserved/i,
+  /copyright/i,
+  /public domain/i,
+  /license/i,
+  /licen[cs]e/i,
+  /legal/i,
+  /disclaimer/i,
+  /terms of use/i,
+  /transcriber'?s note/i,
+  /produced by/i,
+  /distributed proofreading/i,
+  /proofread by/i,
+  /digitized by/i,
+  /scanned by/i,
+  /uploaded by/i,
+  /funded by/i,
+  /ebook/i,
+  /release date/i,
+  /most recently updated/i,
+  /character set encoding/i,
+  /original publication/i,
+  /credits?:/i,
+  /https?:\/\//i,
+  /www\./i,
+  /creative commons/i,
+  /generated at:/i,
+  /bibliographic record/i,
+  /internet archive/i,
+];
+
+function paragraphLooksLikeBoundaryJunk(paragraph) {
+  const normalized = (paragraph || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+
+  const hitCount = TXT_BOUNDARY_JUNK_PATTERNS.reduce((count, pattern) => count + (pattern.test(normalized) ? 1 : 0), 0);
+  if (hitCount >= 2) return true;
+  if (hitCount >= 1 && normalized.length <= 420) return true;
+  if (/^\[?pg\s*\d+\]?$/i.test(normalized)) return true;
+  if (/^(contents?|table of contents)$/i.test(normalized)) return true;
+  if (/^(chapter|section)\s+[ivxlcdm\d]+$/i.test(normalized) && normalized.length < 40) return false;
+  return false;
+}
+
+function trimTxtBoundaryJunk(rawText) {
+  const normalizedText = (rawText || '').replace(/\r\n/g, '\n');
+  const paragraphs = normalizedText.split(/\n\s*\n/);
+  const removedFront = [];
+  const removedBack = [];
+
+  let checkedFrontChars = 0;
+  while (paragraphs.length) {
+    const candidate = paragraphs[0];
+    const nextChecked = checkedFrontChars + candidate.length;
+    if (checkedFrontChars >= TXT_BOUNDARY_AUDIT_CHARS || !paragraphLooksLikeBoundaryJunk(candidate)) break;
+    removedFront.push(paragraphs.shift());
+    checkedFrontChars = nextChecked;
+  }
+
+  let checkedBackChars = 0;
+  while (paragraphs.length) {
+    const candidate = paragraphs[paragraphs.length - 1];
+    const nextChecked = checkedBackChars + candidate.length;
+    if (checkedBackChars >= TXT_BOUNDARY_AUDIT_CHARS || !paragraphLooksLikeBoundaryJunk(candidate)) break;
+    removedBack.unshift(paragraphs.pop());
+    checkedBackChars = nextChecked;
+  }
+
+  return {
+    text: paragraphs.join('\n\n').trim(),
+    removedFront,
+    removedBack,
+    frontSample: normalizedText.slice(0, TXT_BOUNDARY_AUDIT_CHARS),
+    backSample: normalizedText.slice(-TXT_BOUNDARY_AUDIT_CHARS),
+  };
+}
+
+function auditTxtBoundaries(rawText) {
+  console.log(`   ⚖️ [TXT Clean] 边界审判 (前 ${TXT_BOUNDARY_AUDIT_CHARS} 字符 / 后 ${TXT_BOUNDARY_AUDIT_CHARS} 字符)...`);
+  const result = trimTxtBoundaryJunk(rawText);
+  const frontFlag = result.removedFront.length ? '🔴 清理' : '🟢 保留';
+  const backFlag = result.removedBack.length ? '🔴 清理' : '🟢 保留';
+  const frontPreview = result.frontSample.slice(0, 80).replace(/[\r\n]+/g, ' ↵ ');
+  const backPreview = result.backSample.slice(0, 80).replace(/[\r\n]+/g, ' ↵ ');
+
+  console.log(`      [前段审判] ${frontFlag} | 移除段落: ${result.removedFront.length}`);
+  console.log(`          ↳ 预览: "${frontPreview}..."`);
+  console.log(`      [后段审判] ${backFlag} | 移除段落: ${result.removedBack.length}`);
+  console.log(`          ↳ 预览: "${backPreview}..."`);
+
+  return result.text;
+}
+
+function shouldDropJunkLine(line) {
+  const normalized = (line || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+  if (/^\[?pg\s*\d+\]?$/i.test(normalized)) return true;
+  if (/^(contents?|table of contents)$/i.test(normalized)) return true;
+  if ((/https?:\/\//i.test(normalized) || /www\./i.test(normalized)) && normalized.length <= 260) return true;
+  return TXT_BOUNDARY_JUNK_PATTERNS.some((pattern) => pattern.test(normalized)) && normalized.length <= 420;
+}
+
+function findStandaloneLineMatch(sample, patterns) {
+  for (const pattern of patterns) {
+    const match = pattern.exec(sample);
+    if (match && match.index !== undefined) return match;
+  }
+  return null;
+}
+
+function applyLineBoundaryTrim(text) {
+  let normalized = (text || '').replace(/\r\n/g, '\n');
+  const totalLength = normalized.length;
+  if (!totalLength) return normalized;
+
+  const scopeLength = Math.max(1, Math.floor(totalLength * 0.1));
+  const frontSample = normalized.slice(0, scopeLength);
+
+  const frontPrimary = findStandaloneLineMatch(frontSample, [/^[\t \u3000]*CONTENTS[\t \u3000]*$/im]);
+  const frontFallback = findStandaloneLineMatch(frontSample, [
+    /^[\t \u3000]*INTRODUCTION[\t \u3000]*$/im,
+    /^[\t \u3000]*PREFACE[\t \u3000]*$/im,
+    /^[\t \u3000]*PROLOGUE[\t \u3000]*$/im,
+  ]);
+  const frontMarker = frontPrimary || frontFallback;
+  if (frontMarker && frontMarker.index !== undefined) {
+    normalized = frontSample.slice(frontMarker.index) + normalized.slice(scopeLength);
+  }
+
+  const refreshedScopeLength = Math.max(1, Math.floor(normalized.length * 0.1));
+  const refreshedBackSample = normalized.slice(-refreshedScopeLength);
+  const backPrimary = findStandaloneLineMatch(refreshedBackSample, [/^[\t \u3000]*THE END\.?[\t \u3000]*$/im]);
+  const backSecondary = backPrimary ? null : findStandaloneLineMatch(refreshedBackSample, [/^[\t \u3000]*END\.?[\t \u3000]*$/im]);
+  const backFallback = backPrimary || backSecondary
+    ? null
+    : findStandaloneLineMatch(refreshedBackSample, [
+        /^[\t \u3000]*Transcriber[’'`]s Notes[\t \u3000]*$/im,
+        /^[\t \u3000]*E[nN][dD]\s+[oO][fF].*[\t \u3000]*$/m,
+      ]);
+
+  if (backPrimary && backPrimary.index !== undefined) {
+    const absoluteIndex = normalized.length - refreshedBackSample.length + backPrimary.index;
+    normalized = normalized.slice(0, absoluteIndex + backPrimary[0].length).trimEnd();
+  } else if (backSecondary && backSecondary.index !== undefined) {
+    const absoluteIndex = normalized.length - refreshedBackSample.length + backSecondary.index;
+    normalized = normalized.slice(0, absoluteIndex + backSecondary[0].length).trimEnd();
+  } else if (backFallback && backFallback.index !== undefined) {
+    const absoluteIndex = normalized.length - refreshedBackSample.length + backFallback.index;
+    normalized = normalized.slice(0, absoluteIndex).trimEnd();
+  }
+
+  return normalized;
+}
+
+function trimPureSourceBoundaries(text) {
+  let normalized = applyLineBoundaryTrim((text || '').replace(/\r\n/g, '\n'));
+  const frontSample = normalized.slice(0, 5000);
+  const frontIllustration = frontSample.match(/illustration/i);
+  if (frontIllustration && frontIllustration.index !== undefined) {
+    normalized = normalized.slice(frontIllustration.index).trimStart();
+  }
+  return normalized;
+}
+
+function cleanTextCore(text) {
+  let cleaned = (text || '').replace(/\r\n/g, '\n');
+  cleaned = cleaned
+    .replace(/^[\s\S]*?\*\*\*\s*START OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[\s\S]*?\*\*\*\s*/i, '')
+    .replace(/\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG EBOOK[\s\S]*$/i, '')
+    .replace(/^[\s\S]*?START OF THIS STANDARD EBOOK[\s\S]*?\n+/i, '')
+    .replace(/\n+End of (?:the )?Project Gutenberg EBook[\s\S]*$/i, '');
+
+  cleaned = cleaned
+    .split('\n')
+    .filter((line) => !shouldDropJunkLine(line))
+    .join('\n');
+
+  return cleaned.replace(/\n\s*\n/g, '\n\n').trim();
+}
+
+async function savePureSourceTxt(chapters, bookName, author, outputDir, timeStr) {
+  const fileName = `纯净原文_${timeStr}_212.txt`;
+  const filePath = path.join(outputDir, fileName);
+  console.log(`   📘 [Pure TXT] 正在生成清洗后的纯净原文: ${fileName}`);
+  const content = [
+    `书名: ${bookName}`,
+    `作者: ${author}`,
+    '----------------------------------------',
+    ...chapters.map((ch) => `### ${ch.title}\n\n${ch.content}`),
+  ].join('\n\n');
+  try {
+    await fs.writeFile(filePath, content, 'utf-8');
+    console.log('      ✅ 纯净原文 TXT 已存档。');
+    return fileName;
+  } catch (e) {
+    return '生成失败';
+  }
+}
+
+async function translateChapterTitles(chapters) {
+  console.log('   🏷️ [Titles] 正在翻译章节标题 (Zero-Temp Consistency Mode)...');
+  const model = getModel('PRIMARY');
+  const titles = chapters.map((ch) => ch.title);
+  const BATCH_SIZE = 20;
+  for (let i = 0; i < titles.length; i += BATCH_SIZE) {
+    const batch = titles.slice(i, i + BATCH_SIZE);
+    const prompt = `Translate to Simplified Chinese. RULES: 1. Roman/Number/WordNum -> "第X章". 2. "Chapter X: Text" -> "第X章：文本". 3. TOC -> "目录". List:\n${JSON.stringify(batch)}`;
+    try {
+      const res = await model.generateContent(prompt);
+      const batchTrans = JSON.parse(res.response.text().trim().replace(/^```json|```$/g, ''));
+      batchTrans.forEach((t, idx) => {
+        if (chapters[i + idx]) chapters[i + idx].translatedTitle = t;
+      });
+    } catch (e) {}
+  }
+}
+
+function isSentenceEndingChar(char) {
+  return /[。！？!?；;…]/.test(char);
+}
+
+function findSentenceBoundary(text, start) {
+  let index = start;
+  while (index < text.length) {
+    const char = text[index];
+    const nextChar = text[index + 1] || '';
+    const previousChar = text[index - 1] || '';
+
+    if (char === '\n' && nextChar === '\n') {
+      let end = index + 2;
+      while (end < text.length && /[\s\u3000]/.test(text[end])) end += 1;
+      return end;
+    }
+
+    if (char === '.' && previousChar === '.' && nextChar === '.') {
+      let end = index + 2;
+      while (end < text.length && /["'”’）)\]\s]/.test(text[end])) end += 1;
+      while (end < text.length && /[\s\u3000]/.test(text[end])) end += 1;
+      return end;
+    }
+
+    if (char === '.') {
+      const isDecimalPoint = /\d/.test(previousChar) && /\d/.test(nextChar);
+      const nextLooksLikeSentenceBreak = !nextChar || /[\s\u3000\n"'”’）)\]]/.test(nextChar);
+      if (!isDecimalPoint && nextLooksLikeSentenceBreak) {
+        let end = index + 1;
+        while (end < text.length && /["'”’）)\]\s]/.test(text[end])) end += 1;
+        while (end < text.length && /[\s\u3000]/.test(text[end])) end += 1;
+        return end;
+      }
+    }
+
+    if (isSentenceEndingChar(char)) {
+      let end = index + 1;
+      while (end < text.length && /["'”’）)\]】》」』]/.test(text[end])) end += 1;
+      while (end < text.length && /[\s\u3000]/.test(text[end])) end += 1;
+      return end;
+    }
+
+    index += 1;
+  }
+  return text.length;
+}
+
+function collectSentenceUnits(text) {
+  const units = [];
+  let start = 0;
+  while (start < text.length) {
+    const end = findSentenceBoundary(text, start);
+    if (end <= start) break;
+    units.push(text.slice(start, end));
+    start = end;
+  }
+  return units;
+}
+
+async function streamChunkingStrategy(cleanChapters) {
+  console.log(`   🔪 [Chunking] 启动“整句分段” (目标 ${MAX_CHUNK_SIZE}，绝不截断句子)...`);
+  const fullStream = cleanChapters.map((ch) => `\n\n### ${ch.title}\n\n${ch.content}`).join('').trim();
+  const sentences = collectSentenceUnits(fullStream);
+  const chunks = [];
+  let current = '';
+
+  for (const sentence of sentences) {
+    if (!current) {
+      current = sentence;
+      continue;
+    }
+    if (current.length + sentence.length > MAX_CHUNK_SIZE) {
+      chunks.push(current.trim());
+      current = sentence;
+      continue;
+    }
+    current += sentence;
+  }
+
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+function cleanTranslatedText(text) {
+  return (text || '')
+    .replace(/【?\s*全\s*书\s*完\s*】?[\s\S]*/i, '')
+    .replace(/（\s*注\s*：\s*.*）/g, '')
+    .replace(/出版说明/g, '')
+    .trim();
+}
+
+function toChineseNum(num) {
+  const chars = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  if (num <= 9) return chars[num];
+  if (num <= 19) return '十' + (num % 10 === 0 ? '' : chars[num % 10]);
+  return num.toString();
+}
+
+function getBeijingTimeStr() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  const beijingTime = new Date(utc + 3600000 * 8);
+  return beijingTime.getFullYear().toString()
+    + (beijingTime.getMonth() + 1).toString().padStart(2, '0')
+    + beijingTime.getDate().toString().padStart(2, '0')
+    + beijingTime.getHours().toString().padStart(2, '0')
+    + beijingTime.getMinutes().toString().padStart(2, '0')
+    + beijingTime.getSeconds().toString().padStart(2, '0');
+}
+
+async function getOriginalTitle(rawText, chineseBookName) {
+  const match = rawText.match(/^Title:\s*(.+)$/m);
+  return match ? match[1].trim() : `${chineseBookName} (Original)`;
+}
+
+function findExistingTask(originalFileBaseName) {
+  const outputDirRoot = './已翻小说';
+  if (!fs.existsSync(outputDirRoot)) return null;
+  const dirs = fs.readdirSync(outputDirRoot);
+  for (const d of dirs) {
+    const dirPath = path.join(outputDirRoot, d);
+    if (!fs.statSync(dirPath).isDirectory()) continue;
+    const files = fs.readdirSync(dirPath);
+    const infoFile = files.find((f) => f.startsWith(originalFileBaseName) && f.includes('_信息说明_') && f.endsWith('.txt'));
+    if (infoFile) {
+      const content = fs.readFileSync(path.join(dirPath, infoFile), 'utf-8');
+      return { dirPath, infoFile, content, bookName: d };
+    }
+  }
+  return null;
+}
+
+function byteSizeKb(text) {
+  return Buffer.byteLength(text || '', 'utf-8') / 1024;
+}
+
+function evaluateTranslatedBlock(sourceText, translatedText) {
+  const sourceLength = (sourceText || '').length;
+  const output = (translatedText || '').trim();
+  const outputLength = output.length;
+  const ratio = sourceLength > 0 ? (outputLength / sourceLength) * 100 : 100;
+  const sizeKb = byteSizeKb(output);
+
+  if (!output) {
+    throw new Error('Self-Check: Empty Output');
+  }
+  if (/^(i('| a)m sorry|sorry,|i can'?t|i cannot|as an ai|here is the translation)/i.test(output)) {
+    throw new Error('Self-Check: Refusal / Meta Response');
+  }
+  if (outputLength > 30000) {
+    throw new Error('Self-Check: Output Fuse > 30000');
+  }
+  if (sourceLength > 500 && ratio > 110) {
+    throw new Error(`Self-Check: Length Fuse ${ratio.toFixed(1)}% > 110%`);
+  }
+  if (sourceLength >= 22000 && (ratio < 18 || sizeKb < 16)) {
+    throw new Error(`Self-Check: Small File Fuse ${sizeKb.toFixed(2)} KB / ${ratio.toFixed(1)}%`);
+  }
+  if (sourceLength >= 16000 && (ratio < 14 || sizeKb < 10)) {
+    throw new Error(`Self-Check: Small File Fuse ${sizeKb.toFixed(2)} KB / ${ratio.toFixed(1)}%`);
+  }
+  if (sourceLength >= 8000 && outputLength < 800) {
+    throw new Error(`Self-Check: Output Too Short ${outputLength} chars`);
+  }
+
+  return { ratio, sizeKb };
+}
+
+async function translateChunkSmart(text, customInstruction) {
+  let attempt = 0;
+  while (attempt < 3) {
+    try {
+      const model = getModel('PRIMARY');
+      const session = model.startChat({
+        history: [
+          { role: 'user', parts: [{ text: 'System: ' + customInstruction }] },
+          { role: 'model', parts: [{ text: 'OK.' }] },
+        ],
+      });
+      const result = await session.sendMessage(text);
+      const translatedText = result.response.text()
+        .replace(/^(Here is|Okay|Sure|Translation).*?[\r\n]+/gi, '')
+        .replace(/^```markdown|```$/gi, '')
+        .trim();
+
+      const selfCheck = evaluateTranslatedBlock(text, translatedText);
+      console.log(`         ✅ [Self-Check] 🚀 正常 | 长度比: ${selfCheck.ratio.toFixed(1)}% | 文件大小: ${selfCheck.sizeKb.toFixed(2)} KB`);
+      return { text: translatedText, ratio: selfCheck.ratio, sizeKb: selfCheck.sizeKb };
+    } catch (e) {
+      attempt++;
+      console.warn(`         ↳ 原始错误: ${e && e.message ? e.message : String(e)}`);
+      if (attempt === 1) {
+        console.warn('         ⚠️ [Fail 1/3] API/熔断/坏块。暂停 3 分钟...');
+        await new Promise((r) => setTimeout(r, 180000));
+      } else if (attempt === 2) {
+        console.warn('         ⚠️ [Fail 2/3] 依然失败。暂停 30 分钟...');
+        await new Promise((r) => setTimeout(r, 1800000));
+      } else {
+        console.error('         ❌ [Fail 3/3] 彻底失败。停止任务。');
+        process.exit(1);
+      }
+      rotateKeyProactively();
+    }
+  }
+}
+
+function saveStructureManifest(outputDir, bookName, identity, cleanChapters) {
+  const manifestPath = path.join(outputDir, 'structure_manifest.json');
+  const manifest = {
+    bookId: `${bookName}_${new Date().getTime()}`,
+    meta: {
+      originalTitle: identity.cnBookName,
+      cnTitle: identity.cnBookName,
+      author: identity.cnAuthor,
+      source: identity.source,
+    },
+    chapters: cleanChapters.map((ch, idx) => ({
+      index: idx,
+      originalTitle: ch.title,
+      translatedFile: `Chapter_${String(idx + 1).padStart(3, '0')}.md`,
+      preview: ch.content.slice(0, 100),
+    })),
+  };
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  console.log(`   🗺️ [Manifest] 结构蓝图已生成: structure_manifest.json (共 ${manifest.chapters.length} 章)`);
+}
+
+function buildFinalChapters(fullTranslatedText) {
+  const splitRegex = /(?:^|\n)###\s*(.+?)(?:\n|$)/g;
+  const finalChapters = [];
+  let match;
+  let globalChapterCount = 0;
+  while ((match = splitRegex.exec(fullTranslatedText)) !== null) {
+    globalChapterCount++;
+    let finalTitle = `第${toChineseNum(globalChapterCount)}章`;
+    let extractedTitle = match[1].trim().replace(/Chapter\s*\d+/i, '').trim();
+    extractedTitle = extractedTitle.replace(/^第[零一二三四五六七八九十百千]+章[:：]?\s*/, '');
+    if (extractedTitle && extractedTitle.length < 30) finalTitle += `: ${extractedTitle}`;
+    const contentStartIndex = match.index + match[0].length;
+    const nextTitleIndex = fullTranslatedText.slice(contentStartIndex).search(/(?:^|\n)###\s*/);
+    const chapterContent = nextTitleIndex === -1
+      ? fullTranslatedText.slice(contentStartIndex)
+      : fullTranslatedText.slice(contentStartIndex, contentStartIndex + nextTitleIndex);
+    if (chapterContent.trim().length > 0) {
+      finalChapters.push({ title: finalTitle, content: chapterContent.trim() });
+    }
+  }
+
+  if (finalChapters.length === 0) {
+    finalChapters.push({ title: '全本', content: fullTranslatedText.trim() });
+  }
+
+  return finalChapters;
+}
+
+async function generateTranslatedEpub(bookName, author, finalChapters, outputDir, timeStr) {
+  const epubFileName = `${bookName}_全本_${timeStr}_212.epub`;
+  const epubPath = path.join(outputDir, epubFileName);
+  const content = finalChapters.map((chapter) => ({
+    title: chapter.title,
+    data: chapter.content
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => `<p>${line.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')}</p>`)
+      .join(''),
+  }));
+
+  await new EpubGen({ title: bookName, author, tocTitle: '目录', content }, epubPath).promise;
+  console.log(`   🎉 [EPUB] 生成成功: ${epubFileName}`);
+  return { epubFileName, epubPath };
+}
+
+async function exportGeneratedEpubToTxt(epubPath, bookName, outputDir, timeStr) {
+  const epubData = await parseEpubStructure(epubPath);
+  const txtFileName = `${bookName}_全本_${timeStr}_212.txt`;
+  const txtPath = path.join(outputDir, txtFileName);
+  const content = epubData.chapters.length
+    ? epubData.chapters.map((chapter) => `### ${chapter.title}\n\n${chapter.content}`).join('\n\n')
+    : '';
+  await fs.writeFile(txtPath, content, 'utf-8');
+  console.log(`   🎉 [TXT] 由精修 EPUB 回读导出成功: ${txtFileName}`);
+  return txtFileName;
+}
+
+function getChunkSourceLength(outputDir, chapterFileName) {
+  const fileIndex = chapterFileName.match(/Chapter_(\d+)\.md/i)?.[1];
+  if (!fileIndex) return 0;
+  const chunkPath = path.join(outputDir, 'source_chunks', `chunk_${fileIndex}.txt`);
+  if (!fs.existsSync(chunkPath)) return 0;
+  try {
+    return fs.readFileSync(chunkPath, 'utf-8').length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+async function processOneBook(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  const originalFileName = path.basename(filePath);
+  const originalFileBaseName = path.basename(filePath, ext);
+  const taskTimeStr = getBeijingTimeStr();
+
+  console.log(`\n📘 正在解析文件: ${originalFileName}`);
+
+  const existingTask = findExistingTask(originalFileBaseName);
+  let cleanChapters = [];
+  let originalBookTitle = '';
+  let originalAuthor = 'Unknown';
+  let bookName = '';
+  let dynamicSystemInstruction = '';
+  let outputDir = '';
+  let isResumed = false;
+  let sourceArchiveName = '';
+  let sourceFingerprint = '';
+  let identity = null;
+
+  if (existingTask) {
+    console.log(`   ✨ [Resume] 发现历史任务: ${existingTask.bookName}`);
+    outputDir = existingTask.dirPath;
+    bookName = existingTask.bookName;
+    const infoContent = existingTask.content;
+    const glossaryMatch = infoContent.match(/角色\/术语表:\s*\n([\s\S]*?)----/);
+    const glossary = glossaryMatch ? glossaryMatch[1].trim() : '';
+    dynamicSystemInstruction = `${BASE_SYSTEM_INSTRUCTION}\n\n6. [名著术语表 (严格执行)]:\n${glossary}`;
+
+    const pureMatch = infoContent.match(/依据清洗底本TXT:\s*(.*)/);
+    if (pureMatch) sourceArchiveName = pureMatch[1].trim();
+
+    cleanChapters = loadSourceChunks(outputDir);
+    if (cleanChapters) {
+      console.log(`   ✅ [Chunk Match] 成功从 source_chunks 加载 ${cleanChapters.length} 个分块。`);
+      isResumed = true;
+    } else {
+      console.warn('   ⚠️ [Chunk Missing] source_chunks 文件夹丢失，必须重新解析！');
+      isResumed = false;
+    }
+  }
+
+  let chunks = [];
+
+  if (!isResumed) {
+    let initialChapters = [];
+    if (ext === '.epub') {
+      try {
+        const epubData = await parseEpubStructure(filePath);
+        originalBookTitle = epubData.title;
+        originalAuthor = epubData.author;
+        initialChapters = epubData.chapters;
+      } catch (e) {
+        console.error(e);
+        return;
+      }
+    } else {
+      const rawText = await fs.readFile(filePath, 'utf-8');
+      originalBookTitle = await getOriginalTitle(rawText, 'Unknown');
+      const auditedText = auditTxtBoundaries(rawText);
+      const pureSourceText = trimPureSourceBoundaries(auditedText);
+      initialChapters = [{ title: '正文', content: pureSourceText }];
+    }
+
+    const sampleText = initialChapters.slice(0, 3).map((c) => c.content).join(' ').slice(0, 3000);
+    identity = await analyzeBookIdentity(originalBookTitle, originalAuthor, sampleText);
+
+    console.log(`
+   ┌──────────────────────────────────────────
+   │ 🆔 身份锚定报告 (Identity Report)
+   │ ------------------------------------------
+   │ 📘 原名: ${originalBookTitle}
+   │ 🇨🇳 译名: ${identity.cnBookName}
+   │ ✍️ 作者: ${originalAuthor} (CN: ${identity.cnAuthor})
+   │ 🔗 来源: ${identity.source}
+   └──────────────────────────────────────────
+`);
+
+    bookName = identity.cnBookName.replace(/[\\/:*?"<>|]/g, '');
+    dynamicSystemInstruction = `${BASE_SYSTEM_INSTRUCTION}\n\n6. [名著术语表 (严格执行)]:\n${identity.glossary}`;
+    outputDir = path.join('./已翻小说', bookName);
+    await fs.ensureDir(outputDir);
+
+    let validChapters = initialChapters;
+    if (ext === '.epub') {
+      validChapters = await aiStructureFilter(initialChapters);
+      if (validChapters.length > 1) validChapters = await aiContentFilter(validChapters);
+      validChapters = await fixLongTitlesWithAI(validChapters);
+    }
+    cleanChapters = validChapters
+      .map((ch) => ({ title: ch.title, content: cleanTextCore(ch.content) }))
+      .filter((ch) => ch.content.length > 50);
+
+    const expectedPureName = `纯净原文_${taskTimeStr}_212.txt`;
+    if (fs.existsSync(path.join(outputDir, expectedPureName))) {
+      console.log(`   ♻️ [Resource] 检测到已有清洗底本，直接复用: ${expectedPureName}`);
+      sourceArchiveName = expectedPureName;
+    } else {
+      sourceArchiveName = await savePureSourceTxt(cleanChapters, originalBookTitle, originalAuthor, outputDir, taskTimeStr);
+    }
+
+    if (cleanChapters.length > 1) await translateChapterTitles(cleanChapters);
+
+    saveStructureManifest(outputDir, bookName, identity, cleanChapters);
+
+    chunks = await streamChunkingStrategy(cleanChapters);
+    sourceFingerprint = saveSourceChunks(outputDir, chunks);
+
+    const chapterMapStr = cleanChapters.map((ch, idx) => {
+      const transTitle = ch.translatedTitle || ch.title;
+      return `[${idx + 1}] ${ch.title} -> ${transTitle}`;
+    }).join('\n');
+
+    const infoFileName = `${originalFileBaseName}_信息说明_${taskTimeStr}_212.txt`;
+    const infoContent = `【书籍信息报告】
+--------------------------------
+文件名: ${originalFileName}
+原书名: ${originalBookTitle}
+标准译名: ${bookName}
+作者: ${originalAuthor}
+元数据锚定源: ${identity.source}
+--------------------------------
+【名著标准化】
+角色/术语表:
+${identity.glossary}
+--------------------------------
+【版本快照】
+任务时间: ${taskTimeStr}
+依据清洗底本TXT: ${sourceArchiveName}
+输出格式: ${ext === '.epub' ? 'epub+txt' : OUTPUT_FORMAT}
+--------------------------------
+【分块指纹 (Chunk Lock)】
+${sourceFingerprint}
+--------------------------------
+【统计数据】
+分块数量: ${chunks.length}
+--------------------------------
+【清洗后章节映射表 (Visualization)】
+${chapterMapStr}
+`;
+    await fs.writeFile(path.join(outputDir, infoFileName), infoContent);
+  } else {
+    chunks = cleanChapters;
+  }
+
+  let allChunksExist = true;
+  for (let i = 0; i < chunks.length; i++) {
+    const fileIndex = String(i + 1).padStart(3, '0');
+    const standardFile = path.join(outputDir, `Chapter_${fileIndex}.md`);
+    if (!fs.existsSync(standardFile) || fs.statSync(standardFile).size < 100) {
+      allChunksExist = false;
+      break;
+    }
+  }
+
+  if (allChunksExist) {
+    console.log(`   ✨ [Smart Resume] 检测到全部分块 (${chunks.length}/${chunks.length}) 已存在，准备进入最终合并流程...`);
+    const existingTxt212 = fs.readdirSync(outputDir).find((f) => f.includes('_全本_') && f.endsWith('_212.txt'));
+    const existingEpub212 = fs.readdirSync(outputDir).find((f) => f.includes('_全本_') && f.endsWith('_212.epub'));
+    const alreadyDone = ext === '.epub' ? existingTxt212 && existingEpub212 : existingTxt212;
+    if (alreadyDone) {
+      console.log(`   ⚡ [Short Circuit] 检测到最终文件已存在，任务直接归档。`);
+      await fs.move(filePath, path.join('./已翻译（原）', originalFileName), { overwrite: true });
+      return;
+    }
+  } else {
+    for (let i = 0; i < chunks.length; i++) {
+      const fileIndex = String(i + 1).padStart(3, '0');
+      const standardFile = path.join(outputDir, `Chapter_${fileIndex}.md`);
+      if (fs.existsSync(standardFile) && fs.statSync(standardFile).size > 100) {
+        console.log(`   ✅ [Part ${i + 1}] 已存在，跳过。`);
+        continue;
+      }
+      console.log(`      >>> [${bookName}] 翻译中 Part ${i + 1}/${chunks.length}...`);
+      const result = await translateChunkSmart(chunks[i], dynamicSystemInstruction);
+      await fs.writeFile(standardFile, result.text);
+      console.log(`      💾 保存 Chapter_${fileIndex}.md (文件大小: ${result.sizeKb.toFixed(2)} KB)`);
+      rotateKeyProactively();
+      await new Promise((r) => setTimeout(r, CHUNK_DELAY_MS));
+    }
+  }
+
+  console.log(ext === '.epub' ? '   🔄 执行 EPUB + TXT 合并...' : '   🔄 执行 TXT 合并...');
+  const validFiles = fs.readdirSync(outputDir).filter((f) => f.startsWith('Chapter_') && f.endsWith('.md') && !f.includes('_BAD_BLOCK')).sort();
+  let fullTranslatedText = '';
+  for (const f of validFiles) {
+    fullTranslatedText += cleanTranslatedText(await fs.readFile(path.join(outputDir, f), 'utf-8')) + '\n\n';
+  }
+
+  const finalChapters = buildFinalChapters(fullTranslatedText);
+  const timeStr = getBeijingTimeStr();
+
+  if (ext === '.epub') {
+    try {
+      const { epubPath } = await generateTranslatedEpub(bookName, originalAuthor, finalChapters, outputDir, timeStr);
+      await exportGeneratedEpubToTxt(epubPath, bookName, outputDir, timeStr);
+    } catch (e) {
+      console.error(`   ❌ [EPUB Dual Output] 生成失败: ${e && e.message ? e.message : String(e)}`);
+      const fallbackTxt = finalChapters.map((item) => `### ${item.title}\n\n${item.content}`).join('\n\n');
+      const fallbackFileName = `${bookName}_全本_${timeStr}_212.txt`;
+      await fs.writeFile(path.join(outputDir, fallbackFileName), fallbackTxt, 'utf-8');
+      console.log(`   ⚠️ [Fallback TXT] 已输出回退 TXT: ${fallbackFileName}`);
+    }
+  } else {
+    const finalTxt = finalChapters.map((item) => `### ${item.title}\n\n${item.content}`).join('\n\n');
+    const finalFileName = `${bookName}_全本_${timeStr}_212.txt`;
+    await fs.writeFile(path.join(outputDir, finalFileName), finalTxt, 'utf-8');
+    console.log(`   🎉 [TXT] 文本生成成功: ${finalFileName}`);
+  }
+
+  await fs.move(filePath, path.join('./已翻译（原）', originalFileName), { overwrite: true });
+}
+
+async function globalBadBlockSweep(booksDir) {
+  const outputDirRoot = './已翻小说';
+  if (!fs.existsSync(outputDirRoot) || !fs.existsSync(booksDir)) return;
+  const sourceFiles = fs.readdirSync(booksDir).map((f) => path.basename(f, path.extname(f)));
+  console.log('🛡️ [Startup Check] 正在根据 books 列表扫描旧坏块...');
+  let markedCount = 0;
+  const dirs = fs.readdirSync(outputDirRoot);
+  for (const d of dirs) {
+    const dirPath = path.join(outputDirRoot, d);
+    if (!fs.statSync(dirPath).isDirectory()) continue;
+    const files = fs.readdirSync(dirPath);
+    const isTarget = sourceFiles.some((base) => files.some((f) => f.startsWith(base) && f.includes('_信息说明_')));
+    if (!isTarget) continue;
+
+    const mdFiles = files.filter((f) => f.startsWith('Chapter_') && f.endsWith('.md') && !f.includes('_BAD_BLOCK'));
+    for (const f of mdFiles) {
+      const filePath = path.join(dirPath, f);
+      const stats = fs.statSync(filePath);
+      const sourceLength = getChunkSourceLength(dirPath, f);
+      const sizeKb = stats.size / 1024;
+      const tooLarge = ENABLE_LARGE_BLOCK_FILTER && stats.size > 30000;
+      const tooSmallForLargeChunk = sourceLength >= 22000 && sizeKb < 16;
+      const tooSmallForMediumChunk = sourceLength >= 16000 && sizeKb < 10;
+      if (tooLarge || tooSmallForLargeChunk || tooSmallForMediumChunk) {
+        const newName = f.replace('.md', '_BAD_BLOCK.md');
+        const reason = tooLarge ? '过大' : '过小';
+        console.warn(`   🗑️ [Mark Bad Block] 标记旧坏块(${reason}): ${d}/${f} (${sizeKb.toFixed(2)} KB, 源 ${sourceLength} chars) -> ${newName}`);
+        await fs.rename(filePath, path.join(dirPath, newName));
+        markedCount++;
+      }
+    }
+  }
+  if (markedCount > 0) console.log(`   ✅ 标记了 ${markedCount} 个旧坏块，将在本次任务中重翻。`);
+}
+
+async function main() {
+  const booksDir = './books';
+  if (!fs.existsSync(booksDir)) {
+    await fs.ensureDir(booksDir);
+    return;
+  }
+
+  console.log('\n================================');
+  console.log(`🚀 启动 ${VERSION}`);
+  console.log('================================');
+  console.log(`📝 更新日志: ${UPDATE_LOG.trim()}`);
+  console.log('================================\n');
+
+  await globalBadBlockSweep(booksDir);
+  const files = fs.readdirSync(booksDir)
+    .filter((f) => f.toLowerCase().endsWith('.txt') || f.toLowerCase().endsWith('.epub'))
+    .map((f) => ({ name: f, time: fs.statSync(path.join(booksDir, f)).birthtime.getTime() }))
+    .sort((a, b) => a.time - b.time)
+    .map((f) => f.name);
+
+  console.log(`📚 待处理文件: ${files.length} 本`);
+  for (const f of files) {
+    await processOneBook(path.join(booksDir, f));
+  }
+  if (AUTO_SHUTDOWN) exec('sudo poweroff');
+}
+
+main();
+
+
+========== 代码结束 ==========
+共 9 个文件，约 159126 字符
