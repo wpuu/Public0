@@ -1,0 +1,3016 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>run.js</title>
+<style>
+body{margin:0;padding:24px;background:#fff;color:#111;font:14px/1.5 Consolas,Menlo,monospace}
+pre{white-space:pre-wrap;word-break:break-word}
+.ln{color:#888;display:inline-block;min-width:72px}
+</style>
+</head>
+<body>
+<pre>
+
+<span class="ln">00001:</span> &#x27;use strict&#x27;;
+<span class="ln">00002:</span> 
+<span class="ln">00003:</span> const fs = require(&#x27;fs&#x27;);
+<span class="ln">00004:</span> const path = require(&#x27;path&#x27;);
+<span class="ln">00005:</span> const crypto = require(&#x27;crypto&#x27;);
+<span class="ln">00006:</span> 
+<span class="ln">00007:</span> // =========================================
+<span class="ln">00008:</span> // 基础 fetch：Node 18+ 原生有 fetch，没有则自动降级 node-fetch
+<span class="ln">00009:</span> // =========================================
+<span class="ln">00010:</span> const fetchFn =
+<span class="ln">00011:</span>   typeof globalThis.fetch === &#x27;function&#x27;
+<span class="ln">00012:</span>     ? globalThis.fetch.bind(globalThis)
+<span class="ln">00013:</span>     : async (...args) =&gt; {
+<span class="ln">00014:</span>         const mod = await import(&#x27;node-fetch&#x27;);
+<span class="ln">00015:</span>         return mod.default(...args);
+<span class="ln">00016:</span>       };
+<span class="ln">00017:</span> 
+<span class="ln">00018:</span> // =========================================
+<span class="ln">00019:</span> // 版本 / 目录 / 配置
+<span class="ln">00020:</span> // =========================================
+<span class="ln">00021:</span> const VERSION = &#x27;run.js polish-standalone-v2-fixed&#x27;;
+<span class="ln">00022:</span> 
+<span class="ln">00023:</span> const INPUT_DIR = path.join(__dirname, &#x27;润色&#x27;);
+<span class="ln">00024:</span> const ORIGINAL_ARCHIVE_DIR = path.join(__dirname, &#x27;润色（原）&#x27;);
+<span class="ln">00025:</span> const OUTPUT_DIR = path.join(__dirname, &#x27;已润色&#x27;);
+<span class="ln">00026:</span> const API_KEY_FILE = path.join(__dirname, &#x27;api0.txt&#x27;);
+<span class="ln">00027:</span> 
+<span class="ln">00028:</span> const API_USAGE_SEPARATOR = &#x27;============================&#x27;;
+<span class="ln">00029:</span> const QUOTA_RESET_HOUR_BJT = 16;
+<span class="ln">00030:</span> const DEFAULT_MAX_PER_KEY_PER_CYCLE = 25;
+<span class="ln">00031:</span> 
+<span class="ln">00032:</span> const API_BASE_URL =
+<span class="ln">00033:</span>   process.env.GEMINI_BASE_URL ||
+<span class="ln">00034:</span>   &#x27;https://generativelanguage.googleapis.com/v1beta&#x27;;
+<span class="ln">00035:</span> 
+<span class="ln">00036:</span> const PRIMARY_MODEL_NAME =
+<span class="ln">00037:</span>   process.env.GEMINI_PRIMARY_MODEL || &#x27;gemini-3-flash-preview&#x27;;
+<span class="ln">00038:</span> 
+<span class="ln">00039:</span> const FALLBACK_MODEL_NAME =
+<span class="ln">00040:</span>   process.env.GEMINI_FALLBACK_MODEL || &#x27;gemini-3-flash-preview&#x27;;
+<span class="ln">00041:</span> 
+<span class="ln">00042:</span> const MODELS_URL = `${API_BASE_URL.replace(/\/$/, &#x27;&#x27;)}/models`;
+<span class="ln">00043:</span> 
+<span class="ln">00044:</span> const POLISH_ROOT_DIR_NAME = &#x27;_polish&#x27;;
+<span class="ln">00045:</span> const POLISH_ROUND_PREFIX = &#x27;round_&#x27;;
+<span class="ln">00046:</span> 
+<span class="ln">00047:</span> const POLISH_SCAN_HARD_LIMIT = 10000;
+<span class="ln">00048:</span> const POLISH_SCAN_DELAY_MS = 1200;
+<span class="ln">00049:</span> const POLISH_MAX_OUTPUT_TOKENS = 8192;
+<span class="ln">00050:</span> 
+<span class="ln">00051:</span> const POLISH_EXPORT_DEFAULT_SOURCE = &#x27;auto&#x27;;
+<span class="ln">00052:</span> const POLISH_DEFAULT_APPLY_SOURCE = &#x27;effective&#x27;;
+<span class="ln">00053:</span> 
+<span class="ln">00054:</span> const POLISH_SOURCE_MODE_SET = new Set([&#x27;auto&#x27;, &#x27;scan&#x27;, &#x27;imported&#x27;, &#x27;effective&#x27;]);
+<span class="ln">00055:</span> const RETRY_DELAYS = [5000, 15000, 30000, 60000];
+<span class="ln">00056:</span> 
+<span class="ln">00057:</span> const DYNAMIC_OUTPUT_FUSE_BASE = 30000;
+<span class="ln">00058:</span> const DYNAMIC_OUTPUT_FUSE_MAX = 36000;
+<span class="ln">00059:</span> const DYNAMIC_OUTPUT_FUSE_RATIO = 1.08;
+<span class="ln">00060:</span> const DYNAMIC_OUTPUT_FUSE_BONUS = 1200;
+<span class="ln">00061:</span> 
+<span class="ln">00062:</span> const POLISH_IMPORT_NEAR_POSITION_MAX_DISTANCE = 5000;
+<span class="ln">00063:</span> const POLISH_OVERRIDE_POSITION_TOLERANCE = 80;
+<span class="ln">00064:</span> 
+<span class="ln">00065:</span> const POLISH_DELETE_MARKERS = new Set([
+<span class="ln">00066:</span>   &#x27;&#x27;,
+<span class="ln">00067:</span>   &#x27;删除&#x27;,
+<span class="ln">00068:</span>   &#x27;已删除&#x27;,
+<span class="ln">00069:</span>   &#x27;(已删除)&#x27;,
+<span class="ln">00070:</span>   &#x27;[删除]&#x27;,
+<span class="ln">00071:</span>   &#x27;[已删除]&#x27;,
+<span class="ln">00072:</span>   &#x27;&lt;删除&gt;&#x27;,
+<span class="ln">00073:</span>   &#x27;删掉&#x27;,
+<span class="ln">00074:</span>   &#x27;删去&#x27;,
+<span class="ln">00075:</span>   &#x27;delete&#x27;,
+<span class="ln">00076:</span> ]);
+<span class="ln">00077:</span> 
+<span class="ln">00078:</span> const POLISH_SYSTEM_INSTRUCTION = [
+<span class="ln">00079:</span>   &#x27;你是一位拥有二十年经验的资深中文文学翻译家，曾为国内一线出版社（如人民文学出版社、译林出版社、上海译文出版社）翻译过多部畅销外文小说。你的翻译作品以&quot;信、达、雅&quot;著称，深受中国读者喜爱。同时，你也是一位有二十年经验的中文小说责任编辑与文学润色编辑，擅长把“翻译后但略显生硬的中文小说正文”修整得更自然、更像中文原创叙事。&#x27;,
+<span class="ln">00080:</span>   &#x27;&#x27;,
+<span class="ln">00081:</span>   &#x27;## 你的翻译原则&#x27;,
+<span class="ln">00082:</span>   &#x27;&#x27;,
+<span class="ln">00083:</span>   &#x27;### 忠实与自然&#x27;,
+<span class="ln">00084:</span>   &#x27;- 准确传达原文的语义、语气、情感和节奏，不遗漏、不增添原文没有的信息&#x27;,
+<span class="ln">00085:</span>   &#x27;- 翻译必须读起来像一位中国作家直接用中文写的小说，而非翻译腔&#x27;,
+<span class="ln">00086:</span>   &#x27;- 避免欧化长句，将英文的复杂从句拆分为符合中文阅读习惯的短句&#x27;,
+<span class="ln">00087:</span>   &#x27;- 人物对话要符合角色身份、年龄、性格，口语化且鲜活&#x27;,
+<span class="ln">00088:</span>   &#x27;&#x27;,
+<span class="ln">00089:</span>   &#x27;### 词汇与表达&#x27;,
+<span class="ln">00090:</span>   &#x27;- 优先使用当代中国读者熟悉的日常用语，避免生僻词和过度文雅的书面语&#x27;,
+<span class="ln">00091:</span>   &#x27;- 严禁堆砌四字成语（如&quot;跌宕起伏&quot;&quot;引人入胜&quot;&quot;毋庸置疑&quot;），偶尔自然使用即可&#x27;,
+<span class="ln">00092:</span>   &#x27;- 禁止使用以下AI高频词汇和句式：&#x27;,
+<span class="ln">00093:</span>   &#x27;  · &quot;值得注意的是&quot;&quot;不可否认&quot;&quot;毫无疑问&quot;&quot;事实上&quot;&quot;总而言之&quot;&quot;综上所述&quot;&#x27;,
+<span class="ln">00094:</span>   &#x27;  · &quot;令人叹为观止&quot;&quot;恰如其分&quot;&quot;应运而生&quot;&quot;如火如荼&quot;&quot;与此同时&quot;&#x27;,
+<span class="ln">00095:</span>   &#x27;  · &quot;不仅……而且……&quot;&quot;无论……都……&quot;等过度工整的关联词组合&#x27;,
+<span class="ln">00096:</span>   &#x27;  · &quot;这不禁让人……&quot;&quot;这无疑是……&quot;等评论式插入语&#x27;,
+<span class="ln">00097:</span>   &#x27;  · &quot;此外&quot;、&quot;然而&quot;、&quot;值得注意的是&quot;、&quot;不可否认&quot;等生硬的书面语&#x27;,
+<span class="ln">00098:</span>   &#x27;  ·&quot;以此以此&quot;、&quot;等等等等&quot;、&quot;非常非常&quot;、&quot;某种&quot;等明显啰嗦重复的词语&#x27;,
+<span class="ln">00099:</span>   &#x27;- 形容词和副词要克制，不过度渲染情绪&#x27;,
+<span class="ln">00100:</span>   &#x27;- 比喻和修辞保留原文的意象，必要时转化为中国读者能理解的等效表达&#x27;,
+<span class="ln">00101:</span>   &#x27;&#x27;,
+<span class="ln">00102:</span>   &#x27;### 句式与结构&#x27;,
+<span class="ln">00103:</span>   &#x27;- 句子长度参差错落，长短句自然交替，营造阅读节奏&#x27;,
+<span class="ln">00104:</span>   &#x27;- 段落之间过渡自然，不使用&quot;首先&quot;&quot;其次&quot;&quot;最后&quot;等机械连接词&#x27;,
+<span class="ln">00105:</span>   &#x27;- 保持原文的段落划分，不自行合并或拆分段落&#x27;,
+<span class="ln">00106:</span>   &#x27;- 叙述视角、时态与原文保持一致&#x27;,
+<span class="ln">00107:</span>   &#x27;- 多余的空格要去掉。润色时也要避免不要出现多余的空格。&#x27;,
+<span class="ln">00108:</span>   &#x27;&#x27;,
+<span class="ln">00109:</span>   &#x27;### 对话处理&#x27;,
+<span class="ln">00110:</span>   &#x27;- 对话使用中文双引号&quot;&quot;&#x27;,
+<span class="ln">00111:</span>   &#x27;- 根据角色特点赋予不同的说话风格和用词习惯&#x27;,
+<span class="ln">00112:</span>   &#x27;- 语气词（&quot;嗯&quot;&quot;啊&quot;&quot;呢&quot;&quot;吧&quot;&quot;嘛&quot;）适当使用，不过度&#x27;,
+<span class="ln">00113:</span>   &#x27;&#x27;,
+<span class="ln">00114:</span>   &#x27;### 专有名词&#x27;,
+<span class="ln">00115:</span>   &#x27;- 人名：首次出现时注入术语表，翻译中文译名，强制统一译法&#x27;,
+<span class="ln">00116:</span>   &#x27;- 地名：有通行译名的用通行译名，注入术语表，强制统一译法&#x27;,
+<span class="ln">00117:</span>   &#x27;- 品牌、书名、歌曲名等：有官方中文名的用官方名&#x27;,
+<span class="ln">00118:</span>   &#x27;&#x27;,
+<span class="ln">00119:</span>   &#x27;### 格式要求&#x27;,
+<span class="ln">00120:</span>   &#x27;- 仅输出译文，不输出任何解释、注释、译者按语或元评论&#x27;,
+<span class="ln">00121:</span>   &#x27;- 不要在译文前后添加任何说明性文字&#x27;,
+<span class="ln">00122:</span>   &#x27;- 保留原文的章节标题格式。&#x27;,
+<span class="ln">00123:</span>   &#x27;&#x27;,
+<span class="ln">00124:</span>   &#x27;你的任务不是改剧情，而是找出“明确可改”的表达问题，并返回修改清单 JSON。&#x27;,
+<span class="ln">00125:</span>   &#x27;&#x27;,
+<span class="ln">00126:</span>   &#x27;执行目标：&#x27;,
+<span class="ln">00127:</span>   &#x27;1. 删除明显生硬直译&#x27;,
+<span class="ln">00128:</span>   &#x27;2. 调整不自然语序&#x27;,
+<span class="ln">00129:</span>   &#x27;3. 改掉重复累赘表达&#x27;,
+<span class="ln">00130:</span>   &#x27;4. 修正明显别扭搭配&#x27;,
+<span class="ln">00131:</span>   &#x27;5. 保留原段落结构、人物关系、剧情事实、时态和信息量&#x27;,
+<span class="ln">00132:</span>   &#x27;6. 不得擅自增删设定&#x27;,
+<span class="ln">00133:</span>   &#x27;7. old_text 必须与原文完全一致&#x27;,
+<span class="ln">00134:</span>   &#x27;8. new_text 可以为空字符串，表示删除&#x27;,
+<span class="ln">00135:</span>   &#x27;9. 尽量找全“明确可改”的地方，不要只挑前几处&#x27;,
+<span class="ln">00136:</span>   &#x27;10. 如果没有可靠修改，返回 {&quot;modifications&quot;:[]}&#x27;,
+<span class="ln">00137:</span>   &#x27;&#x27;,
+<span class="ln">00138:</span>   &#x27;返回格式：&#x27;,
+<span class="ln">00139:</span>   &#x27;{&#x27;,
+<span class="ln">00140:</span>   &#x27;  &quot;modifications&quot;: [&#x27;,
+<span class="ln">00141:</span>   &#x27;    {&#x27;,
+<span class="ln">00142:</span>   &#x27;      &quot;old_text&quot;: &quot;原文中的一小段&quot;,&#x27;,
+<span class="ln">00143:</span>   &#x27;      &quot;new_text&quot;: &quot;修改后的文本&quot;,&#x27;,
+<span class="ln">00144:</span>   &#x27;      &quot;reason&quot;: &quot;精简理由，例如：删除生硬直译，使表达更自然&quot;&#x27;,
+<span class="ln">00145:</span>   &#x27;    }&#x27;,
+<span class="ln">00146:</span>   &#x27;  ]&#x27;,
+<span class="ln">00147:</span>   &#x27;}&#x27;,
+<span class="ln">00148:</span>   &#x27;&#x27;,
+<span class="ln">00149:</span>   &#x27;严格要求：&#x27;,
+<span class="ln">00150:</span>   &#x27;- 只返回 JSON 对象&#x27;,
+<span class="ln">00151:</span>   &#x27;- 不要输出 Markdown&#x27;,
+<span class="ln">00152:</span>   &#x27;- 不要输出解释&#x27;,
+<span class="ln">00153:</span>   &#x27;- 不要输出代码块&#x27;,
+<span class="ln">00154:</span>   &#x27;- 不要输出任何额外说明&#x27;,
+<span class="ln">00155:</span>   &#x27;- 请对输入文本做“必要且明确”的润色记录抽取&#x27;,
+<span class="ln">00156:</span>   &#x27;- 尽量找全“明确可改”的问题，不要只挑最前面的几处&#x27;,
+<span class="ln">00157:</span>   &#x27;- 不得改剧情、设定、事实与人物关系&#x27;,
+<span class="ln">00158:</span>   &#x27;- 不确定时可以不改，但明显问题不要漏掉&#x27;
+<span class="ln">00159:</span> ].join(&#x27;\n&#x27;);
+<span class="ln">00160:</span> // =========================================
+<span class="ln">00161:</span> // 基础目录准备
+<span class="ln">00162:</span> // =========================================
+<span class="ln">00163:</span> function ensureDir(dir) {
+<span class="ln">00164:</span>   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+<span class="ln">00165:</span> }
+<span class="ln">00166:</span> 
+<span class="ln">00167:</span> function emptyDir(dir) {
+<span class="ln">00168:</span>   ensureDir(dir);
+<span class="ln">00169:</span>   for (const name of fs.readdirSync(dir)) {
+<span class="ln">00170:</span>     fs.rmSync(path.join(dir, name), { recursive: true, force: true });
+<span class="ln">00171:</span>   }
+<span class="ln">00172:</span> }
+<span class="ln">00173:</span> 
+<span class="ln">00174:</span> [INPUT_DIR, ORIGINAL_ARCHIVE_DIR, OUTPUT_DIR].forEach(ensureDir);
+<span class="ln">00175:</span> 
+<span class="ln">00176:</span> // =========================================
+<span class="ln">00177:</span> // 基础工具函数
+<span class="ln">00178:</span> // =========================================
+<span class="ln">00179:</span> function sleep(ms) {
+<span class="ln">00180:</span>   return new Promise((resolve) =&gt; setTimeout(resolve, ms));
+<span class="ln">00181:</span> }
+<span class="ln">00182:</span> 
+<span class="ln">00183:</span> function safeJsonParse(text, fallback = null) {
+<span class="ln">00184:</span>   try {
+<span class="ln">00185:</span>     return JSON.parse(text);
+<span class="ln">00186:</span>   } catch {
+<span class="ln">00187:</span>     return fallback;
+<span class="ln">00188:</span>   }
+<span class="ln">00189:</span> }
+<span class="ln">00190:</span> 
+<span class="ln">00191:</span> function readJsonFile(filePath, fallback = null) {
+<span class="ln">00192:</span>   if (!fs.existsSync(filePath)) return fallback;
+<span class="ln">00193:</span>   try {
+<span class="ln">00194:</span>     return JSON.parse(fs.readFileSync(filePath, &#x27;utf-8&#x27;));
+<span class="ln">00195:</span>   } catch {
+<span class="ln">00196:</span>     return fallback;
+<span class="ln">00197:</span>   }
+<span class="ln">00198:</span> }
+<span class="ln">00199:</span> 
+<span class="ln">00200:</span> function writeJsonFile(filePath, data) {
+<span class="ln">00201:</span>   ensureDir(path.dirname(filePath));
+<span class="ln">00202:</span>   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), &#x27;utf-8&#x27;);
+<span class="ln">00203:</span> }
+<span class="ln">00204:</span> 
+<span class="ln">00205:</span> function normalizePositiveInt(value, fallback) {
+<span class="ln">00206:</span>   const n = Number(value);
+<span class="ln">00207:</span>   if (Number.isFinite(n) &amp;&amp; n &gt; 0) return Math.floor(n);
+<span class="ln">00208:</span>   return fallback;
+<span class="ln">00209:</span> }
+<span class="ln">00210:</span> 
+<span class="ln">00211:</span> function byteSizeKb(text) {
+<span class="ln">00212:</span>   return Buffer.byteLength(String(text || &#x27;&#x27;), &#x27;utf-8&#x27;) / 1024;
+<span class="ln">00213:</span> }
+<span class="ln">00214:</span> 
+<span class="ln">00215:</span> function sanitizeFileName(name) {
+<span class="ln">00216:</span>   return String(name || &#x27;&#x27;).replace(/[\\/:*?&quot;&lt;&gt;|]/g, &#x27;_&#x27;).trim();
+<span class="ln">00217:</span> }
+<span class="ln">00218:</span> 
+<span class="ln">00219:</span> function sanitizeDebugLabel(label) {
+<span class="ln">00220:</span>   return String(label || &#x27;raw&#x27;)
+<span class="ln">00221:</span>     .replace(/[\\/:*?&quot;&lt;&gt;|]/g, &#x27;_&#x27;)
+<span class="ln">00222:</span>     .replace(/\s+/g, &#x27;_&#x27;)
+<span class="ln">00223:</span>     .slice(0, 100);
+<span class="ln">00224:</span> }
+<span class="ln">00225:</span> 
+<span class="ln">00226:</span> function maskApiKey(key) {
+<span class="ln">00227:</span>   if (!key) return &#x27;[EMPTY]&#x27;;
+<span class="ln">00228:</span>   if (key.length &lt;= 10) return key.slice(0, 4) + &#x27;***&#x27;;
+<span class="ln">00229:</span>   return key.slice(0, 6) + &#x27;...&#x27; + key.slice(-4);
+<span class="ln">00230:</span> }
+<span class="ln">00231:</span> 
+<span class="ln">00232:</span> function sha1(text) {
+<span class="ln">00233:</span>   return crypto.createHash(&#x27;sha1&#x27;).update(String(text || &#x27;&#x27;), &#x27;utf-8&#x27;).digest(&#x27;hex&#x27;);
+<span class="ln">00234:</span> }
+<span class="ln">00235:</span> 
+<span class="ln">00236:</span> function getDynamicOutputFuse(sourceLength) {
+<span class="ln">00237:</span>   const dynamic =
+<span class="ln">00238:</span>     Math.floor(Number(sourceLength || 0) * DYNAMIC_OUTPUT_FUSE_RATIO) +
+<span class="ln">00239:</span>     DYNAMIC_OUTPUT_FUSE_BONUS;
+<span class="ln">00240:</span>   return Math.max(
+<span class="ln">00241:</span>     DYNAMIC_OUTPUT_FUSE_BASE,
+<span class="ln">00242:</span>     Math.min(DYNAMIC_OUTPUT_FUSE_MAX, dynamic),
+<span class="ln">00243:</span>   );
+<span class="ln">00244:</span> }
+<span class="ln">00245:</span> 
+<span class="ln">00246:</span> // =========================================
+<span class="ln">00247:</span> // 北京时间工具
+<span class="ln">00248:</span> // =========================================
+<span class="ln">00249:</span> function getBeijingDateObj(date = new Date()) {
+<span class="ln">00250:</span>   const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+<span class="ln">00251:</span>   return new Date(utc + 8 * 3600000);
+<span class="ln">00252:</span> }
+<span class="ln">00253:</span> 
+<span class="ln">00254:</span> function formatDateOnly(dateObj) {
+<span class="ln">00255:</span>   const y = dateObj.getFullYear();
+<span class="ln">00256:</span>   const m = String(dateObj.getMonth() + 1).padStart(2, &#x27;0&#x27;);
+<span class="ln">00257:</span>   const d = String(dateObj.getDate()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00258:</span>   return `${y}-${m}-${d}`;
+<span class="ln">00259:</span> }
+<span class="ln">00260:</span> 
+<span class="ln">00261:</span> function formatDateTime(dateObj) {
+<span class="ln">00262:</span>   const y = dateObj.getFullYear();
+<span class="ln">00263:</span>   const m = String(dateObj.getMonth() + 1).padStart(2, &#x27;0&#x27;);
+<span class="ln">00264:</span>   const d = String(dateObj.getDate()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00265:</span>   const hh = String(dateObj.getHours()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00266:</span>   const mm = String(dateObj.getMinutes()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00267:</span>   const ss = String(dateObj.getSeconds()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00268:</span>   return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+<span class="ln">00269:</span> }
+<span class="ln">00270:</span> 
+<span class="ln">00271:</span> function getBeijingTimeStr() {
+<span class="ln">00272:</span>   return formatDateTime(getBeijingDateObj(new Date()));
+<span class="ln">00273:</span> }
+<span class="ln">00274:</span> 
+<span class="ln">00275:</span> function getQuotaCycleBjt(date = new Date()) {
+<span class="ln">00276:</span>   const bj = getBeijingDateObj(date);
+<span class="ln">00277:</span>   if (bj.getHours() &lt; QUOTA_RESET_HOUR_BJT) {
+<span class="ln">00278:</span>     bj.setDate(bj.getDate() - 1);
+<span class="ln">00279:</span>   }
+<span class="ln">00280:</span>   return formatDateOnly(bj);
+<span class="ln">00281:</span> }
+<span class="ln">00282:</span> 
+<span class="ln">00283:</span> function getCompactTimeStamp() {
+<span class="ln">00284:</span>   const bj = getBeijingDateObj(new Date());
+<span class="ln">00285:</span>   const y = bj.getFullYear();
+<span class="ln">00286:</span>   const m = String(bj.getMonth() + 1).padStart(2, &#x27;0&#x27;);
+<span class="ln">00287:</span>   const d = String(bj.getDate()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00288:</span>   const hh = String(bj.getHours()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00289:</span>   const mm = String(bj.getMinutes()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00290:</span>   const ss = String(bj.getSeconds()).padStart(2, &#x27;0&#x27;);
+<span class="ln">00291:</span>   return `${y}${m}${d}${hh}${mm}${ss}`;
+<span class="ln">00292:</span> }
+<span class="ln">00293:</span> 
+<span class="ln">00294:</span> function getUniqueArchivePath(fileName) {
+<span class="ln">00295:</span>   const parsed = path.parse(fileName);
+<span class="ln">00296:</span>   let candidate = path.join(ORIGINAL_ARCHIVE_DIR, fileName);
+<span class="ln">00297:</span>   if (!fs.existsSync(candidate)) return candidate;
+<span class="ln">00298:</span> 
+<span class="ln">00299:</span>   const stamp = getCompactTimeStamp();
+<span class="ln">00300:</span>   return path.join(ORIGINAL_ARCHIVE_DIR, `${parsed.name}_${stamp}${parsed.ext}`);
+<span class="ln">00301:</span> }
+<span class="ln">00302:</span> 
+<span class="ln">00303:</span> // =========================================
+<span class="ln">00304:</span> // api0.txt 读取 / 自动补格式 / 配额计数
+<span class="ln">00305:</span> // =========================================
+<span class="ln">00306:</span> function extractApiKeyFromLine(rawLine) {
+<span class="ln">00307:</span>   const line = String(rawLine || &#x27;&#x27;).replace(/^\uFEFF/, &#x27;&#x27;).trim();
+<span class="ln">00308:</span>   if (!line) return [];
+<span class="ln">00309:</span>   if (line === API_USAGE_SEPARATOR) return [];
+<span class="ln">00310:</span>   if (line.startsWith(&#x27;#&#x27;) || line.startsWith(&#x27;//&#x27;)) return [];
+<span class="ln">00311:</span>   if (/^(quota_cycle_bjt|last_success_time_bjt|max_per_key)\s*=/i.test(line)) return [];
+<span class="ln">00312:</span>   const matches = line.match(/AIza[0-9A-Za-z\-_]{20,}/g);
+<span class="ln">00313:</span>   return matches ? matches : [];
+<span class="ln">00314:</span> }
+<span class="ln">00315:</span> 
+<span class="ln">00316:</span> function loadApiStateFromFile(filePath) {
+<span class="ln">00317:</span>   if (!fs.existsSync(filePath)) {
+<span class="ln">00318:</span>     return {
+<span class="ln">00319:</span>       keys: [],
+<span class="ln">00320:</span>       usage: {},
+<span class="ln">00321:</span>       quotaCycleBjt: &#x27;&#x27;,
+<span class="ln">00322:</span>       lastSuccessTimeBjt: &#x27;&#x27;,
+<span class="ln">00323:</span>       maxPerKey: DEFAULT_MAX_PER_KEY_PER_CYCLE,
+<span class="ln">00324:</span>       needsRewrite: false,
+<span class="ln">00325:</span>     };
+<span class="ln">00326:</span>   }
+<span class="ln">00327:</span> 
+<span class="ln">00328:</span>   const raw = fs.readFileSync(filePath, &#x27;utf-8&#x27;).replace(/^\uFEFF/, &#x27;&#x27;);
+<span class="ln">00329:</span>   const separatorIndex = raw.indexOf(API_USAGE_SEPARATOR);
+<span class="ln">00330:</span> 
+<span class="ln">00331:</span>   const keySection = separatorIndex &gt;= 0 ? raw.slice(0, separatorIndex) : raw;
+<span class="ln">00332:</span>   const stateSection =
+<span class="ln">00333:</span>     separatorIndex &gt;= 0 ? raw.slice(separatorIndex + API_USAGE_SEPARATOR.length) : &#x27;&#x27;;
+<span class="ln">00334:</span> 
+<span class="ln">00335:</span>   const keys = [];
+<span class="ln">00336:</span>   for (const line of keySection.split(/\r?\n/)) {
+<span class="ln">00337:</span>     keys.push(...extractApiKeyFromLine(line));
+<span class="ln">00338:</span>   }
+<span class="ln">00339:</span> 
+<span class="ln">00340:</span>   const uniqueKeys = [...new Set(keys)];
+<span class="ln">00341:</span>   let maxPerKey = DEFAULT_MAX_PER_KEY_PER_CYCLE;
+<span class="ln">00342:</span>   let quotaCycleBjt = &#x27;&#x27;;
+<span class="ln">00343:</span>   let lastSuccessTimeBjt = &#x27;&#x27;;
+<span class="ln">00344:</span> 
+<span class="ln">00345:</span>   const usage = {};
+<span class="ln">00346:</span>   for (const key of uniqueKeys) usage[key] = 0;
+<span class="ln">00347:</span> 
+<span class="ln">00348:</span>   for (const rawLine of stateSection.split(/\r?\n/)) {
+<span class="ln">00349:</span>     const line = rawLine.trim();
+<span class="ln">00350:</span>     if (!line) continue;
+<span class="ln">00351:</span> 
+<span class="ln">00352:</span>     let m = line.match(/^quota_cycle_bjt\s*=\s*(.+)$/i);
+<span class="ln">00353:</span>     if (m) {
+<span class="ln">00354:</span>       quotaCycleBjt = m[1].trim();
+<span class="ln">00355:</span>       continue;
+<span class="ln">00356:</span>     }
+<span class="ln">00357:</span> 
+<span class="ln">00358:</span>     m = line.match(/^last_success_time_bjt\s*=\s*(.*)$/i);
+<span class="ln">00359:</span>     if (m) {
+<span class="ln">00360:</span>       lastSuccessTimeBjt = m[1].trim();
+<span class="ln">00361:</span>       continue;
+<span class="ln">00362:</span>     }
+<span class="ln">00363:</span> 
+<span class="ln">00364:</span>     m = line.match(/^max_per_key\s*=\s*(\d+)$/i);
+<span class="ln">00365:</span>     if (m) {
+<span class="ln">00366:</span>       maxPerKey = normalizePositiveInt(m[1], DEFAULT_MAX_PER_KEY_PER_CYCLE);
+<span class="ln">00367:</span>       continue;
+<span class="ln">00368:</span>     }
+<span class="ln">00369:</span> 
+<span class="ln">00370:</span>     m = line.match(/^(AIza[0-9A-Za-z\-_]{20,})\s*\|\s*(\d+)\s*\/\s*(\d+)\s*$/);
+<span class="ln">00371:</span>     if (m) {
+<span class="ln">00372:</span>       const key = m[1];
+<span class="ln">00373:</span>       const used = Number(m[2]) || 0;
+<span class="ln">00374:</span>       if (uniqueKeys.includes(key)) {
+<span class="ln">00375:</span>         usage[key] = Math.max(0, Math.min(maxPerKey, used));
+<span class="ln">00376:</span>       }
+<span class="ln">00377:</span>     }
+<span class="ln">00378:</span>   }
+<span class="ln">00379:</span> 
+<span class="ln">00380:</span>   const hasFullState =
+<span class="ln">00381:</span>     separatorIndex &gt;= 0 &amp;&amp;
+<span class="ln">00382:</span>     /quota_cycle_bjt\s*=/.test(stateSection) &amp;&amp;
+<span class="ln">00383:</span>     /last_success_time_bjt\s*=/.test(stateSection) &amp;&amp;
+<span class="ln">00384:</span>     /max_per_key\s*=/.test(stateSection);
+<span class="ln">00385:</span> 
+<span class="ln">00386:</span>   return {
+<span class="ln">00387:</span>     keys: uniqueKeys,
+<span class="ln">00388:</span>     usage,
+<span class="ln">00389:</span>     quotaCycleBjt,
+<span class="ln">00390:</span>     lastSuccessTimeBjt,
+<span class="ln">00391:</span>     maxPerKey,
+<span class="ln">00392:</span>     needsRewrite: !hasFullState,
+<span class="ln">00393:</span>   };
+<span class="ln">00394:</span> }
+<span class="ln">00395:</span> 
+<span class="ln">00396:</span> function normalizeApiState(state) {
+<span class="ln">00397:</span>   const keys = [...new Set((state &amp;&amp; state.keys) || [])];
+<span class="ln">00398:</span>   const maxPerKey = normalizePositiveInt(
+<span class="ln">00399:</span>     state &amp;&amp; state.maxPerKey,
+<span class="ln">00400:</span>     DEFAULT_MAX_PER_KEY_PER_CYCLE,
+<span class="ln">00401:</span>   );
+<span class="ln">00402:</span>   const usage = {};
+<span class="ln">00403:</span> 
+<span class="ln">00404:</span>   for (const key of keys) {
+<span class="ln">00405:</span>     const count = Number((state &amp;&amp; state.usage &amp;&amp; state.usage[key]) || 0);
+<span class="ln">00406:</span>     usage[key] = Math.max(0, Math.min(maxPerKey, count));
+<span class="ln">00407:</span>   }
+<span class="ln">00408:</span> 
+<span class="ln">00409:</span>   return {
+<span class="ln">00410:</span>     keys,
+<span class="ln">00411:</span>     usage,
+<span class="ln">00412:</span>     quotaCycleBjt: (state &amp;&amp; state.quotaCycleBjt) || &#x27;&#x27;,
+<span class="ln">00413:</span>     lastSuccessTimeBjt: (state &amp;&amp; state.lastSuccessTimeBjt) || &#x27;&#x27;,
+<span class="ln">00414:</span>     maxPerKey,
+<span class="ln">00415:</span>     needsRewrite: Boolean(state &amp;&amp; state.needsRewrite),
+<span class="ln">00416:</span>   };
+<span class="ln">00417:</span> }
+<span class="ln">00418:</span> 
+<span class="ln">00419:</span> function saveApiStateToFile(filePath, state) {
+<span class="ln">00420:</span>   const safeState = normalizeApiState(state);
+<span class="ln">00421:</span> 
+<span class="ln">00422:</span>   const lines = [
+<span class="ln">00423:</span>     ...safeState.keys,
+<span class="ln">00424:</span>     API_USAGE_SEPARATOR,
+<span class="ln">00425:</span>     `quota_cycle_bjt=${safeState.quotaCycleBjt || getQuotaCycleBjt()}`,
+<span class="ln">00426:</span>     `last_success_time_bjt=${safeState.lastSuccessTimeBjt || &#x27;&#x27;}`,
+<span class="ln">00427:</span>     `max_per_key=${safeState.maxPerKey}`,
+<span class="ln">00428:</span>     ...safeState.keys.map(
+<span class="ln">00429:</span>       (key) =&gt;
+<span class="ln">00430:</span>         `${key} | ${Math.min(safeState.maxPerKey, safeState.usage[key] || 0)}/${safeState.maxPerKey}`,
+<span class="ln">00431:</span>     ),
+<span class="ln">00432:</span>     &#x27;&#x27;,
+<span class="ln">00433:</span>   ];
+<span class="ln">00434:</span> 
+<span class="ln">00435:</span>   fs.writeFileSync(filePath, lines.join(&#x27;\n&#x27;), &#x27;utf-8&#x27;);
+<span class="ln">00436:</span> }
+<span class="ln">00437:</span> 
+<span class="ln">00438:</span> let apiState = null;
+<span class="ln">00439:</span> let API_KEYS = [];
+<span class="ln">00440:</span> let currentKeyIndex = -1;
+<span class="ln">00441:</span> let nextKeyOverrideIndex = null;
+<span class="ln">00442:</span> 
+<span class="ln">00443:</span> function initApiStateIfNeeded() {
+<span class="ln">00444:</span>   if (apiState) return;
+<span class="ln">00445:</span> 
+<span class="ln">00446:</span>   apiState = normalizeApiState(loadApiStateFromFile(API_KEY_FILE));
+<span class="ln">00447:</span>   API_KEYS = [...apiState.keys];
+<span class="ln">00448:</span> 
+<span class="ln">00449:</span>   if (API_KEYS.length === 0) {
+<span class="ln">00450:</span>     throw new Error(&#x27;未读取到任何有效 Gemini API Key。请检查 api0.txt。&#x27;);
+<span class="ln">00451:</span>   }
+<span class="ln">00452:</span> 
+<span class="ln">00453:</span>   if (apiState.needsRewrite) {
+<span class="ln">00454:</span>     if (!apiState.quotaCycleBjt) {
+<span class="ln">00455:</span>       apiState.quotaCycleBjt = getQuotaCycleBjt();
+<span class="ln">00456:</span>     }
+<span class="ln">00457:</span>     saveApiStateToFile(API_KEY_FILE, apiState);
+<span class="ln">00458:</span>     console.log(&#x27;🛠️ [api0.txt] 检测到仅有裸 Key 或状态区不完整，已自动补写标准格式。&#x27;);
+<span class="ln">00459:</span>   }
+<span class="ln">00460:</span> }
+<span class="ln">00461:</span> 
+<span class="ln">00462:</span> function getMaxPerKeyPerCycle() {
+<span class="ln">00463:</span>   initApiStateIfNeeded();
+<span class="ln">00464:</span>   return normalizePositiveInt(apiState.maxPerKey, DEFAULT_MAX_PER_KEY_PER_CYCLE);
+<span class="ln">00465:</span> }
+<span class="ln">00466:</span> 
+<span class="ln">00467:</span> function getKeyUsageCountByIndex(index) {
+<span class="ln">00468:</span>   initApiStateIfNeeded();
+<span class="ln">00469:</span>   const key = API_KEYS[index];
+<span class="ln">00470:</span>   if (!key) return 0;
+<span class="ln">00471:</span>   return apiState.usage[key] || 0;
+<span class="ln">00472:</span> }
+<span class="ln">00473:</span> 
+<span class="ln">00474:</span> function maybeResetQuotaCycle() {
+<span class="ln">00475:</span>   initApiStateIfNeeded();
+<span class="ln">00476:</span>   const currentQuotaCycle = getQuotaCycleBjt(new Date());
+<span class="ln">00477:</span> 
+<span class="ln">00478:</span>   if (apiState.quotaCycleBjt !== currentQuotaCycle) {
+<span class="ln">00479:</span>     apiState.quotaCycleBjt = currentQuotaCycle;
+<span class="ln">00480:</span>     for (const key of API_KEYS) {
+<span class="ln">00481:</span>       apiState.usage[key] = 0;
+<span class="ln">00482:</span>     }
+<span class="ln">00483:</span>     saveApiStateToFile(API_KEY_FILE, apiState);
+<span class="ln">00484:</span>     console.log(
+<span class="ln">00485:</span>       `🕓 [Quota Reset] 北京时间 ${QUOTA_RESET_HOUR_BJT}:00 配额周期切换为 ${currentQuotaCycle}，全部 Key 计数已清零。`,
+<span class="ln">00486:</span>     );
+<span class="ln">00487:</span>   }
+<span class="ln">00488:</span> }
+<span class="ln">00489:</span> 
+<span class="ln">00490:</span> function getAvailableKeyIndicesSorted() {
+<span class="ln">00491:</span>   initApiStateIfNeeded();
+<span class="ln">00492:</span>   maybeResetQuotaCycle();
+<span class="ln">00493:</span> 
+<span class="ln">00494:</span>   const maxPerKey = getMaxPerKeyPerCycle();
+<span class="ln">00495:</span>   const indices = API_KEYS
+<span class="ln">00496:</span>     .map((_, idx) =&gt; idx)
+<span class="ln">00497:</span>     .filter((idx) =&gt; getKeyUsageCountByIndex(idx) &lt; maxPerKey);
+<span class="ln">00498:</span> 
+<span class="ln">00499:</span>   indices.sort((a, b) =&gt; {
+<span class="ln">00500:</span>     const diff = getKeyUsageCountByIndex(a) - getKeyUsageCountByIndex(b);
+<span class="ln">00501:</span>     if (diff !== 0) return diff;
+<span class="ln">00502:</span>     return a - b;
+<span class="ln">00503:</span>   });
+<span class="ln">00504:</span> 
+<span class="ln">00505:</span>   return indices;
+<span class="ln">00506:</span> }
+<span class="ln">00507:</span> 
+<span class="ln">00508:</span> class AllKeysExhaustedError extends Error {
+<span class="ln">00509:</span>   constructor() {
+<span class="ln">00510:</span>     super(`所有 API Key 当前周期都已达到 ${getMaxPerKeyPerCycle()}/${getMaxPerKeyPerCycle()}，任务停止。`);
+<span class="ln">00511:</span>     this.name = &#x27;AllKeysExhaustedError&#x27;;
+<span class="ln">00512:</span>     this.code = &#x27;ALL_KEYS_DAILY_LIMIT_REACHED&#x27;;
+<span class="ln">00513:</span>   }
+<span class="ln">00514:</span> }
+<span class="ln">00515:</span> 
+<span class="ln">00516:</span> function getKey(modelName = PRIMARY_MODEL_NAME) {
+<span class="ln">00517:</span>   initApiStateIfNeeded();
+<span class="ln">00518:</span> 
+<span class="ln">00519:</span>   const available = getAvailableKeyIndicesSorted();
+<span class="ln">00520:</span>   const maxPerKey = getMaxPerKeyPerCycle();
+<span class="ln">00521:</span> 
+<span class="ln">00522:</span>   if (available.length === 0) {
+<span class="ln">00523:</span>     throw new AllKeysExhaustedError();
+<span class="ln">00524:</span>   }
+<span class="ln">00525:</span> 
+<span class="ln">00526:</span>   let selectedIndex = -1;
+<span class="ln">00527:</span> 
+<span class="ln">00528:</span>   if (
+<span class="ln">00529:</span>     Number.isInteger(nextKeyOverrideIndex) &amp;&amp;
+<span class="ln">00530:</span>     nextKeyOverrideIndex &gt;= 0 &amp;&amp;
+<span class="ln">00531:</span>     available.includes(nextKeyOverrideIndex)
+<span class="ln">00532:</span>   ) {
+<span class="ln">00533:</span>     selectedIndex = nextKeyOverrideIndex;
+<span class="ln">00534:</span>     nextKeyOverrideIndex = null;
+<span class="ln">00535:</span>   } else {
+<span class="ln">00536:</span>     selectedIndex = available[0];
+<span class="ln">00537:</span>   }
+<span class="ln">00538:</span> 
+<span class="ln">00539:</span>   currentKeyIndex = selectedIndex;
+<span class="ln">00540:</span>   const currentUsage = getKeyUsageCountByIndex(selectedIndex);
+<span class="ln">00541:</span>   const nextIfSuccess = Math.min(maxPerKey, currentUsage + 1);
+<span class="ln">00542:</span> 
+<span class="ln">00543:</span>   console.log(
+<span class="ln">00544:</span>     `🔐 [Key 选择] Key ${selectedIndex + 1}/${API_KEYS.length} | 当前 ${currentUsage}/${maxPerKey} | 本次若成功 =&gt; ${nextIfSuccess}/${maxPerKey} | model=${modelName}`,
+<span class="ln">00545:</span>   );
+<span class="ln">00546:</span> 
+<span class="ln">00547:</span>   return {
+<span class="ln">00548:</span>     key: API_KEYS[selectedIndex],
+<span class="ln">00549:</span>     index: selectedIndex,
+<span class="ln">00550:</span>     usage: currentUsage,
+<span class="ln">00551:</span>   };
+<span class="ln">00552:</span> }
+<span class="ln">00553:</span> 
+<span class="ln">00554:</span> function rotateKeyProactively(reason = &#x27;主动切换&#x27;) {
+<span class="ln">00555:</span>   initApiStateIfNeeded();
+<span class="ln">00556:</span> 
+<span class="ln">00557:</span>   const available = getAvailableKeyIndicesSorted();
+<span class="ln">00558:</span>   const maxPerKey = getMaxPerKeyPerCycle();
+<span class="ln">00559:</span> 
+<span class="ln">00560:</span>   if (available.length === 0) {
+<span class="ln">00561:</span>     throw new AllKeysExhaustedError();
+<span class="ln">00562:</span>   }
+<span class="ln">00563:</span> 
+<span class="ln">00564:</span>   const currentPos = available.indexOf(currentKeyIndex);
+<span class="ln">00565:</span>   const nextPos = currentPos &gt;= 0 ? (currentPos + 1) % available.length : 0;
+<span class="ln">00566:</span> 
+<span class="ln">00567:</span>   nextKeyOverrideIndex = available[nextPos];
+<span class="ln">00568:</span>   currentKeyIndex = nextKeyOverrideIndex;
+<span class="ln">00569:</span> 
+<span class="ln">00570:</span>   console.log(
+<span class="ln">00571:</span>     `🔁 [Key 切换] ${reason} -&gt; Key ${currentKeyIndex + 1}/${API_KEYS.length} | 当前 ${getKeyUsageCountByIndex(currentKeyIndex)}/${maxPerKey}`,
+<span class="ln">00572:</span>   );
+<span class="ln">00573:</span> }
+<span class="ln">00574:</span> 
+<span class="ln">00575:</span> function recordSuccessfulKeyCall(modelName, keyIndex) {
+<span class="ln">00576:</span>   initApiStateIfNeeded();
+<span class="ln">00577:</span>   maybeResetQuotaCycle();
+<span class="ln">00578:</span> 
+<span class="ln">00579:</span>   apiState.lastSuccessTimeBjt = formatDateTime(getBeijingDateObj(new Date()));
+<span class="ln">00580:</span> 
+<span class="ln">00581:</span>   const key = API_KEYS[keyIndex];
+<span class="ln">00582:</span>   apiState.usage[key] = Math.min(getMaxPerKeyPerCycle(), (apiState.usage[key] || 0) + 1);
+<span class="ln">00583:</span> 
+<span class="ln">00584:</span>   saveApiStateToFile(API_KEY_FILE, apiState);
+<span class="ln">00585:</span> 
+<span class="ln">00586:</span>   console.log(
+<span class="ln">00587:</span>     `✅ [Key 成功] Key ${keyIndex + 1}/${API_KEYS.length} | 已记为 ${getKeyUsageCountByIndex(keyIndex)}/${getMaxPerKeyPerCycle()} | 最后成功时间(BJT): ${apiState.lastSuccessTimeBjt}`,
+<span class="ln">00588:</span>   );
+<span class="ln">00589:</span> 
+<span class="ln">00590:</span>   currentKeyIndex = -1;
+<span class="ln">00591:</span>   nextKeyOverrideIndex = null;
+<span class="ln">00592:</span> }
+<span class="ln">00593:</span> 
+<span class="ln">00594:</span> // =========================================
+<span class="ln">00595:</span> // Gemini API 调用
+<span class="ln">00596:</span> // =========================================
+<span class="ln">00597:</span> function buildGenerateUrl(modelName) {
+<span class="ln">00598:</span>   return `${API_BASE_URL.replace(/\/$/, &#x27;&#x27;)}/models/${encodeURIComponent(
+<span class="ln">00599:</span>     modelName,
+<span class="ln">00600:</span>   )}:generateContent`;
+<span class="ln">00601:</span> }
+<span class="ln">00602:</span> 
+<span class="ln">00603:</span> function extractResponseText(data) {
+<span class="ln">00604:</span>   const parts =
+<span class="ln">00605:</span>     data &amp;&amp;
+<span class="ln">00606:</span>     data.candidates &amp;&amp;
+<span class="ln">00607:</span>     data.candidates[0] &amp;&amp;
+<span class="ln">00608:</span>     data.candidates[0].content &amp;&amp;
+<span class="ln">00609:</span>     data.candidates[0].content.parts;
+<span class="ln">00610:</span> 
+<span class="ln">00611:</span>   if (!Array.isArray(parts)) return &#x27;&#x27;;
+<span class="ln">00612:</span>   return parts
+<span class="ln">00613:</span>     .map((part) =&gt; (part &amp;&amp; typeof part.text === &#x27;string&#x27; ? part.text : &#x27;&#x27;))
+<span class="ln">00614:</span>     .join(&#x27;&#x27;);
+<span class="ln">00615:</span> }
+<span class="ln">00616:</span> 
+<span class="ln">00617:</span> function normalizeUsageMetadata(data) {
+<span class="ln">00618:</span>   const usage = (data &amp;&amp; data.usageMetadata) || {};
+<span class="ln">00619:</span>   return {
+<span class="ln">00620:</span>     prompt_tokens: usage.promptTokenCount ?? &#x27;?&#x27;,
+<span class="ln">00621:</span>     completion_tokens: usage.candidatesTokenCount ?? &#x27;?&#x27;,
+<span class="ln">00622:</span>     total_tokens: usage.totalTokenCount ?? &#x27;?&#x27;,
+<span class="ln">00623:</span>   };
+<span class="ln">00624:</span> }
+<span class="ln">00625:</span> 
+<span class="ln">00626:</span> function isTransientHttpStatus(status) {
+<span class="ln">00627:</span>   return [429, 500, 502, 503, 504].includes(status);
+<span class="ln">00628:</span> }
+<span class="ln">00629:</span> 
+<span class="ln">00630:</span> async function validateApiKey(apiKey) {
+<span class="ln">00631:</span>   const response = await fetchFn(MODELS_URL, {
+<span class="ln">00632:</span>     method: &#x27;GET&#x27;,
+<span class="ln">00633:</span>     headers: {
+<span class="ln">00634:</span>       &#x27;x-goog-api-key&#x27;: apiKey,
+<span class="ln">00635:</span>     },
+<span class="ln">00636:</span>   });
+<span class="ln">00637:</span> 
+<span class="ln">00638:</span>   const rawText = await response.text();
+<span class="ln">00639:</span>   if (!response.ok) {
+<span class="ln">00640:</span>     throw new Error(`KEY_VALIDATE_${response.status}: ${rawText.slice(0, 500)}`);
+<span class="ln">00641:</span>   }
+<span class="ln">00642:</span> 
+<span class="ln">00643:</span>   const data = safeJsonParse(rawText, {});
+<span class="ln">00644:</span>   const modelList = Array.isArray(data &amp;&amp; data.models)
+<span class="ln">00645:</span>     ? data.models
+<span class="ln">00646:</span>         .map((item) =&gt; String((item &amp;&amp; item.name) || &#x27;&#x27;).replace(/^models\//, &#x27;&#x27;))
+<span class="ln">00647:</span>         .filter(Boolean)
+<span class="ln">00648:</span>     : [];
+<span class="ln">00649:</span> 
+<span class="ln">00650:</span>   return {
+<span class="ln">00651:</span>     ok: true,
+<span class="ln">00652:</span>     status: response.status,
+<span class="ln">00653:</span>     rawText,
+<span class="ln">00654:</span>     modelList,
+<span class="ln">00655:</span>   };
+<span class="ln">00656:</span> }
+<span class="ln">00657:</span> 
+<span class="ln">00658:</span> async function preflightCheck() {
+<span class="ln">00659:</span>   initApiStateIfNeeded();
+<span class="ln">00660:</span> 
+<span class="ln">00661:</span>   console.log(`\n🔐 [预检] 共读取到 ${API_KEYS.length} 个 API Key`);
+<span class="ln">00662:</span>   console.log(`🌐 [预检] API_BASE_URL: ${API_BASE_URL}`);
+<span class="ln">00663:</span>   console.log(`📡 [预检] 主模型: ${PRIMARY_MODEL_NAME}`);
+<span class="ln">00664:</span>   console.log(`📡 [预检] 回退模型: ${FALLBACK_MODEL_NAME}`);
+<span class="ln">00665:</span> 
+<span class="ln">00666:</span>   let validatedCount = 0;
+<span class="ln">00667:</span>   const failures = [];
+<span class="ln">00668:</span> 
+<span class="ln">00669:</span>   for (let i = 0; i &lt; API_KEYS.length; i++) {
+<span class="ln">00670:</span>     const apiKey = API_KEYS[i];
+<span class="ln">00671:</span>     const masked = maskApiKey(apiKey);
+<span class="ln">00672:</span> 
+<span class="ln">00673:</span>     try {
+<span class="ln">00674:</span>       process.stdout.write(`   [预检] 校验 Key ${i + 1}/${API_KEYS.length}: ${masked}\r`);
+<span class="ln">00675:</span>       await validateApiKey(apiKey);
+<span class="ln">00676:</span>       validatedCount++;
+<span class="ln">00677:</span>       console.log(`   ✅ Key 可用: ${masked}`);
+<span class="ln">00678:</span>     } catch (error) {
+<span class="ln">00679:</span>       failures.push({ masked, message: error.message });
+<span class="ln">00680:</span>       console.log(`   ❌ Key 失效: ${masked} | ${error.message}`);
+<span class="ln">00681:</span>     }
+<span class="ln">00682:</span>   }
+<span class="ln">00683:</span> 
+<span class="ln">00684:</span>   if (validatedCount === 0) {
+<span class="ln">00685:</span>     const detail = failures.map((item) =&gt; `${item.masked}: ${item.message}`).join(&#x27;\n&#x27;);
+<span class="ln">00686:</span>     throw new Error(`所有 API Key 预检失败。\n${detail}`);
+<span class="ln">00687:</span>   }
+<span class="ln">00688:</span> }
+<span class="ln">00689:</span> 
+<span class="ln">00690:</span> async function callGeminiGenerateContentJson({
+<span class="ln">00691:</span>   modelName,
+<span class="ln">00692:</span>   systemInstruction,
+<span class="ln">00693:</span>   userText,
+<span class="ln">00694:</span>   temperature = 0,
+<span class="ln">00695:</span>   maxOutputTokens = POLISH_MAX_OUTPUT_TOKENS,
+<span class="ln">00696:</span>   responseMimeType = &#x27;application/json&#x27;,
+<span class="ln">00697:</span> }) {
+<span class="ln">00698:</span>   let lastError = null;
+<span class="ln">00699:</span> 
+<span class="ln">00700:</span>   for (let round = 0; round &lt; RETRY_DELAYS.length + 2; round++) {
+<span class="ln">00701:</span>     const available = getAvailableKeyIndicesSorted();
+<span class="ln">00702:</span>     if (!available.length) throw new AllKeysExhaustedError();
+<span class="ln">00703:</span> 
+<span class="ln">00704:</span>     for (let i = 0; i &lt; available.length; i++) {
+<span class="ln">00705:</span>       const keyInfo = getKey(modelName);
+<span class="ln">00706:</span>       const key = keyInfo.key;
+<span class="ln">00707:</span> 
+<span class="ln">00708:</span>       const payload = {
+<span class="ln">00709:</span>         systemInstruction: {
+<span class="ln">00710:</span>           parts: [{ text: systemInstruction }],
+<span class="ln">00711:</span>         },
+<span class="ln">00712:</span>         contents: [
+<span class="ln">00713:</span>           {
+<span class="ln">00714:</span>             role: &#x27;user&#x27;,
+<span class="ln">00715:</span>             parts: [{ text: userText }],
+<span class="ln">00716:</span>           },
+<span class="ln">00717:</span>         ],
+<span class="ln">00718:</span>         generationConfig: {
+<span class="ln">00719:</span>           temperature,
+<span class="ln">00720:</span>           maxOutputTokens,
+<span class="ln">00721:</span>           responseMimeType,
+<span class="ln">00722:</span>         },
+<span class="ln">00723:</span>       };
+<span class="ln">00724:</span> 
+<span class="ln">00725:</span>       try {
+<span class="ln">00726:</span>         const response = await fetchFn(buildGenerateUrl(modelName), {
+<span class="ln">00727:</span>           method: &#x27;POST&#x27;,
+<span class="ln">00728:</span>           headers: {
+<span class="ln">00729:</span>             &#x27;x-goog-api-key&#x27;: key,
+<span class="ln">00730:</span>             &#x27;Content-Type&#x27;: &#x27;application/json&#x27;,
+<span class="ln">00731:</span>           },
+<span class="ln">00732:</span>           body: JSON.stringify(payload),
+<span class="ln">00733:</span>         });
+<span class="ln">00734:</span> 
+<span class="ln">00735:</span>         const responseText = await response.text();
+<span class="ln">00736:</span> 
+<span class="ln">00737:</span>         if (!response.ok) {
+<span class="ln">00738:</span>           if (response.status === 404) {
+<span class="ln">00739:</span>             throw new Error(`404 Not Found: ${responseText.slice(0, 500)}`);
+<span class="ln">00740:</span>           }
+<span class="ln">00741:</span> 
+<span class="ln">00742:</span>           if (isTransientHttpStatus(response.status)) {
+<span class="ln">00743:</span>             rotateKeyProactively(`HTTP ${response.status}`);
+<span class="ln">00744:</span>             lastError = new Error(`HTTP ${response.status}: ${responseText.slice(0, 500)}`);
+<span class="ln">00745:</span>             continue;
+<span class="ln">00746:</span>           }
+<span class="ln">00747:</span> 
+<span class="ln">00748:</span>           if (response.status === 401 || response.status === 403) {
+<span class="ln">00749:</span>             rotateKeyProactively(`HTTP ${response.status}`);
+<span class="ln">00750:</span>             lastError = new Error(`HTTP ${response.status}: ${responseText.slice(0, 500)}`);
+<span class="ln">00751:</span>             continue;
+<span class="ln">00752:</span>           }
+<span class="ln">00753:</span> 
+<span class="ln">00754:</span>           throw new Error(`HTTP ${response.status}: ${responseText.slice(0, 500)}`);
+<span class="ln">00755:</span>         }
+<span class="ln">00756:</span> 
+<span class="ln">00757:</span>         const data = safeJsonParse(responseText, null);
+<span class="ln">00758:</span>         if (!data) {
+<span class="ln">00759:</span>           rotateKeyProactively(&#x27;返回体不是合法 JSON&#x27;);
+<span class="ln">00760:</span>           lastError = new Error(`返回体不是合法 JSON：${responseText.slice(0, 300)}`);
+<span class="ln">00761:</span>           continue;
+<span class="ln">00762:</span>         }
+<span class="ln">00763:</span> 
+<span class="ln">00764:</span>         recordSuccessfulKeyCall(modelName, keyInfo.index);
+<span class="ln">00765:</span>         return data;
+<span class="ln">00766:</span>       } catch (error) {
+<span class="ln">00767:</span>         if (error &amp;&amp; error.code === &#x27;ALL_KEYS_DAILY_LIMIT_REACHED&#x27;) throw error;
+<span class="ln">00768:</span>         if (/404 Not Found/i.test(String(error &amp;&amp; error.message))) throw error;
+<span class="ln">00769:</span> 
+<span class="ln">00770:</span>         rotateKeyProactively(&#x27;请求异常&#x27;);
+<span class="ln">00771:</span>         lastError = error;
+<span class="ln">00772:</span>       }
+<span class="ln">00773:</span>     }
+<span class="ln">00774:</span> 
+<span class="ln">00775:</span>     if (round &lt; RETRY_DELAYS.length) {
+<span class="ln">00776:</span>       const delay = RETRY_DELAYS[round];
+<span class="ln">00777:</span>       console.log(`⏳ [Gemini 重试] 本轮 key 均失败，${delay / 1000} 秒后继续...`);
+<span class="ln">00778:</span>       await sleep(delay);
+<span class="ln">00779:</span>     }
+<span class="ln">00780:</span>   }
+<span class="ln">00781:</span> 
+<span class="ln">00782:</span>   throw lastError || new Error(&#x27;Gemini 请求失败&#x27;);
+<span class="ln">00783:</span> }
+<span class="ln">00784:</span> 
+<span class="ln">00785:</span> // =========================================
+<span class="ln">00786:</span> // 书籍上下文：scan 只认 INPUT_DIR
+<span class="ln">00787:</span> // =========================================
+<span class="ln">00788:</span> function getBookOutputDir(bookName) {
+<span class="ln">00789:</span>   return path.join(OUTPUT_DIR, sanitizeFileName(bookName));
+<span class="ln">00790:</span> }
+<span class="ln">00791:</span> 
+<span class="ln">00792:</span> function listInputBooks() {
+<span class="ln">00793:</span>   ensureDir(INPUT_DIR);
+<span class="ln">00794:</span>   return fs
+<span class="ln">00795:</span>     .readdirSync(INPUT_DIR)
+<span class="ln">00796:</span>     .filter((f) =&gt; f.toLowerCase().endsWith(&#x27;.txt&#x27;))
+<span class="ln">00797:</span>     .map((f) =&gt; ({
+<span class="ln">00798:</span>       bookName: path.parse(f).name,
+<span class="ln">00799:</span>       sourceFilePath: path.join(INPUT_DIR, f),
+<span class="ln">00800:</span>       sourceFileName: f,
+<span class="ln">00801:</span>       bookOutputDir: getBookOutputDir(path.parse(f).name),
+<span class="ln">00802:</span>     }))
+<span class="ln">00803:</span>     .sort((a, b) =&gt; a.bookName.localeCompare(b.bookName, &#x27;zh-CN&#x27;));
+<span class="ln">00804:</span> }
+<span class="ln">00805:</span> 
+<span class="ln">00806:</span> function listOutputBooks() {
+<span class="ln">00807:</span>   ensureDir(OUTPUT_DIR);
+<span class="ln">00808:</span>   return fs
+<span class="ln">00809:</span>     .readdirSync(OUTPUT_DIR)
+<span class="ln">00810:</span>     .map((name) =&gt; ({
+<span class="ln">00811:</span>       name,
+<span class="ln">00812:</span>       full: path.join(OUTPUT_DIR, name),
+<span class="ln">00813:</span>     }))
+<span class="ln">00814:</span>     .filter((item) =&gt; fs.statSync(item.full).isDirectory())
+<span class="ln">00815:</span>     .map((item) =&gt; {
+<span class="ln">00816:</span>       const expectedInput = path.join(INPUT_DIR, `${item.name}.txt`);
+<span class="ln">00817:</span>       return {
+<span class="ln">00818:</span>         bookName: item.name,
+<span class="ln">00819:</span>         sourceFilePath: fs.existsSync(expectedInput) ? expectedInput : &#x27;&#x27;,
+<span class="ln">00820:</span>         sourceFileName: fs.existsSync(expectedInput) ? `${item.name}.txt` : &#x27;&#x27;,
+<span class="ln">00821:</span>         bookOutputDir: item.full,
+<span class="ln">00822:</span>       };
+<span class="ln">00823:</span>     })
+<span class="ln">00824:</span>     .sort((a, b) =&gt; a.bookName.localeCompare(b.bookName, &#x27;zh-CN&#x27;));
+<span class="ln">00825:</span> }
+<span class="ln">00826:</span> 
+<span class="ln">00827:</span> function mergeBookContexts(inputBooks, outputBooks) {
+<span class="ln">00828:</span>   const map = new Map();
+<span class="ln">00829:</span> 
+<span class="ln">00830:</span>   for (const item of inputBooks) {
+<span class="ln">00831:</span>     map.set(item.bookName, item);
+<span class="ln">00832:</span>   }
+<span class="ln">00833:</span> 
+<span class="ln">00834:</span>   for (const item of outputBooks) {
+<span class="ln">00835:</span>     if (!map.has(item.bookName)) {
+<span class="ln">00836:</span>       map.set(item.bookName, item);
+<span class="ln">00837:</span>     } else {
+<span class="ln">00838:</span>       const existing = map.get(item.bookName);
+<span class="ln">00839:</span>       existing.bookOutputDir = item.bookOutputDir;
+<span class="ln">00840:</span>       if (!existing.sourceFilePath &amp;&amp; item.sourceFilePath) {
+<span class="ln">00841:</span>         existing.sourceFilePath = item.sourceFilePath;
+<span class="ln">00842:</span>         existing.sourceFileName = item.sourceFileName;
+<span class="ln">00843:</span>       }
+<span class="ln">00844:</span>       map.set(item.bookName, existing);
+<span class="ln">00845:</span>     }
+<span class="ln">00846:</span>   }
+<span class="ln">00847:</span> 
+<span class="ln">00848:</span>   return [...map.values()].sort((a, b) =&gt; a.bookName.localeCompare(b.bookName, &#x27;zh-CN&#x27;));
+<span class="ln">00849:</span> }
+<span class="ln">00850:</span> 
+<span class="ln">00851:</span> function getAllKnownBooks() {
+<span class="ln">00852:</span>   return mergeBookContexts(listInputBooks(), listOutputBooks());
+<span class="ln">00853:</span> }
+<span class="ln">00854:</span> 
+<span class="ln">00855:</span> function resolveBookContextForScan(bookArg = &#x27;&#x27;) {
+<span class="ln">00856:</span>   const books = listInputBooks();
+<span class="ln">00857:</span> 
+<span class="ln">00858:</span>   if (!books.length) {
+<span class="ln">00859:</span>     throw new Error(`润色 目录下没有找到任何 txt：${INPUT_DIR}`);
+<span class="ln">00860:</span>   }
+<span class="ln">00861:</span> 
+<span class="ln">00862:</span>   if (!bookArg) {
+<span class="ln">00863:</span>     if (books.length === 1) return books[0];
+<span class="ln">00864:</span>     throw new Error(&#x27;润色 目录里有多本书，请用 --book 指定书名。&#x27;);
+<span class="ln">00865:</span>   }
+<span class="ln">00866:</span> 
+<span class="ln">00867:</span>   const exact = books.find((item) =&gt; item.bookName === bookArg);
+<span class="ln">00868:</span>   if (exact) return exact;
+<span class="ln">00869:</span> 
+<span class="ln">00870:</span>   const fuzzy = books.filter((item) =&gt; item.bookName.includes(bookArg));
+<span class="ln">00871:</span>   if (fuzzy.length === 1) return fuzzy[0];
+<span class="ln">00872:</span>   if (fuzzy.length &gt; 1) {
+<span class="ln">00873:</span>     throw new Error(`--book 命中多本输入书：${fuzzy.map((x) =&gt; x.bookName).join(&#x27; / &#x27;)}`);
+<span class="ln">00874:</span>   }
+<span class="ln">00875:</span> 
+<span class="ln">00876:</span>   throw new Error(`润色 目录中未找到书：${bookArg}`);
+<span class="ln">00877:</span> }
+<span class="ln">00878:</span> 
+<span class="ln">00879:</span> function resolveBookContextForRead(bookArg = &#x27;&#x27;) {
+<span class="ln">00880:</span>   const books = getAllKnownBooks();
+<span class="ln">00881:</span> 
+<span class="ln">00882:</span>   if (!books.length) {
+<span class="ln">00883:</span>     throw new Error(`未找到任何书。请先把 txt 放到：${INPUT_DIR}`);
+<span class="ln">00884:</span>   }
+<span class="ln">00885:</span> 
+<span class="ln">00886:</span>   if (!bookArg) {
+<span class="ln">00887:</span>     if (books.length === 1) return books[0];
+<span class="ln">00888:</span>     throw new Error(&#x27;存在多本书，请用 --book 指定书名。&#x27;);
+<span class="ln">00889:</span>   }
+<span class="ln">00890:</span> 
+<span class="ln">00891:</span>   const exact = books.find((item) =&gt; item.bookName === bookArg);
+<span class="ln">00892:</span>   if (exact) return exact;
+<span class="ln">00893:</span> 
+<span class="ln">00894:</span>   const fuzzy = books.filter((item) =&gt; item.bookName.includes(bookArg));
+<span class="ln">00895:</span>   if (fuzzy.length === 1) return fuzzy[0];
+<span class="ln">00896:</span>   if (fuzzy.length &gt; 1) {
+<span class="ln">00897:</span>     throw new Error(`--book 命中多个书名：${fuzzy.map((x) =&gt; x.bookName).join(&#x27; / &#x27;)}`);
+<span class="ln">00898:</span>   }
+<span class="ln">00899:</span> 
+<span class="ln">00900:</span>   throw new Error(`未找到书：${bookArg}`);
+<span class="ln">00901:</span> }
+<span class="ln">00902:</span> 
+<span class="ln">00903:</span> // =========================================
+<span class="ln">00904:</span> // round 文件体系
+<span class="ln">00905:</span> // =========================================
+<span class="ln">00906:</span> function polishPadRoundNo(roundNo) {
+<span class="ln">00907:</span>   return String(Number(roundNo) || 0).padStart(4, &#x27;0&#x27;);
+<span class="ln">00908:</span> }
+<span class="ln">00909:</span> 
+<span class="ln">00910:</span> function polishRoundLabel(roundNo) {
+<span class="ln">00911:</span>   return `round${String(Number(roundNo) || 0).padStart(2, &#x27;0&#x27;)}`;
+<span class="ln">00912:</span> }
+<span class="ln">00913:</span> 
+<span class="ln">00914:</span> function getPolishRootDir(bookDir) {
+<span class="ln">00915:</span>   return path.join(bookDir, POLISH_ROOT_DIR_NAME);
+<span class="ln">00916:</span> }
+<span class="ln">00917:</span> 
+<span class="ln">00918:</span> function getPolishPointerPath(bookDir) {
+<span class="ln">00919:</span>   return path.join(getPolishRootDir(bookDir), &#x27;current_body_pointer.json&#x27;);
+<span class="ln">00920:</span> }
+<span class="ln">00921:</span> 
+<span class="ln">00922:</span> function getPolishRoundDir(bookDir, roundNo) {
+<span class="ln">00923:</span>   return path.join(bookDir, POLISH_ROOT_DIR_NAME, `${POLISH_ROUND_PREFIX}${polishPadRoundNo(roundNo)}`);
+<span class="ln">00924:</span> }
+<span class="ln">00925:</span> 
+<span class="ln">00926:</span> function getPolishRoundMetaPath(bookDir, roundNo) {
+<span class="ln">00927:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;round_meta.json&#x27;);
+<span class="ln">00928:</span> }
+<span class="ln">00929:</span> 
+<span class="ln">00930:</span> function getPolishRoundBaseTextPath(bookDir, roundNo) {
+<span class="ln">00931:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;base_text.txt&#x27;);
+<span class="ln">00932:</span> }
+<span class="ln">00933:</span> 
+<span class="ln">00934:</span> function getPolishRoundScanModsPath(bookDir, roundNo) {
+<span class="ln">00935:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;scan_mods.json&#x27;);
+<span class="ln">00936:</span> }
+<span class="ln">00937:</span> 
+<span class="ln">00938:</span> function getPolishRoundImportedModsPath(bookDir, roundNo) {
+<span class="ln">00939:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;imported_mods.json&#x27;);
+<span class="ln">00940:</span> }
+<span class="ln">00941:</span> 
+<span class="ln">00942:</span> function getPolishRoundImportedUnresolvedPath(bookDir, roundNo) {
+<span class="ln">00943:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;imported_unresolved.json&#x27;);
+<span class="ln">00944:</span> }
+<span class="ln">00945:</span> 
+<span class="ln">00946:</span> function getPolishRoundEffectiveModsPath(bookDir, roundNo) {
+<span class="ln">00947:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;effective_mods.json&#x27;);
+<span class="ln">00948:</span> }
+<span class="ln">00949:</span> 
+<span class="ln">00950:</span> function getPolishRoundExportPath(bookDir, roundNo, sourceMode) {
+<span class="ln">00951:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), `export_${sourceMode}.txt`);
+<span class="ln">00952:</span> }
+<span class="ln">00953:</span> 
+<span class="ln">00954:</span> function getPolishRoundProofPath(bookDir, roundNo) {
+<span class="ln">00955:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), `proof_${polishRoundLabel(roundNo)}.txt`);
+<span class="ln">00956:</span> }
+<span class="ln">00957:</span> 
+<span class="ln">00958:</span> function getPolishRoundFinalPath(bookDir, roundNo) {
+<span class="ln">00959:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), `final_${polishRoundLabel(roundNo)}.txt`);
+<span class="ln">00960:</span> }
+<span class="ln">00961:</span> 
+<span class="ln">00962:</span> function getPolishRoundImportDir(bookDir, roundNo) {
+<span class="ln">00963:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;_imports&#x27;);
+<span class="ln">00964:</span> }
+<span class="ln">00965:</span> 
+<span class="ln">00966:</span> function getPolishRoundChunkDir(bookDir, roundNo) {
+<span class="ln">00967:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;_scan_chunks&#x27;);
+<span class="ln">00968:</span> }
+<span class="ln">00969:</span> 
+<span class="ln">00970:</span> function getPolishRoundChunkManifestPath(bookDir, roundNo) {
+<span class="ln">00971:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;scan_chunk_manifest.json&#x27;);
+<span class="ln">00972:</span> }
+<span class="ln">00973:</span> 
+<span class="ln">00974:</span> function getPolishRoundProgressPath(bookDir, roundNo) {
+<span class="ln">00975:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;scan_progress.json&#x27;);
+<span class="ln">00976:</span> }
+<span class="ln">00977:</span> 
+<span class="ln">00978:</span> function getPolishRoundUsageLogPath(bookDir, roundNo) {
+<span class="ln">00979:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;scan_usage.log&#x27;);
+<span class="ln">00980:</span> }
+<span class="ln">00981:</span> 
+<span class="ln">00982:</span> function getPolishRoundDebugDir(bookDir, roundNo) {
+<span class="ln">00983:</span>   return path.join(getPolishRoundDir(bookDir, roundNo), &#x27;_scan_debug_raw&#x27;);
+<span class="ln">00984:</span> }
+<span class="ln">00985:</span> 
+<span class="ln">00986:</span> function listPolishRounds(bookDir) {
+<span class="ln">00987:</span>   const root = getPolishRootDir(bookDir);
+<span class="ln">00988:</span>   if (!fs.existsSync(root)) return [];
+<span class="ln">00989:</span> 
+<span class="ln">00990:</span>   return fs
+<span class="ln">00991:</span>     .readdirSync(root)
+<span class="ln">00992:</span>     .filter((name) =&gt; new RegExp(`^${POLISH_ROUND_PREFIX}\\d+$`).test(name))
+<span class="ln">00993:</span>     .map((name) =&gt; {
+<span class="ln">00994:</span>       const roundNo = Number(name.replace(POLISH_ROUND_PREFIX, &#x27;&#x27;)) || 0;
+<span class="ln">00995:</span>       return {
+<span class="ln">00996:</span>         roundNo,
+<span class="ln">00997:</span>         dir: path.join(root, name),
+<span class="ln">00998:</span>         name,
+<span class="ln">00999:</span>         meta: readJsonFile(path.join(root, name, &#x27;round_meta.json&#x27;), null),
+<span class="ln">01000:</span>       };
+<span class="ln">01001:</span>     })
+<span class="ln">01002:</span>     .sort((a, b) =&gt; a.roundNo - b.roundNo);
+<span class="ln">01003:</span> }
+<span class="ln">01004:</span> 
+<span class="ln">01005:</span> function getLatestPolishRoundInfo(bookDir) {
+<span class="ln">01006:</span>   const rounds = listPolishRounds(bookDir);
+<span class="ln">01007:</span>   return rounds.length ? rounds[rounds.length - 1] : null;
+<span class="ln">01008:</span> }
+<span class="ln">01009:</span> 
+<span class="ln">01010:</span> function writePolishCurrentPointer(bookDir, payload = {}) {
+<span class="ln">01011:</span>   const pointerPath = getPolishPointerPath(bookDir);
+<span class="ln">01012:</span>   ensureDir(path.dirname(pointerPath));
+<span class="ln">01013:</span>   writeJsonFile(pointerPath, payload);
+<span class="ln">01014:</span> }
+<span class="ln">01015:</span> 
+<span class="ln">01016:</span> // =========================================
+<span class="ln">01017:</span> // round 基底：scan 一定来自 润色/*.txt
+<span class="ln">01018:</span> // =========================================
+<span class="ln">01019:</span> function getScanSourceText(bookCtx) {
+<span class="ln">01020:</span>   if (!bookCtx || !bookCtx.sourceFilePath || !fs.existsSync(bookCtx.sourceFilePath)) {
+<span class="ln">01021:</span>     throw new Error(`润色 目录中不存在《${bookCtx ? bookCtx.bookName : &#x27;&#x27;}》对应的 txt。`);
+<span class="ln">01022:</span>   }
+<span class="ln">01023:</span> 
+<span class="ln">01024:</span>   const text = fs.readFileSync(bookCtx.sourceFilePath, &#x27;utf-8&#x27;);
+<span class="ln">01025:</span>   if (!text || text.trim() === &#x27;&#x27;) {
+<span class="ln">01026:</span>     throw new Error(`《${bookCtx.bookName}》是空文件，无法润色。`);
+<span class="ln">01027:</span>   }
+<span class="ln">01028:</span> 
+<span class="ln">01029:</span>   return {
+<span class="ln">01030:</span>     filePath: bookCtx.sourceFilePath,
+<span class="ln">01031:</span>     fileName: path.basename(bookCtx.sourceFilePath),
+<span class="ln">01032:</span>     text,
+<span class="ln">01033:</span>   };
+<span class="ln">01034:</span> }
+<span class="ln">01035:</span> 
+<span class="ln">01036:</span> function createNewPolishRoundFromInput(bookCtx) {
+<span class="ln">01037:</span>   const bookDir = bookCtx.bookOutputDir;
+<span class="ln">01038:</span>   ensureDir(bookDir);
+<span class="ln">01039:</span>   ensureDir(getPolishRootDir(bookDir));
+<span class="ln">01040:</span> 
+<span class="ln">01041:</span>   const latest = getLatestPolishRoundInfo(bookDir);
+<span class="ln">01042:</span>   const nextRoundNo = latest ? latest.roundNo + 1 : 1;
+<span class="ln">01043:</span>   const roundDir = getPolishRoundDir(bookDir, nextRoundNo);
+<span class="ln">01044:</span>   ensureDir(roundDir);
+<span class="ln">01045:</span> 
+<span class="ln">01046:</span>   const source = getScanSourceText(bookCtx);
+<span class="ln">01047:</span>   const baseTextPath = getPolishRoundBaseTextPath(bookDir, nextRoundNo);
+<span class="ln">01048:</span>   fs.writeFileSync(baseTextPath, source.text, &#x27;utf-8&#x27;);
+<span class="ln">01049:</span> 
+<span class="ln">01050:</span>   const meta = {
+<span class="ln">01051:</span>     roundNo: nextRoundNo,
+<span class="ln">01052:</span>     roundId: `${POLISH_ROUND_PREFIX}${polishPadRoundNo(nextRoundNo)}`,
+<span class="ln">01053:</span>     createdAtBjt: getBeijingTimeStr(),
+<span class="ln">01054:</span>     status: &#x27;open&#x27;,
+<span class="ln">01055:</span>     baseFileName: source.fileName,
+<span class="ln">01056:</span>     baseSourceKind: &#x27;input-source&#x27;,
+<span class="ln">01057:</span>     baseTextLength: source.text.length,
+<span class="ln">01058:</span>     baseTextSha1: sha1(source.text),
+<span class="ln">01059:</span>     appliedAtBjt: &#x27;&#x27;,
+<span class="ln">01060:</span>     appliedSource: &#x27;&#x27;,
+<span class="ln">01061:</span>     finalTextLength: 0,
+<span class="ln">01062:</span>     finalTextSha1: &#x27;&#x27;,
+<span class="ln">01063:</span>   };
+<span class="ln">01064:</span> 
+<span class="ln">01065:</span>   writeJsonFile(getPolishRoundMetaPath(bookDir, nextRoundNo), meta);
+<span class="ln">01066:</span>   return { roundNo: nextRoundNo, roundDir, meta, base: source };
+<span class="ln">01067:</span> }
+<span class="ln">01068:</span> 
+<span class="ln">01069:</span> function ensureRoundForScan(bookCtx, roundArg = &#x27;auto&#x27;) {
+<span class="ln">01070:</span>   const bookDir = bookCtx.bookOutputDir;
+<span class="ln">01071:</span>   const latest = getLatestPolishRoundInfo(bookDir);
+<span class="ln">01072:</span>   const source = getScanSourceText(bookCtx);
+<span class="ln">01073:</span>   const sourceHash = sha1(source.text);
+<span class="ln">01074:</span> 
+<span class="ln">01075:</span>   if (String(roundArg || &#x27;&#x27;).toLowerCase() === &#x27;next&#x27;) {
+<span class="ln">01076:</span>     return createNewPolishRoundFromInput(bookCtx);
+<span class="ln">01077:</span>   }
+<span class="ln">01078:</span> 
+<span class="ln">01079:</span>   if (!latest) {
+<span class="ln">01080:</span>     return createNewPolishRoundFromInput(bookCtx);
+<span class="ln">01081:</span>   }
+<span class="ln">01082:</span> 
+<span class="ln">01083:</span>   if (!roundArg || roundArg === &#x27;auto&#x27; || roundArg === &#x27;latest&#x27;) {
+<span class="ln">01084:</span>     const latestMeta = latest.meta || {};
+<span class="ln">01085:</span>     if (latestMeta.status === &#x27;open&#x27; &amp;&amp; latestMeta.baseTextSha1 === sourceHash) {
+<span class="ln">01086:</span>       return latest;
+<span class="ln">01087:</span>     }
+<span class="ln">01088:</span>     return createNewPolishRoundFromInput(bookCtx);
+<span class="ln">01089:</span>   }
+<span class="ln">01090:</span> 
+<span class="ln">01091:</span>   const numeric = Number(roundArg);
+<span class="ln">01092:</span>   if (!Number.isInteger(numeric) || numeric &lt;= 0) {
+<span class="ln">01093:</span>     throw new Error(`非法 round 参数：${roundArg}`);
+<span class="ln">01094:</span>   }
+<span class="ln">01095:</span> 
+<span class="ln">01096:</span>   const hit = listPolishRounds(bookDir).find((item) =&gt; item.roundNo === numeric);
+<span class="ln">01097:</span>   if (hit) return hit;
+<span class="ln">01098:</span> 
+<span class="ln">01099:</span>   if (numeric === latest.roundNo + 1) {
+<span class="ln">01100:</span>     return createNewPolishRoundFromInput(bookCtx);
+<span class="ln">01101:</span>   }
+<span class="ln">01102:</span> 
+<span class="ln">01103:</span>   throw new Error(`指定 round 不存在：${roundArg}`);
+<span class="ln">01104:</span> }
+<span class="ln">01105:</span> 
+<span class="ln">01106:</span> function ensureRoundForRead(bookCtx, roundArg = &#x27;latest&#x27;) {
+<span class="ln">01107:</span>   const bookDir = bookCtx.bookOutputDir;
+<span class="ln">01108:</span>   const rounds = listPolishRounds(bookDir);
+<span class="ln">01109:</span> 
+<span class="ln">01110:</span>   if (!rounds.length) {
+<span class="ln">01111:</span>     if (bookCtx.sourceFilePath &amp;&amp; fs.existsSync(bookCtx.sourceFilePath)) {
+<span class="ln">01112:</span>       return createNewPolishRoundFromInput(bookCtx);
+<span class="ln">01113:</span>     }
+<span class="ln">01114:</span>     throw new Error(`《${bookCtx.bookName}》还没有任何 round。请先把 TXT 放到“润色”目录并执行 scan。`);
+<span class="ln">01115:</span>   }
+<span class="ln">01116:</span> 
+<span class="ln">01117:</span>   if (!roundArg || roundArg === &#x27;latest&#x27; || roundArg === &#x27;auto&#x27;) {
+<span class="ln">01118:</span>     return rounds[rounds.length - 1];
+<span class="ln">01119:</span>   }
+<span class="ln">01120:</span> 
+<span class="ln">01121:</span>   if (String(roundArg).toLowerCase() === &#x27;next&#x27;) {
+<span class="ln">01122:</span>     if (bookCtx.sourceFilePath &amp;&amp; fs.existsSync(bookCtx.sourceFilePath)) {
+<span class="ln">01123:</span>       return createNewPolishRoundFromInput(bookCtx);
+<span class="ln">01124:</span>     }
+<span class="ln">01125:</span>     throw new Error(`《${bookCtx.bookName}》当前没有可用于新建 round 的输入 TXT。`);
+<span class="ln">01126:</span>   }
+<span class="ln">01127:</span> 
+<span class="ln">01128:</span>   const numeric = Number(roundArg);
+<span class="ln">01129:</span>   if (!Number.isInteger(numeric) || numeric &lt;= 0) {
+<span class="ln">01130:</span>     throw new Error(`非法 round 参数：${roundArg}`);
+<span class="ln">01131:</span>   }
+<span class="ln">01132:</span> 
+<span class="ln">01133:</span>   const hit = rounds.find((item) =&gt; item.roundNo === numeric);
+<span class="ln">01134:</span>   if (!hit) throw new Error(`指定 round 不存在：${roundArg}`);
+<span class="ln">01135:</span>   return hit;
+<span class="ln">01136:</span> }
+<span class="ln">01137:</span> 
+<span class="ln">01138:</span> // =========================================
+<span class="ln">01139:</span> // 句子切分 / polish chunking
+<span class="ln">01140:</span> // =========================================
+<span class="ln">01141:</span> function isSentenceEndingChar(char) {
+<span class="ln">01142:</span>   return /[。！？!?；;…]/.test(char);
+<span class="ln">01143:</span> }
+<span class="ln">01144:</span> 
+<span class="ln">01145:</span> function findSentenceBoundary(text, start) {
+<span class="ln">01146:</span>   let index = start;
+<span class="ln">01147:</span> 
+<span class="ln">01148:</span>   while (index &lt; text.length) {
+<span class="ln">01149:</span>     const char = text[index];
+<span class="ln">01150:</span>     const nextChar = text[index + 1] || &#x27;&#x27;;
+<span class="ln">01151:</span>     const previousChar = text[index - 1] || &#x27;&#x27;;
+<span class="ln">01152:</span> 
+<span class="ln">01153:</span>     if (char === &#x27;\n&#x27; &amp;&amp; nextChar === &#x27;\n&#x27;) {
+<span class="ln">01154:</span>       let end = index + 2;
+<span class="ln">01155:</span>       while (end &lt; text.length &amp;&amp; /[\s\u3000]/.test(text[end])) end += 1;
+<span class="ln">01156:</span>       return end;
+<span class="ln">01157:</span>     }
+<span class="ln">01158:</span> 
+<span class="ln">01159:</span>     if (char === &#x27;.&#x27; &amp;&amp; previousChar === &#x27;.&#x27; &amp;&amp; nextChar === &#x27;.&#x27;) {
+<span class="ln">01160:</span>       let end = index + 2;
+<span class="ln">01161:</span>       while (end &lt; text.length &amp;&amp; /[&quot;&#x27;”’）)\]\s]/.test(text[end])) end += 1;
+<span class="ln">01162:</span>       while (end &lt; text.length &amp;&amp; /[\s\u3000]/.test(text[end])) end += 1;
+<span class="ln">01163:</span>       return end;
+<span class="ln">01164:</span>     }
+<span class="ln">01165:</span> 
+<span class="ln">01166:</span>     if (char === &#x27;.&#x27;) {
+<span class="ln">01167:</span>       const isDecimalPoint = /\d/.test(previousChar) &amp;&amp; /\d/.test(nextChar);
+<span class="ln">01168:</span>       const nextLooksLikeSentenceBreak = !nextChar || /[\s\u3000\n&quot;&#x27;”’）)\]]/.test(nextChar);
+<span class="ln">01169:</span>       if (!isDecimalPoint &amp;&amp; nextLooksLikeSentenceBreak) {
+<span class="ln">01170:</span>         let end = index + 1;
+<span class="ln">01171:</span>         while (end &lt; text.length &amp;&amp; /[&quot;&#x27;”’）)\]\s]/.test(text[end])) end += 1;
+<span class="ln">01172:</span>         while (end &lt; text.length &amp;&amp; /[\s\u3000]/.test(text[end])) end += 1;
+<span class="ln">01173:</span>         return end;
+<span class="ln">01174:</span>       }
+<span class="ln">01175:</span>     }
+<span class="ln">01176:</span> 
+<span class="ln">01177:</span>     if (isSentenceEndingChar(char)) {
+<span class="ln">01178:</span>       let end = index + 1;
+<span class="ln">01179:</span>       while (end &lt; text.length &amp;&amp; /[&quot;&#x27;”’）)\]〗》」』]/.test(text[end])) end += 1;
+<span class="ln">01180:</span>       while (end &lt; text.length &amp;&amp; /[\s\u3000]/.test(text[end])) end += 1;
+<span class="ln">01181:</span>       return end;
+<span class="ln">01182:</span>     }
+<span class="ln">01183:</span> 
+<span class="ln">01184:</span>     index += 1;
+<span class="ln">01185:</span>   }
+<span class="ln">01186:</span> 
+<span class="ln">01187:</span>   return text.length;
+<span class="ln">01188:</span> }
+<span class="ln">01189:</span> 
+<span class="ln">01190:</span> function collectSentenceUnitsWithOffsetsForPolish(text, baseOffset = 0) {
+<span class="ln">01191:</span>   const units = [];
+<span class="ln">01192:</span>   let start = 0;
+<span class="ln">01193:</span> 
+<span class="ln">01194:</span>   while (start &lt; text.length) {
+<span class="ln">01195:</span>     const end = findSentenceBoundary(text, start);
+<span class="ln">01196:</span>     if (end &lt;= start) break;
+<span class="ln">01197:</span> 
+<span class="ln">01198:</span>     units.push({
+<span class="ln">01199:</span>       text: text.slice(start, end),
+<span class="ln">01200:</span>       startOffset: start,
+<span class="ln">01201:</span>       endOffset: end,
+<span class="ln">01202:</span>       startIndex: baseOffset + start,
+<span class="ln">01203:</span>       endIndex: baseOffset + end,
+<span class="ln">01204:</span>     });
+<span class="ln">01205:</span> 
+<span class="ln">01206:</span>     start = end;
+<span class="ln">01207:</span>   }
+<span class="ln">01208:</span> 
+<span class="ln">01209:</span>   if (!units.length &amp;&amp; text.length &gt; 0) {
+<span class="ln">01210:</span>     units.push({
+<span class="ln">01211:</span>       text,
+<span class="ln">01212:</span>       startOffset: 0,
+<span class="ln">01213:</span>       endOffset: text.length,
+<span class="ln">01214:</span>       startIndex: baseOffset,
+<span class="ln">01215:</span>       endIndex: baseOffset + text.length,
+<span class="ln">01216:</span>     });
+<span class="ln">01217:</span>   }
+<span class="ln">01218:</span> 
+<span class="ln">01219:</span>   return units;
+<span class="ln">01220:</span> }
+<span class="ln">01221:</span> 
+<span class="ln">01222:</span> function splitTextIntoTwoSentenceAwareWithOffsetsForPolish(text) {
+<span class="ln">01223:</span>   const sentences = collectSentenceUnitsWithOffsetsForPolish(text, 0);
+<span class="ln">01224:</span>   if (sentences.length &lt; 2 || text.length &lt; 1200) return null;
+<span class="ln">01225:</span> 
+<span class="ln">01226:</span>   const totalLength = sentences.reduce((sum, item) =&gt; sum + item.text.length, 0);
+<span class="ln">01227:</span>   const target = totalLength / 2;
+<span class="ln">01228:</span> 
+<span class="ln">01229:</span>   let running = 0;
+<span class="ln">01230:</span>   let splitIndex = -1;
+<span class="ln">01231:</span> 
+<span class="ln">01232:</span>   for (let i = 0; i &lt; sentences.length; i++) {
+<span class="ln">01233:</span>     running += sentences[i].text.length;
+<span class="ln">01234:</span>     if (running &gt;= target) {
+<span class="ln">01235:</span>       splitIndex = i + 1;
+<span class="ln">01236:</span>       break;
+<span class="ln">01237:</span>     }
+<span class="ln">01238:</span>   }
+<span class="ln">01239:</span> 
+<span class="ln">01240:</span>   if (splitIndex &lt;= 0 || splitIndex &gt;= sentences.length) {
+<span class="ln">01241:</span>     splitIndex = Math.floor(sentences.length / 2);
+<span class="ln">01242:</span>   }
+<span class="ln">01243:</span> 
+<span class="ln">01244:</span>   const leftEnd = sentences[splitIndex - 1].endOffset;
+<span class="ln">01245:</span>   const rightStart = sentences[splitIndex].startOffset;
+<span class="ln">01246:</span> 
+<span class="ln">01247:</span>   const leftText = text.slice(0, leftEnd);
+<span class="ln">01248:</span>   const rightText = text.slice(rightStart);
+<span class="ln">01249:</span> 
+<span class="ln">01250:</span>   if (!leftText || !rightText) return null;
+<span class="ln">01251:</span> 
+<span class="ln">01252:</span>   return [
+<span class="ln">01253:</span>     { text: leftText, startOffset: 0, endOffset: leftEnd },
+<span class="ln">01254:</span>     { text: rightText, startOffset: rightStart, endOffset: text.length },
+<span class="ln">01255:</span>   ];
+<span class="ln">01256:</span> }
+<span class="ln">01257:</span> 
+<span class="ln">01258:</span> function findBestPolishChunkEnd(text, startIndex, hardLimit = POLISH_SCAN_HARD_LIMIT) {
+<span class="ln">01259:</span>   const maxEnd = Math.min(text.length, startIndex + hardLimit);
+<span class="ln">01260:</span>   if (maxEnd &gt;= text.length) return text.length;
+<span class="ln">01261:</span> 
+<span class="ln">01262:</span>   const minAccept = Math.max(startIndex + Math.floor(hardLimit * 0.55), startIndex + 1);
+<span class="ln">01263:</span> 
+<span class="ln">01264:</span>   for (let i = maxEnd; i &gt;= minAccept + 1; i--) {
+<span class="ln">01265:</span>     if (text.slice(i - 2, i) === &#x27;\n\n&#x27;) return i;
+<span class="ln">01266:</span>   }
+<span class="ln">01267:</span> 
+<span class="ln">01268:</span>   for (let i = maxEnd; i &gt;= minAccept; i--) {
+<span class="ln">01269:</span>     const ch = text[i - 1];
+<span class="ln">01270:</span>     if (/[。！？!?；;…]/.test(ch)) {
+<span class="ln">01271:</span>       let end = i;
+<span class="ln">01272:</span>       while (end &lt; text.length &amp;&amp; /[&quot;&#x27;”’）)\]〗》」』\s]/.test(text[end])) end += 1;
+<span class="ln">01273:</span>       return end;
+<span class="ln">01274:</span>     }
+<span class="ln">01275:</span>   }
+<span class="ln">01276:</span> 
+<span class="ln">01277:</span>   for (let i = maxEnd; i &gt;= minAccept; i--) {
+<span class="ln">01278:</span>     if (text[i - 1] === &#x27;\n&#x27;) return i;
+<span class="ln">01279:</span>   }
+<span class="ln">01280:</span> 
+<span class="ln">01281:</span>   return maxEnd;
+<span class="ln">01282:</span> }
+<span class="ln">01283:</span> 
+<span class="ln">01284:</span> function buildPolishChunkPlan(text, hardLimit = POLISH_SCAN_HARD_LIMIT) {
+<span class="ln">01285:</span>   const chunks = [];
+<span class="ln">01286:</span>   let cursor = 0;
+<span class="ln">01287:</span>   let index = 1;
+<span class="ln">01288:</span> 
+<span class="ln">01289:</span>   while (cursor &lt; text.length) {
+<span class="ln">01290:</span>     const end = findBestPolishChunkEnd(text, cursor, hardLimit);
+<span class="ln">01291:</span>     const chunkText = text.slice(cursor, end);
+<span class="ln">01292:</span>     const actualEnd = chunkText ? end : Math.min(text.length, cursor + hardLimit);
+<span class="ln">01293:</span> 
+<span class="ln">01294:</span>     chunks.push({
+<span class="ln">01295:</span>       index,
+<span class="ln">01296:</span>       startIndex: cursor,
+<span class="ln">01297:</span>       endIndex: actualEnd,
+<span class="ln">01298:</span>       length: actualEnd - cursor,
+<span class="ln">01299:</span>       text: text.slice(cursor, actualEnd),
+<span class="ln">01300:</span>       fileName: `chunk_${String(index).padStart(4, &#x27;0&#x27;)}.txt`,
+<span class="ln">01301:</span>     });
+<span class="ln">01302:</span> 
+<span class="ln">01303:</span>     cursor = actualEnd;
+<span class="ln">01304:</span>     index += 1;
+<span class="ln">01305:</span>   }
+<span class="ln">01306:</span> 
+<span class="ln">01307:</span>   return chunks;
+<span class="ln">01308:</span> }
+<span class="ln">01309:</span> 
+<span class="ln">01310:</span> function savePolishChunkPlan(bookDir, roundNo, baseText, chunkPlan) {
+<span class="ln">01311:</span>   const chunkDir = getPolishRoundChunkDir(bookDir, roundNo);
+<span class="ln">01312:</span>   const manifestPath = getPolishRoundChunkManifestPath(bookDir, roundNo);
+<span class="ln">01313:</span> 
+<span class="ln">01314:</span>   ensureDir(chunkDir);
+<span class="ln">01315:</span>   emptyDir(chunkDir);
+<span class="ln">01316:</span> 
+<span class="ln">01317:</span>   for (const chunk of chunkPlan) {
+<span class="ln">01318:</span>     fs.writeFileSync(path.join(chunkDir, chunk.fileName), chunk.text, &#x27;utf-8&#x27;);
+<span class="ln">01319:</span>   }
+<span class="ln">01320:</span> 
+<span class="ln">01321:</span>   writeJsonFile(manifestPath, {
+<span class="ln">01322:</span>     totalChars: baseText.length,
+<span class="ln">01323:</span>     hardLimit: POLISH_SCAN_HARD_LIMIT,
+<span class="ln">01324:</span>     chunkCount: chunkPlan.length,
+<span class="ln">01325:</span>     chunks: chunkPlan.map((chunk) =&gt; ({
+<span class="ln">01326:</span>       index: chunk.index,
+<span class="ln">01327:</span>       startIndex: chunk.startIndex,
+<span class="ln">01328:</span>       endIndex: chunk.endIndex,
+<span class="ln">01329:</span>       length: chunk.length,
+<span class="ln">01330:</span>       fileName: chunk.fileName,
+<span class="ln">01331:</span>     })),
+<span class="ln">01332:</span>   });
+<span class="ln">01333:</span> 
+<span class="ln">01334:</span>   return chunkPlan;
+<span class="ln">01335:</span> }
+<span class="ln">01336:</span> 
+<span class="ln">01337:</span> function loadPolishChunkPlan(bookDir, roundNo, totalChars) {
+<span class="ln">01338:</span>   const chunkDir = getPolishRoundChunkDir(bookDir, roundNo);
+<span class="ln">01339:</span>   const manifestPath = getPolishRoundChunkManifestPath(bookDir, roundNo);
+<span class="ln">01340:</span> 
+<span class="ln">01341:</span>   if (!fs.existsSync(chunkDir) || !fs.existsSync(manifestPath)) return null;
+<span class="ln">01342:</span> 
+<span class="ln">01343:</span>   const manifest = readJsonFile(manifestPath, null);
+<span class="ln">01344:</span>   if (!manifest || manifest.totalChars !== totalChars || !Array.isArray(manifest.chunks)) return null;
+<span class="ln">01345:</span> 
+<span class="ln">01346:</span>   const plan = [];
+<span class="ln">01347:</span>   for (const item of manifest.chunks) {
+<span class="ln">01348:</span>     const filePath = path.join(chunkDir, item.fileName);
+<span class="ln">01349:</span>     if (!fs.existsSync(filePath)) return null;
+<span class="ln">01350:</span> 
+<span class="ln">01351:</span>     plan.push({
+<span class="ln">01352:</span>       index: item.index,
+<span class="ln">01353:</span>       startIndex: item.startIndex,
+<span class="ln">01354:</span>       endIndex: item.endIndex,
+<span class="ln">01355:</span>       length: item.length,
+<span class="ln">01356:</span>       fileName: item.fileName,
+<span class="ln">01357:</span>       text: fs.readFileSync(filePath, &#x27;utf-8&#x27;),
+<span class="ln">01358:</span>     });
+<span class="ln">01359:</span>   }
+<span class="ln">01360:</span> 
+<span class="ln">01361:</span>   return plan;
+<span class="ln">01362:</span> }
+<span class="ln">01363:</span> 
+<span class="ln">01364:</span> function buildOrLoadPolishChunkPlan(bookDir, roundNo, baseText) {
+<span class="ln">01365:</span>   const loaded = loadPolishChunkPlan(bookDir, roundNo, baseText.length);
+<span class="ln">01366:</span>   if (loaded) return loaded;
+<span class="ln">01367:</span> 
+<span class="ln">01368:</span>   const built = buildPolishChunkPlan(baseText, POLISH_SCAN_HARD_LIMIT);
+<span class="ln">01369:</span>   return savePolishChunkPlan(bookDir, roundNo, baseText, built);
+<span class="ln">01370:</span> }
+<span class="ln">01371:</span> 
+<span class="ln">01372:</span> function buildChunkTagByNo(no) {
+<span class="ln">01373:</span>   if (!Number.isInteger(Number(no)) || Number(no) &lt;= 0) return &#x27;&#x27;;
+<span class="ln">01374:</span>   return `chunk_${Number(no)}`;
+<span class="ln">01375:</span> }
+<span class="ln">01376:</span> 
+<span class="ln">01377:</span> function loadPolishChunkRanges(bookDir, roundNo) {
+<span class="ln">01378:</span>   const manifest = readJsonFile(getPolishRoundChunkManifestPath(bookDir, roundNo), null);
+<span class="ln">01379:</span>   if (!manifest || !Array.isArray(manifest.chunks)) return [];
+<span class="ln">01380:</span>   return manifest.chunks.map((item) =&gt; ({
+<span class="ln">01381:</span>     index: item.index,
+<span class="ln">01382:</span>     startIndex: item.startIndex,
+<span class="ln">01383:</span>     endIndex: item.endIndex,
+<span class="ln">01384:</span>     tag: buildChunkTagByNo(item.index),
+<span class="ln">01385:</span>   }));
+<span class="ln">01386:</span> }
+<span class="ln">01387:</span> 
+<span class="ln">01388:</span> // =========================================
+<span class="ln">01389:</span> // 模型返回解析 / 修改清洗 / 定位
+<span class="ln">01390:</span> // =========================================
+<span class="ln">01391:</span> function cleanModelText(text) {
+<span class="ln">01392:</span>   return String(text || &#x27;&#x27;)
+<span class="ln">01393:</span>     .replace(/^```json\s*/i, &#x27;&#x27;)
+<span class="ln">01394:</span>     .replace(/^```\s*/i, &#x27;&#x27;)
+<span class="ln">01395:</span>     .replace(/\s*```$/i, &#x27;&#x27;)
+<span class="ln">01396:</span>     .trim();
+<span class="ln">01397:</span> }
+<span class="ln">01398:</span> 
+<span class="ln">01399:</span> function extractLikelyJson(text) {
+<span class="ln">01400:</span>   const cleanText = cleanModelText(text);
+<span class="ln">01401:</span>   const firstBrace = cleanText.indexOf(&#x27;{&#x27;);
+<span class="ln">01402:</span>   const lastBrace = cleanText.lastIndexOf(&#x27;}&#x27;);
+<span class="ln">01403:</span> 
+<span class="ln">01404:</span>   if (firstBrace !== -1 &amp;&amp; lastBrace !== -1 &amp;&amp; lastBrace &gt; firstBrace) {
+<span class="ln">01405:</span>     return cleanText.slice(firstBrace, lastBrace + 1);
+<span class="ln">01406:</span>   }
+<span class="ln">01407:</span> 
+<span class="ln">01408:</span>   return cleanText;
+<span class="ln">01409:</span> }
+<span class="ln">01410:</span> 
+<span class="ln">01411:</span> function parsePolishModelModifications(rawContent) {
+<span class="ln">01412:</span>   const result = {
+<span class="ln">01413:</span>     modifications: [],
+<span class="ln">01414:</span>     parsed: false,
+<span class="ln">01415:</span>     rawContent: rawContent || &#x27;&#x27;,
+<span class="ln">01416:</span>   };
+<span class="ln">01417:</span> 
+<span class="ln">01418:</span>   const likelyJson = extractLikelyJson(rawContent);
+<span class="ln">01419:</span> 
+<span class="ln">01420:</span>   try {
+<span class="ln">01421:</span>     const parsed = JSON.parse(likelyJson);
+<span class="ln">01422:</span>     if (Array.isArray(parsed)) {
+<span class="ln">01423:</span>       result.modifications = parsed;
+<span class="ln">01424:</span>     } else if (parsed &amp;&amp; Array.isArray(parsed.modifications)) {
+<span class="ln">01425:</span>       result.modifications = parsed.modifications;
+<span class="ln">01426:</span>     }
+<span class="ln">01427:</span>     result.parsed = true;
+<span class="ln">01428:</span>     return result;
+<span class="ln">01429:</span>   } catch {}
+<span class="ln">01430:</span> 
+<span class="ln">01431:</span>   const matches =
+<span class="ln">01432:</span>     likelyJson.match(/\{[\s\S]*?&quot;old_text&quot;[\s\S]*?&quot;new_text&quot;[\s\S]*?&quot;reason&quot;[\s\S]*?\}/g) || [];
+<span class="ln">01433:</span>   const rescued = [];
+<span class="ln">01434:</span> 
+<span class="ln">01435:</span>   for (const item of matches) {
+<span class="ln">01436:</span>     try {
+<span class="ln">01437:</span>       rescued.push(JSON.parse(item));
+<span class="ln">01438:</span>     } catch {}
+<span class="ln">01439:</span>   }
+<span class="ln">01440:</span> 
+<span class="ln">01441:</span>   result.modifications = rescued;
+<span class="ln">01442:</span>   result.parsed = rescued.length &gt; 0;
+<span class="ln">01443:</span>   return result;
+<span class="ln">01444:</span> }
+<span class="ln">01445:</span> 
+<span class="ln">01446:</span> function sanitizePolishModifications(chunkText, aiMods) {
+<span class="ln">01447:</span>   const validMods = [];
+<span class="ln">01448:</span>   const seen = new Set();
+<span class="ln">01449:</span> 
+<span class="ln">01450:</span>   for (const mod of aiMods || []) {
+<span class="ln">01451:</span>     if (!mod) continue;
+<span class="ln">01452:</span> 
+<span class="ln">01453:</span>     const oldText = typeof mod.old_text === &#x27;string&#x27; ? mod.old_text : &#x27;&#x27;;
+<span class="ln">01454:</span>     const newText = typeof mod.new_text === &#x27;string&#x27; ? mod.new_text : &#x27;&#x27;;
+<span class="ln">01455:</span>     const reason = typeof mod.reason === &#x27;string&#x27; ? mod.reason.trim() : &#x27;&#x27;;
+<span class="ln">01456:</span> 
+<span class="ln">01457:</span>     if (!oldText) continue;
+<span class="ln">01458:</span>     if (!chunkText.includes(oldText)) continue;
+<span class="ln">01459:</span>     if (oldText === newText) continue;
+<span class="ln">01460:</span>     if (/无需修改|不需要修改/i.test(reason)) continue;
+<span class="ln">01461:</span> 
+<span class="ln">01462:</span>     const key = `${oldText}&gt;&gt;&gt;${newText}&gt;&gt;&gt;${reason}`;
+<span class="ln">01463:</span>     if (seen.has(key)) continue;
+<span class="ln">01464:</span>     seen.add(key);
+<span class="ln">01465:</span> 
+<span class="ln">01466:</span>     validMods.push({
+<span class="ln">01467:</span>       old_text: oldText,
+<span class="ln">01468:</span>       new_text: newText,
+<span class="ln">01469:</span>       reason: reason || &#x27;&#x27;,
+<span class="ln">01470:</span>     });
+<span class="ln">01471:</span>   }
+<span class="ln">01472:</span> 
+<span class="ln">01473:</span>   return validMods;
+<span class="ln">01474:</span> }
+<span class="ln">01475:</span> 
+<span class="ln">01476:</span> function resolvePolishModificationPositions(chunkText, chunkStartIndex, mods, chunkTag) {
+<span class="ln">01477:</span>   const occupiedRanges = [];
+<span class="ln">01478:</span>   const cursors = new Map();
+<span class="ln">01479:</span>   const positioned = [];
+<span class="ln">01480:</span> 
+<span class="ln">01481:</span>   for (const mod of mods) {
+<span class="ln">01482:</span>     let searchFrom = cursors.get(mod.old_text) || 0;
+<span class="ln">01483:</span>     let localIndex = chunkText.indexOf(mod.old_text, searchFrom);
+<span class="ln">01484:</span> 
+<span class="ln">01485:</span>     while (localIndex !== -1) {
+<span class="ln">01486:</span>       const candidateStart = localIndex;
+<span class="ln">01487:</span>       const candidateEnd = localIndex + mod.old_text.length;
+<span class="ln">01488:</span>       const overlaps = occupiedRanges.some(
+<span class="ln">01489:</span>         (range) =&gt; candidateStart &lt; range.end &amp;&amp; candidateEnd &gt; range.start,
+<span class="ln">01490:</span>       );
+<span class="ln">01491:</span> 
+<span class="ln">01492:</span>       if (!overlaps) break;
+<span class="ln">01493:</span>       localIndex = chunkText.indexOf(mod.old_text, localIndex + 1);
+<span class="ln">01494:</span>     }
+<span class="ln">01495:</span> 
+<span class="ln">01496:</span>     if (localIndex === -1) localIndex = chunkText.indexOf(mod.old_text);
+<span class="ln">01497:</span>     if (localIndex === -1) continue;
+<span class="ln">01498:</span> 
+<span class="ln">01499:</span>     const localEnd = localIndex + mod.old_text.length;
+<span class="ln">01500:</span>     occupiedRanges.push({ start: localIndex, end: localEnd });
+<span class="ln">01501:</span>     cursors.set(mod.old_text, localEnd);
+<span class="ln">01502:</span> 
+<span class="ln">01503:</span>     positioned.push({
+<span class="ln">01504:</span>       old_text: mod.old_text,
+<span class="ln">01505:</span>       new_text: mod.new_text,
+<span class="ln">01506:</span>       reason: mod.reason,
+<span class="ln">01507:</span>       chunkTag,
+<span class="ln">01508:</span>       absoluteStart: chunkStartIndex + localIndex,
+<span class="ln">01509:</span>       absoluteEnd: chunkStartIndex + localEnd,
+<span class="ln">01510:</span>       sourceType: &#x27;scan&#x27;,
+<span class="ln">01511:</span>       importLocateKind: &#x27;&#x27;,
+<span class="ln">01512:</span>       overrideKind: &#x27;&#x27;,
+<span class="ln">01513:</span>     });
+<span class="ln">01514:</span>   }
+<span class="ln">01515:</span> 
+<span class="ln">01516:</span>   return positioned;
+<span class="ln">01517:</span> }
+<span class="ln">01518:</span> 
+<span class="ln">01519:</span> function evaluatePolishModelOutput(sourceText, rawContent, parsedResult) {
+<span class="ln">01520:</span>   const sourceLength = String(sourceText || &#x27;&#x27;).length;
+<span class="ln">01521:</span>   const output = String(rawContent || &#x27;&#x27;).trim();
+<span class="ln">01522:</span>   const outputLength = output.length;
+<span class="ln">01523:</span>   const outputFuse = getDynamicOutputFuse(sourceLength);
+<span class="ln">01524:</span> 
+<span class="ln">01525:</span>   if (!output) {
+<span class="ln">01526:</span>     throw new Error(&#x27;Polish Self-Check: Empty Output&#x27;);
+<span class="ln">01527:</span>   }
+<span class="ln">01528:</span> 
+<span class="ln">01529:</span>   if (/^(i(&#x27;| a)m sorry|sorry|as an ai|here is|以下是|当然|好的)/i.test(output)) {
+<span class="ln">01530:</span>     throw new Error(&#x27;Polish Self-Check: Refusal / Meta Response&#x27;);
+<span class="ln">01531:</span>   }
+<span class="ln">01532:</span> 
+<span class="ln">01533:</span>   if (outputLength &gt; outputFuse) {
+<span class="ln">01534:</span>     throw new Error(`Polish Self-Check: Output Fuse ${outputLength} &gt; ${outputFuse}`);
+<span class="ln">01535:</span>   }
+<span class="ln">01536:</span> 
+<span class="ln">01537:</span>   if (!(parsedResult &amp;&amp; parsedResult.parsed)) {
+<span class="ln">01538:</span>     throw new Error(&#x27;Polish Self-Check: JSON Parse Failed&#x27;);
+<span class="ln">01539:</span>   }
+<span class="ln">01540:</span> 
+<span class="ln">01541:</span>   return {
+<span class="ln">01542:</span>     outputLength,
+<span class="ln">01543:</span>     outputFuse,
+<span class="ln">01544:</span>     sizeKb: byteSizeKb(output),
+<span class="ln">01545:</span>   };
+<span class="ln">01546:</span> }
+<span class="ln">01547:</span> 
+<span class="ln">01548:</span> function getPolishModKey(mod) {
+<span class="ln">01549:</span>   return [
+<span class="ln">01550:</span>     mod.absoluteStart,
+<span class="ln">01551:</span>     mod.absoluteEnd,
+<span class="ln">01552:</span>     mod.old_text,
+<span class="ln">01553:</span>     mod.new_text,
+<span class="ln">01554:</span>     mod.reason,
+<span class="ln">01555:</span>     mod.sourceType || &#x27;&#x27;,
+<span class="ln">01556:</span>     mod.overrideKind || &#x27;&#x27;,
+<span class="ln">01557:</span>   ].join(&#x27;::&#x27;);
+<span class="ln">01558:</span> }
+<span class="ln">01559:</span> 
+<span class="ln">01560:</span> function mergeUniquePolishMods(existingMods, incomingMods) {
+<span class="ln">01561:</span>   const merged = Array.isArray(existingMods) ? [...existingMods] : [];
+<span class="ln">01562:</span>   const seen = new Set(merged.map(getPolishModKey));
+<span class="ln">01563:</span> 
+<span class="ln">01564:</span>   for (const mod of incomingMods || []) {
+<span class="ln">01565:</span>     const key = getPolishModKey(mod);
+<span class="ln">01566:</span>     if (seen.has(key)) continue;
+<span class="ln">01567:</span>     seen.add(key);
+<span class="ln">01568:</span>     merged.push(mod);
+<span class="ln">01569:</span>   }
+<span class="ln">01570:</span> 
+<span class="ln">01571:</span>   return merged;
+<span class="ln">01572:</span> }
+<span class="ln">01573:</span> 
+<span class="ln">01574:</span> function createEmptyPolishExtractionResult() {
+<span class="ln">01575:</span>   return {
+<span class="ln">01576:</span>     positionedMods: [],
+<span class="ln">01577:</span>     usageEntries: [],
+<span class="ln">01578:</span>     debugPayloads: [],
+<span class="ln">01579:</span>   };
+<span class="ln">01580:</span> }
+<span class="ln">01581:</span> 
+<span class="ln">01582:</span> function mergePolishExtractionResults(results) {
+<span class="ln">01583:</span>   const merged = createEmptyPolishExtractionResult();
+<span class="ln">01584:</span> 
+<span class="ln">01585:</span>   for (const item of results || []) {
+<span class="ln">01586:</span>     if (!item) continue;
+<span class="ln">01587:</span>     merged.positionedMods = mergeUniquePolishMods(merged.positionedMods, item.positionedMods || []);
+<span class="ln">01588:</span>     merged.usageEntries.push(...(item.usageEntries || []));
+<span class="ln">01589:</span>     merged.debugPayloads.push(...(item.debugPayloads || []));
+<span class="ln">01590:</span>   }
+<span class="ln">01591:</span> 
+<span class="ln">01592:</span>   return merged;
+<span class="ln">01593:</span> }
+<span class="ln">01594:</span> 
+<span class="ln">01595:</span> function mergePolishErrorArtifacts(target, error) {
+<span class="ln">01596:</span>   if (!target || !error) return;
+<span class="ln">01597:</span>   if (Array.isArray(error.usageEntries)) target.usageEntries.push(...error.usageEntries);
+<span class="ln">01598:</span>   if (Array.isArray(error.debugPayloads)) target.debugPayloads.push(...error.debugPayloads);
+<span class="ln">01599:</span> }
+<span class="ln">01600:</span> 
+<span class="ln">01601:</span> // =========================================
+<span class="ln">01602:</span> // 单次模型调用 + 补救
+<span class="ln">01603:</span> // =========================================
+<span class="ln">01604:</span> async function polishScanOnce(pieceText, absoluteStart, chunkTag, modelName, temperature, label) {
+<span class="ln">01605:</span>   let rawContent = &#x27;&#x27;;
+<span class="ln">01606:</span>   let parsed = { modifications: [], parsed: false, rawContent: &#x27;&#x27; };
+<span class="ln">01607:</span> 
+<span class="ln">01608:</span>   try {
+<span class="ln">01609:</span>     const result = await callGeminiGenerateContentJson({
+<span class="ln">01610:</span>       modelName,
+<span class="ln">01611:</span>       systemInstruction: POLISH_SYSTEM_INSTRUCTION,
+<span class="ln">01612:</span>       userText: `待润色文本：\n${pieceText}`,
+<span class="ln">01613:</span>       temperature,
+<span class="ln">01614:</span>       maxOutputTokens: POLISH_MAX_OUTPUT_TOKENS,
+<span class="ln">01615:</span>       responseMimeType: &#x27;application/json&#x27;,
+<span class="ln">01616:</span>     });
+<span class="ln">01617:</span> 
+<span class="ln">01618:</span>     rawContent = extractResponseText(result);
+<span class="ln">01619:</span>     parsed = parsePolishModelModifications(rawContent);
+<span class="ln">01620:</span> 
+<span class="ln">01621:</span>     const selfCheck = evaluatePolishModelOutput(pieceText, rawContent, parsed);
+<span class="ln">01622:</span>     const validMods = sanitizePolishModifications(pieceText, parsed.modifications);
+<span class="ln">01623:</span>     const positionedMods = resolvePolishModificationPositions(
+<span class="ln">01624:</span>       pieceText,
+<span class="ln">01625:</span>       absoluteStart,
+<span class="ln">01626:</span>       validMods,
+<span class="ln">01627:</span>       chunkTag,
+<span class="ln">01628:</span>     );
+<span class="ln">01629:</span>     const usage = normalizeUsageMetadata(result);
+<span class="ln">01630:</span> 
+<span class="ln">01631:</span>     return {
+<span class="ln">01632:</span>       positionedMods,
+<span class="ln">01633:</span>       usageEntries: [
+<span class="ln">01634:</span>         {
+<span class="ln">01635:</span>           chunkTag,
+<span class="ln">01636:</span>           label,
+<span class="ln">01637:</span>           model: modelName,
+<span class="ln">01638:</span>           temperature,
+<span class="ln">01639:</span>           chars: pieceText.length,
+<span class="ln">01640:</span>           mods: positionedMods.length,
+<span class="ln">01641:</span>           prompt_tokens: usage.prompt_tokens,
+<span class="ln">01642:</span>           completion_tokens: usage.completion_tokens,
+<span class="ln">01643:</span>           total_tokens: usage.total_tokens,
+<span class="ln">01644:</span>           output_chars: selfCheck.outputLength,
+<span class="ln">01645:</span>           output_kb: selfCheck.sizeKb.toFixed(2),
+<span class="ln">01646:</span>           output_fuse: selfCheck.outputFuse,
+<span class="ln">01647:</span>         },
+<span class="ln">01648:</span>       ],
+<span class="ln">01649:</span>       debugPayloads: [
+<span class="ln">01650:</span>         {
+<span class="ln">01651:</span>           label,
+<span class="ln">01652:</span>           chunkTag,
+<span class="ln">01653:</span>           model: modelName,
+<span class="ln">01654:</span>           temperature,
+<span class="ln">01655:</span>           rawContent,
+<span class="ln">01656:</span>           parsed: parsed.parsed,
+<span class="ln">01657:</span>           modCount: positionedMods.length,
+<span class="ln">01658:</span>         },
+<span class="ln">01659:</span>       ],
+<span class="ln">01660:</span>     };
+<span class="ln">01661:</span>   } catch (error) {
+<span class="ln">01662:</span>     error.usageEntries = [];
+<span class="ln">01663:</span>     error.debugPayloads = rawContent
+<span class="ln">01664:</span>       ? [
+<span class="ln">01665:</span>           {
+<span class="ln">01666:</span>             label,
+<span class="ln">01667:</span>             chunkTag,
+<span class="ln">01668:</span>             model: modelName,
+<span class="ln">01669:</span>             temperature,
+<span class="ln">01670:</span>             rawContent,
+<span class="ln">01671:</span>             parsed: parsed.parsed,
+<span class="ln">01672:</span>             modCount: 0,
+<span class="ln">01673:</span>             failed: true,
+<span class="ln">01674:</span>             reason: error &amp;&amp; error.message ? error.message : String(error),
+<span class="ln">01675:</span>           },
+<span class="ln">01676:</span>         ]
+<span class="ln">01677:</span>       : [];
+<span class="ln">01678:</span>     throw error;
+<span class="ln">01679:</span>   }
+<span class="ln">01680:</span> }
+<span class="ln">01681:</span> 
+<span class="ln">01682:</span> async function polishScanAfterSecondFailure(text, absoluteStart, chunkTag) {
+<span class="ln">01683:</span>   const aggregate = createEmptyPolishExtractionResult();
+<span class="ln">01684:</span>   const split = splitTextIntoTwoSentenceAwareWithOffsetsForPolish(text);
+<span class="ln">01685:</span> 
+<span class="ln">01686:</span>   if (!split) {
+<span class="ln">01687:</span>     try {
+<span class="ln">01688:</span>       const result = await polishScanOnce(
+<span class="ln">01689:</span>         text,
+<span class="ln">01690:</span>         absoluteStart,
+<span class="ln">01691:</span>         chunkTag,
+<span class="ln">01692:</span>         FALLBACK_MODEL_NAME,
+<span class="ln">01693:</span>         0.1,
+<span class="ln">01694:</span>         `${chunkTag} | 二次补救直译`,
+<span class="ln">01695:</span>       );
+<span class="ln">01696:</span>       return mergePolishExtractionResults([aggregate, result]);
+<span class="ln">01697:</span>     } catch (error) {
+<span class="ln">01698:</span>       mergePolishErrorArtifacts(aggregate, error);
+<span class="ln">01699:</span>       throw Object.assign(error, aggregate);
+<span class="ln">01700:</span>     }
+<span class="ln">01701:</span>   }
+<span class="ln">01702:</span> 
+<span class="ln">01703:</span>   const pieceResults = [];
+<span class="ln">01704:</span>   for (let i = 0; i &lt; split.length; i++) {
+<span class="ln">01705:</span>     const piece = split[i];
+<span class="ln">01706:</span>     const pieceTag = `${chunkTag}.${i + 1}`;
+<span class="ln">01707:</span> 
+<span class="ln">01708:</span>     try {
+<span class="ln">01709:</span>       const result = await polishScanOnce(
+<span class="ln">01710:</span>         piece.text,
+<span class="ln">01711:</span>         absoluteStart + piece.startOffset,
+<span class="ln">01712:</span>         pieceTag,
+<span class="ln">01713:</span>         FALLBACK_MODEL_NAME,
+<span class="ln">01714:</span>         0.1,
+<span class="ln">01715:</span>         `${pieceTag} | 二次补救子段`,
+<span class="ln">01716:</span>       );
+<span class="ln">01717:</span>       pieceResults.push(result);
+<span class="ln">01718:</span>     } catch (error) {
+<span class="ln">01719:</span>       mergePolishErrorArtifacts(aggregate, error);
+<span class="ln">01720:</span>       throw Object.assign(error, aggregate);
+<span class="ln">01721:</span>     }
+<span class="ln">01722:</span>   }
+<span class="ln">01723:</span> 
+<span class="ln">01724:</span>   return mergePolishExtractionResults([aggregate, ...pieceResults]);
+<span class="ln">01725:</span> }
+<span class="ln">01726:</span> 
+<span class="ln">01727:</span> async function polishScanAfterFirstFailure(text, absoluteStart, chunkTag) {
+<span class="ln">01728:</span>   const aggregate = createEmptyPolishExtractionResult();
+<span class="ln">01729:</span>   const split = splitTextIntoTwoSentenceAwareWithOffsetsForPolish(text);
+<span class="ln">01730:</span> 
+<span class="ln">01731:</span>   if (!split) {
+<span class="ln">01732:</span>     const result = await polishScanAfterSecondFailure(text, absoluteStart, `${chunkTag}.fallback`);
+<span class="ln">01733:</span>     return mergePolishExtractionResults([aggregate, result]);
+<span class="ln">01734:</span>   }
+<span class="ln">01735:</span> 
+<span class="ln">01736:</span>   const pieceResults = [];
+<span class="ln">01737:</span>   for (let i = 0; i &lt; split.length; i++) {
+<span class="ln">01738:</span>     const piece = split[i];
+<span class="ln">01739:</span>     const pieceTag = `${chunkTag}.${i + 1}`;
+<span class="ln">01740:</span> 
+<span class="ln">01741:</span>     try {
+<span class="ln">01742:</span>       const result = await polishScanOnce(
+<span class="ln">01743:</span>         piece.text,
+<span class="ln">01744:</span>         absoluteStart + piece.startOffset,
+<span class="ln">01745:</span>         pieceTag,
+<span class="ln">01746:</span>         PRIMARY_MODEL_NAME,
+<span class="ln">01747:</span>         0,
+<span class="ln">01748:</span>         `${pieceTag} | 首次补救子段`,
+<span class="ln">01749:</span>       );
+<span class="ln">01750:</span>       pieceResults.push(result);
+<span class="ln">01751:</span>     } catch (error) {
+<span class="ln">01752:</span>       mergePolishErrorArtifacts(aggregate, error);
+<span class="ln">01753:</span>       const fallbackResult = await polishScanAfterSecondFailure(
+<span class="ln">01754:</span>         piece.text,
+<span class="ln">01755:</span>         absoluteStart + piece.startOffset,
+<span class="ln">01756:</span>         pieceTag,
+<span class="ln">01757:</span>       );
+<span class="ln">01758:</span>       pieceResults.push(fallbackResult);
+<span class="ln">01759:</span>     }
+<span class="ln">01760:</span>   }
+<span class="ln">01761:</span> 
+<span class="ln">01762:</span>   return mergePolishExtractionResults([aggregate, ...pieceResults]);
+<span class="ln">01763:</span> }
+<span class="ln">01764:</span> 
+<span class="ln">01765:</span> async function polishScanSmart(chunkText, absoluteStart, chunkTag) {
+<span class="ln">01766:</span>   const aggregate = createEmptyPolishExtractionResult();
+<span class="ln">01767:</span> 
+<span class="ln">01768:</span>   try {
+<span class="ln">01769:</span>     const result = await polishScanOnce(
+<span class="ln">01770:</span>       chunkText,
+<span class="ln">01771:</span>       absoluteStart,
+<span class="ln">01772:</span>       chunkTag,
+<span class="ln">01773:</span>       PRIMARY_MODEL_NAME,
+<span class="ln">01774:</span>       0,
+<span class="ln">01775:</span>       `${chunkTag} | 初始尝试`,
+<span class="ln">01776:</span>     );
+<span class="ln">01777:</span>     return mergePolishExtractionResults([aggregate, result]);
+<span class="ln">01778:</span>   } catch (error) {
+<span class="ln">01779:</span>     mergePolishErrorArtifacts(aggregate, error);
+<span class="ln">01780:</span> 
+<span class="ln">01781:</span>     try {
+<span class="ln">01782:</span>       const result = await polishScanAfterFirstFailure(chunkText, absoluteStart, chunkTag);
+<span class="ln">01783:</span>       return mergePolishExtractionResults([aggregate, result]);
+<span class="ln">01784:</span>     } catch (error2) {
+<span class="ln">01785:</span>       mergePolishErrorArtifacts(aggregate, error2);
+<span class="ln">01786:</span>       throw Object.assign(error2, aggregate);
+<span class="ln">01787:</span>     }
+<span class="ln">01788:</span>   }
+<span class="ln">01789:</span> }
+<span class="ln">01790:</span> 
+<span class="ln">01791:</span> async function runPolishScanForBook(bookCtx, roundArg = &#x27;auto&#x27;) {
+<span class="ln">01792:</span>   initApiStateIfNeeded();
+<span class="ln">01793:</span> 
+<span class="ln">01794:</span>   const source = getScanSourceText(bookCtx);
+<span class="ln">01795:</span>   const sourceText = source.text;
+<span class="ln">01796:</span>   if (!sourceText || sourceText.trim() === &#x27;&#x27;) {
+<span class="ln">01797:</span>     console.log(`⚠️ [跳过] 《${bookCtx.bookName}》为空文件。`);
+<span class="ln">01798:</span>     return;
+<span class="ln">01799:</span>   }
+<span class="ln">01800:</span> 
+<span class="ln">01801:</span>   ensureDir(bookCtx.bookOutputDir);
+<span class="ln">01802:</span> 
+<span class="ln">01803:</span>   const roundInfo = ensureRoundForScan(bookCtx, roundArg);
+<span class="ln">01804:</span>   const roundNo = roundInfo.roundNo;
+<span class="ln">01805:</span>   const roundDir = getPolishRoundDir(bookCtx.bookOutputDir, roundNo);
+<span class="ln">01806:</span>   const metaPath = getPolishRoundMetaPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">01807:</span>   const meta = readJsonFile(metaPath, roundInfo.meta || {});
+<span class="ln">01808:</span>   const baseText = fs.readFileSync(getPolishRoundBaseTextPath(bookCtx.bookOutputDir, roundNo), &#x27;utf-8&#x27;);
+<span class="ln">01809:</span> 
+<span class="ln">01810:</span>   const progressPath = getPolishRoundProgressPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">01811:</span>   const usagePath = getPolishRoundUsageLogPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">01812:</span>   const scanModsPath = getPolishRoundScanModsPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">01813:</span>   const debugDir = getPolishRoundDebugDir(bookCtx.bookOutputDir, roundNo);
+<span class="ln">01814:</span> 
+<span class="ln">01815:</span>   ensureDir(roundDir);
+<span class="ln">01816:</span>   ensureDir(debugDir);
+<span class="ln">01817:</span> 
+<span class="ln">01818:</span>   const chunkPlan = buildOrLoadPolishChunkPlan(bookCtx.bookOutputDir, roundNo, baseText);
+<span class="ln">01819:</span> 
+<span class="ln">01820:</span>   let completedChunks = 0;
+<span class="ln">01821:</span>   const progress = readJsonFile(progressPath, null);
+<span class="ln">01822:</span> 
+<span class="ln">01823:</span>   if (progress &amp;&amp; progress.baseTextSha1 === sha1(baseText)) {
+<span class="ln">01824:</span>     completedChunks = Number(progress.completedChunks) || 0;
+<span class="ln">01825:</span>   }
+<span class="ln">01826:</span> 
+<span class="ln">01827:</span>   if (!fs.existsSync(usagePath)) {
+<span class="ln">01828:</span>     fs.writeFileSync(
+<span class="ln">01829:</span>       usagePath,
+<span class="ln">01830:</span>       `round=${roundNo}\nmodel=${PRIMARY_MODEL_NAME}\nfallback=${FALLBACK_MODEL_NAME}\n\n`,
+<span class="ln">01831:</span>       &#x27;utf-8&#x27;,
+<span class="ln">01832:</span>     );
+<span class="ln">01833:</span>   }
+<span class="ln">01834:</span> 
+<span class="ln">01835:</span>   console.log(`\n🧽 [Polish Scan] 《${bookCtx.bookName}》 ${polishRoundLabel(roundNo)}`);
+<span class="ln">01836:</span>   console.log(`   输入源: ${source.fileName}`);
+<span class="ln">01837:</span>   console.log(`   基底: ${meta &amp;&amp; meta.baseFileName ? meta.baseFileName : path.basename(getPolishRoundBaseTextPath(bookCtx.bookOutputDir, roundNo))}`);
+<span class="ln">01838:</span>   console.log(`   分块: ${chunkPlan.length} 块`);
+<span class="ln">01839:</span> 
+<span class="ln">01840:</span>   for (let i = completedChunks; i &lt; chunkPlan.length; i++) {
+<span class="ln">01841:</span>     const chunk = chunkPlan[i];
+<span class="ln">01842:</span>     console.log(`\n   ---[Polish Chunk ${chunk.index}/${chunkPlan.length}] chars=${chunk.length} ---`);
+<span class="ln">01843:</span> 
+<span class="ln">01844:</span>     let result;
+<span class="ln">01845:</span>     let networkAttempt = 0;
+<span class="ln">01846:</span> 
+<span class="ln">01847:</span>     while (true) {
+<span class="ln">01848:</span>       try {
+<span class="ln">01849:</span>         result = await polishScanSmart(chunk.text, chunk.startIndex, `chunk_${chunk.index}`);
+<span class="ln">01850:</span>         break;
+<span class="ln">01851:</span>       } catch (error) {
+<span class="ln">01852:</span>         if (error &amp;&amp; error.code === &#x27;ALL_KEYS_DAILY_LIMIT_REACHED&#x27;) throw error;
+<span class="ln">01853:</span> 
+<span class="ln">01854:</span>         const message = String((error &amp;&amp; error.message) || error);
+<span class="ln">01855:</span>         if (/404 Not Found/i.test(message)) throw error;
+<span class="ln">01856:</span> 
+<span class="ln">01857:</span>         if (networkAttempt &lt; RETRY_DELAYS.length) {
+<span class="ln">01858:</span>           const waitSeconds = RETRY_DELAYS[networkAttempt] / 1000;
+<span class="ln">01859:</span>           console.log(`⚠️ [Polish Retry] ${message}，${waitSeconds} 秒后重试...`);
+<span class="ln">01860:</span>           await sleep(RETRY_DELAYS[networkAttempt]);
+<span class="ln">01861:</span>           networkAttempt += 1;
+<span class="ln">01862:</span>         } else {
+<span class="ln">01863:</span>           throw error;
+<span class="ln">01864:</span>         }
+<span class="ln">01865:</span>       }
+<span class="ln">01866:</span>     }
+<span class="ln">01867:</span> 
+<span class="ln">01868:</span>     for (const usageEntry of result.usageEntries) {
+<span class="ln">01869:</span>       const usageLine = [
+<span class="ln">01870:</span>         `chunk=${chunk.index}`,
+<span class="ln">01871:</span>         `label=${usageEntry.label}`,
+<span class="ln">01872:</span>         `model=${usageEntry.model}`,
+<span class="ln">01873:</span>         `temp=${usageEntry.temperature}`,
+<span class="ln">01874:</span>         `chars=${usageEntry.chars}`,
+<span class="ln">01875:</span>         `mods=${usageEntry.mods}`,
+<span class="ln">01876:</span>         `prompt_tokens=${usageEntry.prompt_tokens}`,
+<span class="ln">01877:</span>         `completion_tokens=${usageEntry.completion_tokens}`,
+<span class="ln">01878:</span>         `total_tokens=${usageEntry.total_tokens}`,
+<span class="ln">01879:</span>         `output_chars=${usageEntry.output_chars}`,
+<span class="ln">01880:</span>         `output_fuse=${usageEntry.output_fuse}`,
+<span class="ln">01881:</span>       ].join(&#x27; | &#x27;);
+<span class="ln">01882:</span>       fs.appendFileSync(usagePath, `${usageLine}\n`, &#x27;utf-8&#x27;);
+<span class="ln">01883:</span>     }
+<span class="ln">01884:</span> 
+<span class="ln">01885:</span>     for (const payload of result.debugPayloads) {
+<span class="ln">01886:</span>       if (!payload.parsed || (payload.rawContent &amp;&amp; payload.modCount === 0)) {
+<span class="ln">01887:</span>         const debugPath = path.join(
+<span class="ln">01888:</span>           debugDir,
+<span class="ln">01889:</span>           `chunk_${String(chunk.index).padStart(4, &#x27;0&#x27;)}_${sanitizeDebugLabel(payload.label)}.txt`,
+<span class="ln">01890:</span>         );
+<span class="ln">01891:</span>         fs.writeFileSync(debugPath, payload.rawContent || &#x27;[EMPTY RESPONSE]&#x27;, &#x27;utf-8&#x27;);
+<span class="ln">01892:</span>       }
+<span class="ln">01893:</span>     }
+<span class="ln">01894:</span> 
+<span class="ln">01895:</span>     if (result.positionedMods.length &gt; 0) {
+<span class="ln">01896:</span>       const existing = readJsonFile(scanModsPath, []);
+<span class="ln">01897:</span>       const merged = mergeUniquePolishMods(existing, result.positionedMods);
+<span class="ln">01898:</span>       writeJsonFile(scanModsPath, merged);
+<span class="ln">01899:</span>       console.log(`   ✅ 本块识别到 ${result.positionedMods.length} 条润色建议`);
+<span class="ln">01900:</span>     } else {
+<span class="ln">01901:</span>       console.log(&#x27;   [提示] 本块没有可靠修改建议&#x27;);
+<span class="ln">01902:</span>     }
+<span class="ln">01903:</span> 
+<span class="ln">01904:</span>     writeJsonFile(progressPath, {
+<span class="ln">01905:</span>       roundNo,
+<span class="ln">01906:</span>       completedChunks: i + 1,
+<span class="ln">01907:</span>       chunkCount: chunkPlan.length,
+<span class="ln">01908:</span>       baseTextSha1: sha1(baseText),
+<span class="ln">01909:</span>       lastUpdatedBjt: getBeijingTimeStr(),
+<span class="ln">01910:</span>     });
+<span class="ln">01911:</span> 
+<span class="ln">01912:</span>     await sleep(POLISH_SCAN_DELAY_MS);
+<span class="ln">01913:</span>   }
+<span class="ln">01914:</span> 
+<span class="ln">01915:</span>   console.log(`\n✅ [Polish Scan Done] ${bookCtx.bookName} ${polishRoundLabel(roundNo)}`);
+<span class="ln">01916:</span> }
+<span class="ln">01917:</span> 
+<span class="ln">01918:</span> // =========================================
+<span class="ln">01919:</span> // 导出
+<span class="ln">01920:</span> // =========================================
+<span class="ln">01921:</span> function normalizePolishSourceMode(mode = &#x27;auto&#x27;) {
+<span class="ln">01922:</span>   const normalized = String(mode || &#x27;auto&#x27;).trim().toLowerCase();
+<span class="ln">01923:</span>   return POLISH_SOURCE_MODE_SET.has(normalized) ? normalized : &#x27;auto&#x27;;
+<span class="ln">01924:</span> }
+<span class="ln">01925:</span> 
+<span class="ln">01926:</span> function extractPolishChunkNumber(chunkTag = &#x27;&#x27;) {
+<span class="ln">01927:</span>   const m = String(chunkTag || &#x27;&#x27;).match(/chunk_(\d+)/i);
+<span class="ln">01928:</span>   return m ? Number(m[1]) : &#x27;&#x27;;
+<span class="ln">01929:</span> }
+<span class="ln">01930:</span> 
+<span class="ln">01931:</span> function formatPolishModsForExport(mods = []) {
+<span class="ln">01932:</span>   return (mods || [])
+<span class="ln">01933:</span>     .map((mod, idx) =&gt; {
+<span class="ln">01934:</span>       const reason = String(mod.reason || &#x27;润色&#x27;).trim();
+<span class="ln">01935:</span>       const oldText = String(mod.old_text || &#x27;&#x27;);
+<span class="ln">01936:</span>       const newText = mod.new_text === &#x27;&#x27; ? &#x27;(已删除)&#x27; : String(mod.new_text || &#x27;&#x27;);
+<span class="ln">01937:</span>       const start = Number.isInteger(mod.absoluteStart) ? mod.absoluteStart : &#x27;&#x27;;
+<span class="ln">01938:</span>       const end = Number.isInteger(mod.absoluteEnd) ? mod.absoluteEnd : &#x27;&#x27;;
+<span class="ln">01939:</span>       const chunkNo = extractPolishChunkNumber(mod.chunkTag);
+<span class="ln">01940:</span> 
+<span class="ln">01941:</span>       return [
+<span class="ln">01942:</span>         `${idx + 1}.`,
+<span class="ln">01943:</span>         reason,
+<span class="ln">01944:</span>         `原文: ${oldText}`,
+<span class="ln">01945:</span>         `校正: ${newText}`,
+<span class="ln">01946:</span>         start !== &#x27;&#x27; &amp;&amp; end !== &#x27;&#x27; ? `位置: ${start} - ${end}` : &#x27;&#x27;,
+<span class="ln">01947:</span>         chunkNo ? `分段: ${chunkNo}` : &#x27;&#x27;,
+<span class="ln">01948:</span>       ]
+<span class="ln">01949:</span>         .filter(Boolean)
+<span class="ln">01950:</span>         .join(&#x27;\n&#x27;);
+<span class="ln">01951:</span>     })
+<span class="ln">01952:</span>     .join(&#x27;\n\n&#x27;);
+<span class="ln">01953:</span> }
+<span class="ln">01954:</span> 
+<span class="ln">01955:</span> function loadPolishModsBySource(bookDir, roundNo, sourceMode = &#x27;auto&#x27;) {
+<span class="ln">01956:</span>   const scanMods = readJsonFile(getPolishRoundScanModsPath(bookDir, roundNo), []);
+<span class="ln">01957:</span>   const importedMods = readJsonFile(getPolishRoundImportedModsPath(bookDir, roundNo), []);
+<span class="ln">01958:</span>   const effectiveMods = readJsonFile(getPolishRoundEffectiveModsPath(bookDir, roundNo), []);
+<span class="ln">01959:</span> 
+<span class="ln">01960:</span>   const mode = normalizePolishSourceMode(sourceMode);
+<span class="ln">01961:</span> 
+<span class="ln">01962:</span>   if (mode === &#x27;scan&#x27;) return { source: &#x27;scan&#x27;, mods: stabilizePolishMods(scanMods) };
+<span class="ln">01963:</span>   if (mode === &#x27;imported&#x27;) return { source: &#x27;imported&#x27;, mods: stabilizePolishMods(importedMods) };
+<span class="ln">01964:</span>   if (mode === &#x27;effective&#x27;) {
+<span class="ln">01965:</span>     if (effectiveMods.length) return { source: &#x27;effective&#x27;, mods: stabilizePolishMods(effectiveMods) };
+<span class="ln">01966:</span>     return { source: &#x27;effective&#x27;, mods: buildEffectivePolishMods(scanMods, importedMods) };
+<span class="ln">01967:</span>   }
+<span class="ln">01968:</span> 
+<span class="ln">01969:</span>   if (effectiveMods.length) return { source: &#x27;effective&#x27;, mods: stabilizePolishMods(effectiveMods) };
+<span class="ln">01970:</span>   if (importedMods.length) return { source: &#x27;imported&#x27;, mods: stabilizePolishMods(importedMods) };
+<span class="ln">01971:</span>   return { source: &#x27;scan&#x27;, mods: stabilizePolishMods(scanMods) };
+<span class="ln">01972:</span> }
+<span class="ln">01973:</span> 
+<span class="ln">01974:</span> async function runPolishExport(bookCtx, roundArg = &#x27;latest&#x27;, sourceMode = POLISH_EXPORT_DEFAULT_SOURCE) {
+<span class="ln">01975:</span>   const roundInfo = ensureRoundForRead(bookCtx, roundArg);
+<span class="ln">01976:</span>   const roundNo = roundInfo.roundNo;
+<span class="ln">01977:</span>   const resolved = loadPolishModsBySource(bookCtx.bookOutputDir, roundNo, sourceMode);
+<span class="ln">01978:</span> 
+<span class="ln">01979:</span>   if (!resolved.mods.length) {
+<span class="ln">01980:</span>     throw new Error(`该 round 没有可导出的 ${resolved.source} 数据。`);
+<span class="ln">01981:</span>   }
+<span class="ln">01982:</span> 
+<span class="ln">01983:</span>   const exportText = formatPolishModsForExport(
+<span class="ln">01984:</span>     [...resolved.mods].sort((a, b) =&gt; {
+<span class="ln">01985:</span>       if (a.absoluteStart !== b.absoluteStart) return a.absoluteStart - b.absoluteStart;
+<span class="ln">01986:</span>       return a.absoluteEnd - b.absoluteEnd;
+<span class="ln">01987:</span>     }),
+<span class="ln">01988:</span>   );
+<span class="ln">01989:</span> 
+<span class="ln">01990:</span>   const exportPath = getPolishRoundExportPath(bookCtx.bookOutputDir, roundNo, resolved.source);
+<span class="ln">01991:</span>   fs.writeFileSync(exportPath, exportText, &#x27;utf-8&#x27;);
+<span class="ln">01992:</span> 
+<span class="ln">01993:</span>   console.log(`✅ [Polish Export] 已导出 ${resolved.mods.length} 条 -&gt; ${exportPath}`);
+<span class="ln">01994:</span> }
+<span class="ln">01995:</span> 
+<span class="ln">01996:</span> // =========================================
+<span class="ln">01997:</span> // 更强自由导入解析器
+<span class="ln">01998:</span> // =========================================
+<span class="ln">01999:</span> function normalizeFlexibleImportText(raw = &#x27;&#x27;) {
+<span class="ln">02000:</span>   return String(raw || &#x27;&#x27;)
+<span class="ln">02001:</span>     .replace(/\r\n/g, &#x27;\n&#x27;)
+<span class="ln">02002:</span>     .replace(/\u3000/g, &#x27; &#x27;)
+<span class="ln">02003:</span>     .replace(/[ \t]+\n/g, &#x27;\n&#x27;)
+<span class="ln">02004:</span>     .replace(
+<span class="ln">02005:</span>       /([^\n])\s*(原文|旧文|旧句|原句|校正|校对|修改|改成|改为|改后|润色后|新文|新句|位置|分段|理由|原因|说明|备注)\s*[:：]/g,
+<span class="ln">02006:</span>       &#x27;$1\n$2: &#x27;,
+<span class="ln">02007:</span>     )
+<span class="ln">02008:</span>     .trim();
+<span class="ln">02009:</span> }
+<span class="ln">02010:</span> 
+<span class="ln">02011:</span> function splitFlexiblePolishBlocks(raw = &#x27;&#x27;) {
+<span class="ln">02012:</span>   const normalized = normalizeFlexibleImportText(raw);
+<span class="ln">02013:</span>   const lines = normalized.split(&#x27;\n&#x27;);
+<span class="ln">02014:</span>   const blocks = [];
+<span class="ln">02015:</span>   let current = [];
+<span class="ln">02016:</span> 
+<span class="ln">02017:</span>   function pushCurrent() {
+<span class="ln">02018:</span>     const text = current.join(&#x27;\n&#x27;).trim();
+<span class="ln">02019:</span>     if (text) blocks.push(text);
+<span class="ln">02020:</span>     current = [];
+<span class="ln">02021:</span>   }
+<span class="ln">02022:</span> 
+<span class="ln">02023:</span>   for (const rawLine of lines) {
+<span class="ln">02024:</span>     const line = String(rawLine || &#x27;&#x27;).trimEnd();
+<span class="ln">02025:</span>     const trimmed = line.trim();
+<span class="ln">02026:</span> 
+<span class="ln">02027:</span>     if (!trimmed) {
+<span class="ln">02028:</span>       pushCurrent();
+<span class="ln">02029:</span>       continue;
+<span class="ln">02030:</span>     }
+<span class="ln">02031:</span> 
+<span class="ln">02032:</span>     if (/^[-=]{3,}$/.test(trimmed)) {
+<span class="ln">02033:</span>       pushCurrent();
+<span class="ln">02034:</span>       continue;
+<span class="ln">02035:</span>     }
+<span class="ln">02036:</span> 
+<span class="ln">02037:</span>     if (/^\d+\s*[.、]\s*$/.test(trimmed)) {
+<span class="ln">02038:</span>       pushCurrent();
+<span class="ln">02039:</span>       continue;
+<span class="ln">02040:</span>     }
+<span class="ln">02041:</span> 
+<span class="ln">02042:</span>     if (/^\d+\s*[.、]\s+\S/.test(trimmed)) {
+<span class="ln">02043:</span>       pushCurrent();
+<span class="ln">02044:</span>       current.push(trimmed.replace(/^\d+\s*[.、]\s*/, &#x27;&#x27;));
+<span class="ln">02045:</span>       continue;
+<span class="ln">02046:</span>     }
+<span class="ln">02047:</span> 
+<span class="ln">02048:</span>     current.push(line);
+<span class="ln">02049:</span>   }
+<span class="ln">02050:</span> 
+<span class="ln">02051:</span>   pushCurrent();
+<span class="ln">02052:</span>   return blocks;
+<span class="ln">02053:</span> }
+<span class="ln">02054:</span> 
+<span class="ln">02055:</span> function unwrapImportedFieldText(text = &#x27;&#x27;) {
+<span class="ln">02056:</span>   let value = String(text || &#x27;&#x27;).trim();
+<span class="ln">02057:</span> 
+<span class="ln">02058:</span>   if (
+<span class="ln">02059:</span>     (value.startsWith(&#x27;&quot;&#x27;) &amp;&amp; value.endsWith(&#x27;&quot;&#x27;)) ||
+<span class="ln">02060:</span>     (value.startsWith(&#x27;“&#x27;) &amp;&amp; value.endsWith(&#x27;”&#x27;)) ||
+<span class="ln">02061:</span>     (value.startsWith(&quot;&#x27;&quot;) &amp;&amp; value.endsWith(&quot;&#x27;&quot;))
+<span class="ln">02062:</span>   ) {
+<span class="ln">02063:</span>     value = value.slice(1, -1).trim();
+<span class="ln">02064:</span>   }
+<span class="ln">02065:</span> 
+<span class="ln">02066:</span>   if (POLISH_DELETE_MARKERS.has(value)) return &#x27;&#x27;;
+<span class="ln">02067:</span>   return value;
+<span class="ln">02068:</span> }
+<span class="ln">02069:</span> 
+<span class="ln">02070:</span> function parsePositionText(raw = &#x27;&#x27;) {
+<span class="ln">02071:</span>   const text = String(raw || &#x27;&#x27;).trim();
+<span class="ln">02072:</span>   const m = text.match(/(\d+)\s*(?:-|—|–|~|～|到|to)\s*(\d+)/i);
+<span class="ln">02073:</span>   if (!m) return { absoluteStart: null, absoluteEnd: null };
+<span class="ln">02074:</span> 
+<span class="ln">02075:</span>   const start = Number(m[1]);
+<span class="ln">02076:</span>   const end = Number(m[2]);
+<span class="ln">02077:</span> 
+<span class="ln">02078:</span>   if (!Number.isInteger(start) || !Number.isInteger(end) || end &lt; start) {
+<span class="ln">02079:</span>     return { absoluteStart: null, absoluteEnd: null };
+<span class="ln">02080:</span>   }
+<span class="ln">02081:</span> 
+<span class="ln">02082:</span>   return {
+<span class="ln">02083:</span>     absoluteStart: start,
+<span class="ln">02084:</span>     absoluteEnd: end,
+<span class="ln">02085:</span>   };
+<span class="ln">02086:</span> }
+<span class="ln">02087:</span> 
+<span class="ln">02088:</span> function extractChunkNoFromText(text = &#x27;&#x27;) {
+<span class="ln">02089:</span>   const s = String(text || &#x27;&#x27;).trim();
+<span class="ln">02090:</span>   if (!s) return null;
+<span class="ln">02091:</span> 
+<span class="ln">02092:</span>   let m = s.match(/chunk[_\s-]?(\d+)/i);
+<span class="ln">02093:</span>   if (m) return Number(m[1]) || null;
+<span class="ln">02094:</span> 
+<span class="ln">02095:</span>   m = s.match(/分段\s*[:：]?\s*(\d+)/i);
+<span class="ln">02096:</span>   if (m) return Number(m[1]) || null;
+<span class="ln">02097:</span> 
+<span class="ln">02098:</span>   m = s.match(/^(\d{1,5})$/);
+<span class="ln">02099:</span>   if (m) return Number(m[1]) || null;
+<span class="ln">02100:</span> 
+<span class="ln">02101:</span>   return null;
+<span class="ln">02102:</span> }
+<span class="ln">02103:</span> 
+<span class="ln">02104:</span> function tryParseArrowPair(line = &#x27;&#x27;) {
+<span class="ln">02105:</span>   const s = String(line || &#x27;&#x27;).trim();
+<span class="ln">02106:</span> 
+<span class="ln">02107:</span>   let m = s.match(/^(.*?)\s*(?:-&gt;|=&gt;|→|➡|⇢|⟶)\s*(.*?)$/);
+<span class="ln">02108:</span>   if (m) {
+<span class="ln">02109:</span>     return {
+<span class="ln">02110:</span>       old_text: unwrapImportedFieldText(m[1]),
+<span class="ln">02111:</span>       new_text: unwrapImportedFieldText(m[2]),
+<span class="ln">02112:</span>     };
+<span class="ln">02113:</span>   }
+<span class="ln">02114:</span> 
+<span class="ln">02115:</span>   m = s.match(/^(.*?)\s*(?:改成|改为|校正为|改后为)\s*(.*?)$/);
+<span class="ln">02116:</span>   if (m &amp;&amp; m[1] &amp;&amp; m[2]) {
+<span class="ln">02117:</span>     return {
+<span class="ln">02118:</span>       old_text: unwrapImportedFieldText(m[1]),
+<span class="ln">02119:</span>       new_text: unwrapImportedFieldText(m[2]),
+<span class="ln">02120:</span>     };
+<span class="ln">02121:</span>   }
+<span class="ln">02122:</span> 
+<span class="ln">02123:</span>   return null;
+<span class="ln">02124:</span> }
+<span class="ln">02125:</span> 
+<span class="ln">02126:</span> function parseFlexiblePolishImportBlock(blockText = &#x27;&#x27;) {
+<span class="ln">02127:</span>   const lines = String(blockText || &#x27;&#x27;)
+<span class="ln">02128:</span>     .replace(/\r\n/g, &#x27;\n&#x27;)
+<span class="ln">02129:</span>     .split(&#x27;\n&#x27;)
+<span class="ln">02130:</span>     .map((line) =&gt; line.trimEnd());
+<span class="ln">02131:</span> 
+<span class="ln">02132:</span>   const result = {
+<span class="ln">02133:</span>     reason: &#x27;&#x27;,
+<span class="ln">02134:</span>     old_text: &#x27;&#x27;,
+<span class="ln">02135:</span>     new_text: &#x27;&#x27;,
+<span class="ln">02136:</span>     positionText: &#x27;&#x27;,
+<span class="ln">02137:</span>     chunkText: &#x27;&#x27;,
+<span class="ln">02138:</span>     rawBlock: blockText,
+<span class="ln">02139:</span>   };
+<span class="ln">02140:</span> 
+<span class="ln">02141:</span>   let currentField = &#x27;&#x27;;
+<span class="ln">02142:</span> 
+<span class="ln">02143:</span>   function appendField(field, value) {
+<span class="ln">02144:</span>     if (value === undefined || value === null) return;
+<span class="ln">02145:</span>     if (!result[field]) result[field] = String(value);
+<span class="ln">02146:</span>     else result[field] += `\n${String(value)}`;
+<span class="ln">02147:</span>   }
+<span class="ln">02148:</span> 
+<span class="ln">02149:</span>   for (const rawLine of lines) {
+<span class="ln">02150:</span>     const line = String(rawLine || &#x27;&#x27;).trim();
+<span class="ln">02151:</span>     if (!line) continue;
+<span class="ln">02152:</span> 
+<span class="ln">02153:</span>     let m = null;
+<span class="ln">02154:</span> 
+<span class="ln">02155:</span>     if ((m = line.match(/^(?:原文|旧文|旧句|原句|before|old(?:_text)?)\s*[:：]?\s*(.*)$/i))) {
+<span class="ln">02156:</span>       currentField = &#x27;old_text&#x27;;
+<span class="ln">02157:</span>       appendField(&#x27;old_text&#x27;, m[1]);
+<span class="ln">02158:</span>       continue;
+<span class="ln">02159:</span>     }
+<span class="ln">02160:</span> 
+<span class="ln">02161:</span>     if ((m = line.match(/^(?:校正|校对|修改|改成|改为|改后|润色后|新文|新句|after|new(?:_text)?)\s*[:：]?\s*(.*)$/i))) {
+<span class="ln">02162:</span>       currentField = &#x27;new_text&#x27;;
+<span class="ln">02163:</span>       appendField(&#x27;new_text&#x27;, m[1]);
+<span class="ln">02164:</span>       continue;
+<span class="ln">02165:</span>     }
+<span class="ln">02166:</span> 
+<span class="ln">02167:</span>     if ((m = line.match(/^(?:位置|坐标|范围|span|range|position)\s*[:：]?\s*(.*)$/i))) {
+<span class="ln">02168:</span>       currentField = &#x27;positionText&#x27;;
+<span class="ln">02169:</span>       appendField(&#x27;positionText&#x27;, m[1]);
+<span class="ln">02170:</span>       continue;
+<span class="ln">02171:</span>     }
+<span class="ln">02172:</span> 
+<span class="ln">02173:</span>     if ((m = line.match(/^(?:分段|来源块|块|chunk|chunktag|section)\s*[:：]?\s*(.*)$/i))) {
+<span class="ln">02174:</span>       currentField = &#x27;chunkText&#x27;;
+<span class="ln">02175:</span>       appendField(&#x27;chunkText&#x27;, m[1]);
+<span class="ln">02176:</span>       continue;
+<span class="ln">02177:</span>     }
+<span class="ln">02178:</span> 
+<span class="ln">02179:</span>     if ((m = line.match(/^(?:理由|原因|说明|问题|备注|reason)\s*[:：]?\s*(.*)$/i))) {
+<span class="ln">02180:</span>       currentField = &#x27;reason&#x27;;
+<span class="ln">02181:</span>       appendField(&#x27;reason&#x27;, m[1]);
+<span class="ln">02182:</span>       continue;
+<span class="ln">02183:</span>     }
+<span class="ln">02184:</span> 
+<span class="ln">02185:</span>     const pos = parsePositionText(line);
+<span class="ln">02186:</span>     if (Number.isInteger(pos.absoluteStart) &amp;&amp; Number.isInteger(pos.absoluteEnd) &amp;&amp; !result.positionText) {
+<span class="ln">02187:</span>       result.positionText = line;
+<span class="ln">02188:</span>       currentField = &#x27;positionText&#x27;;
+<span class="ln">02189:</span>       continue;
+<span class="ln">02190:</span>     }
+<span class="ln">02191:</span> 
+<span class="ln">02192:</span>     if (/^\d{1,5}$/.test(line) &amp;&amp; !result.chunkText &amp;&amp; (result.old_text || result.new_text || result.positionText)) {
+<span class="ln">02193:</span>       result.chunkText = line;
+<span class="ln">02194:</span>       currentField = &#x27;chunkText&#x27;;
+<span class="ln">02195:</span>       continue;
+<span class="ln">02196:</span>     }
+<span class="ln">02197:</span> 
+<span class="ln">02198:</span>     const arrowPair = tryParseArrowPair(line);
+<span class="ln">02199:</span>     if (arrowPair &amp;&amp; !result.old_text &amp;&amp; !result.new_text) {
+<span class="ln">02200:</span>       result.old_text = arrowPair.old_text;
+<span class="ln">02201:</span>       result.new_text = arrowPair.new_text;
+<span class="ln">02202:</span>       currentField = &#x27;&#x27;;
+<span class="ln">02203:</span>       continue;
+<span class="ln">02204:</span>     }
+<span class="ln">02205:</span> 
+<span class="ln">02206:</span>     if (!currentField &amp;&amp; !result.reason) {
+<span class="ln">02207:</span>       result.reason = line;
+<span class="ln">02208:</span>       continue;
+<span class="ln">02209:</span>     }
+<span class="ln">02210:</span> 
+<span class="ln">02211:</span>     if (!result.old_text) {
+<span class="ln">02212:</span>       result.old_text = line;
+<span class="ln">02213:</span>       currentField = &#x27;old_text&#x27;;
+<span class="ln">02214:</span>       continue;
+<span class="ln">02215:</span>     }
+<span class="ln">02216:</span> 
+<span class="ln">02217:</span>     if (!result.new_text) {
+<span class="ln">02218:</span>       result.new_text = line;
+<span class="ln">02219:</span>       currentField = &#x27;new_text&#x27;;
+<span class="ln">02220:</span>       continue;
+<span class="ln">02221:</span>     }
+<span class="ln">02222:</span> 
+<span class="ln">02223:</span>     if (currentField) {
+<span class="ln">02224:</span>       appendField(currentField, line);
+<span class="ln">02225:</span>     } else {
+<span class="ln">02226:</span>       appendField(&#x27;reason&#x27;, line);
+<span class="ln">02227:</span>     }
+<span class="ln">02228:</span>   }
+<span class="ln">02229:</span> 
+<span class="ln">02230:</span>   result.reason = unwrapImportedFieldText(result.reason || &#x27;&#x27;);
+<span class="ln">02231:</span>   result.old_text = unwrapImportedFieldText(result.old_text || &#x27;&#x27;);
+<span class="ln">02232:</span>   result.new_text = unwrapImportedFieldText(result.new_text || &#x27;&#x27;);
+<span class="ln">02233:</span> 
+<span class="ln">02234:</span>   return result;
+<span class="ln">02235:</span> }
+<span class="ln">02236:</span> 
+<span class="ln">02237:</span> function parseFlexiblePolishImportText(raw = &#x27;&#x27;) {
+<span class="ln">02238:</span>   const blocks = splitFlexiblePolishBlocks(raw);
+<span class="ln">02239:</span>   return blocks
+<span class="ln">02240:</span>     .map(parseFlexiblePolishImportBlock)
+<span class="ln">02241:</span>     .filter((item) =&gt; item.old_text || item.positionText || item.new_text || item.reason);
+<span class="ln">02242:</span> }
+<span class="ln">02243:</span> 
+<span class="ln">02244:</span> function findAllOccurrences(text, needle) {
+<span class="ln">02245:</span>   const result = [];
+<span class="ln">02246:</span>   if (!needle) return result;
+<span class="ln">02247:</span> 
+<span class="ln">02248:</span>   let startIndex = 0;
+<span class="ln">02249:</span>   while (startIndex &lt; text.length) {
+<span class="ln">02250:</span>     const hit = text.indexOf(needle, startIndex);
+<span class="ln">02251:</span>     if (hit === -1) break;
+<span class="ln">02252:</span>     result.push(hit);
+<span class="ln">02253:</span>     startIndex = hit + 1;
+<span class="ln">02254:</span>   }
+<span class="ln">02255:</span> 
+<span class="ln">02256:</span>   return result;
+<span class="ln">02257:</span> }
+<span class="ln">02258:</span> 
+<span class="ln">02259:</span> // =========================================
+<span class="ln">02260:</span> // imported 定位与更稳覆盖策略
+<span class="ln">02261:</span> // =========================================
+<span class="ln">02262:</span> function resolveImportedPolishItemsAgainstBase(items = [], baseText = &#x27;&#x27;, ctx = {}) {
+<span class="ln">02263:</span>   const resolved = [];
+<span class="ln">02264:</span>   const unresolved = [];
+<span class="ln">02265:</span>   const chunkRanges = loadPolishChunkRanges(ctx.bookDir, ctx.roundNo);
+<span class="ln">02266:</span> 
+<span class="ln">02267:</span>   for (const item of items) {
+<span class="ln">02268:</span>     const pos = parsePositionText(item.positionText || &#x27;&#x27;);
+<span class="ln">02269:</span>     const chunkNo = extractChunkNoFromText(item.chunkText || &#x27;&#x27;);
+<span class="ln">02270:</span>     const chunkRange = chunkRanges.find((x) =&gt; x.index === chunkNo) || null;
+<span class="ln">02271:</span>     let oldText = String(item.old_text || &#x27;&#x27;);
+<span class="ln">02272:</span>     const newText = typeof item.new_text === &#x27;string&#x27; ? item.new_text : &#x27;&#x27;;
+<span class="ln">02273:</span>     const reason = String(item.reason || &#x27;导入润色&#x27;).trim() || &#x27;导入润色&#x27;;
+<span class="ln">02274:</span> 
+<span class="ln">02275:</span>     if (!oldText &amp;&amp; Number.isInteger(pos.absoluteStart) &amp;&amp; Number.isInteger(pos.absoluteEnd)) {
+<span class="ln">02276:</span>       oldText = baseText.slice(pos.absoluteStart, pos.absoluteEnd);
+<span class="ln">02277:</span>     }
+<span class="ln">02278:</span> 
+<span class="ln">02279:</span>     if (!oldText) {
+<span class="ln">02280:</span>       unresolved.push({
+<span class="ln">02281:</span>         ...item,
+<span class="ln">02282:</span>         unresolvedReason: &#x27;缺少 old_text，且无法从位置自动提取&#x27;,
+<span class="ln">02283:</span>       });
+<span class="ln">02284:</span>       continue;
+<span class="ln">02285:</span>     }
+<span class="ln">02286:</span> 
+<span class="ln">02287:</span>     if (
+<span class="ln">02288:</span>       Number.isInteger(pos.absoluteStart) &amp;&amp;
+<span class="ln">02289:</span>       Number.isInteger(pos.absoluteEnd) &amp;&amp;
+<span class="ln">02290:</span>       baseText.slice(pos.absoluteStart, pos.absoluteEnd) === oldText
+<span class="ln">02291:</span>     ) {
+<span class="ln">02292:</span>       resolved.push({
+<span class="ln">02293:</span>         old_text: oldText,
+<span class="ln">02294:</span>         new_text: newText,
+<span class="ln">02295:</span>         reason,
+<span class="ln">02296:</span>         absoluteStart: pos.absoluteStart,
+<span class="ln">02297:</span>         absoluteEnd: pos.absoluteEnd,
+<span class="ln">02298:</span>         chunkTag: chunkRange ? chunkRange.tag : buildChunkTagByNo(chunkNo),
+<span class="ln">02299:</span>         sourceType: &#x27;imported&#x27;,
+<span class="ln">02300:</span>         importLocateKind: &#x27;explicit-position-exact&#x27;,
+<span class="ln">02301:</span>         overrideKind: &#x27;&#x27;,
+<span class="ln">02302:</span>       });
+<span class="ln">02303:</span>       continue;
+<span class="ln">02304:</span>     }
+<span class="ln">02305:</span> 
+<span class="ln">02306:</span>     const hits = findAllOccurrences(baseText, oldText);
+<span class="ln">02307:</span> 
+<span class="ln">02308:</span>     if (hits.length === 1) {
+<span class="ln">02309:</span>       const start = hits[0];
+<span class="ln">02310:</span>       resolved.push({
+<span class="ln">02311:</span>         old_text: oldText,
+<span class="ln">02312:</span>         new_text: newText,
+<span class="ln">02313:</span>         reason,
+<span class="ln">02314:</span>         absoluteStart: start,
+<span class="ln">02315:</span>         absoluteEnd: start + oldText.length,
+<span class="ln">02316:</span>         chunkTag: chunkRange ? chunkRange.tag : buildChunkTagByNo(chunkNo),
+<span class="ln">02317:</span>         sourceType: &#x27;imported&#x27;,
+<span class="ln">02318:</span>         importLocateKind: &#x27;global-unique&#x27;,
+<span class="ln">02319:</span>         overrideKind: &#x27;&#x27;,
+<span class="ln">02320:</span>       });
+<span class="ln">02321:</span>       continue;
+<span class="ln">02322:</span>     }
+<span class="ln">02323:</span> 
+<span class="ln">02324:</span>     if (hits.length &gt; 1 &amp;&amp; chunkRange) {
+<span class="ln">02325:</span>       const inChunk = hits.filter(
+<span class="ln">02326:</span>         (hit) =&gt; hit &gt;= chunkRange.startIndex &amp;&amp; hit + oldText.length &lt;= chunkRange.endIndex,
+<span class="ln">02327:</span>       );
+<span class="ln">02328:</span>       if (inChunk.length === 1) {
+<span class="ln">02329:</span>         const start = inChunk[0];
+<span class="ln">02330:</span>         resolved.push({
+<span class="ln">02331:</span>           old_text: oldText,
+<span class="ln">02332:</span>           new_text: newText,
+<span class="ln">02333:</span>           reason,
+<span class="ln">02334:</span>           absoluteStart: start,
+<span class="ln">02335:</span>           absoluteEnd: start + oldText.length,
+<span class="ln">02336:</span>           chunkTag: chunkRange.tag,
+<span class="ln">02337:</span>           sourceType: &#x27;imported&#x27;,
+<span class="ln">02338:</span>           importLocateKind: &#x27;chunk-unique&#x27;,
+<span class="ln">02339:</span>           overrideKind: &#x27;&#x27;,
+<span class="ln">02340:</span>         });
+<span class="ln">02341:</span>         continue;
+<span class="ln">02342:</span>       }
+<span class="ln">02343:</span>     }
+<span class="ln">02344:</span> 
+<span class="ln">02345:</span>     if (hits.length &gt; 1 &amp;&amp; Number.isInteger(pos.absoluteStart)) {
+<span class="ln">02346:</span>       const nearest = hits
+<span class="ln">02347:</span>         .map((hit) =&gt; ({ hit, dist: Math.abs(hit - pos.absoluteStart) }))
+<span class="ln">02348:</span>         .sort((a, b) =&gt; a.dist - b.dist)[0];
+<span class="ln">02349:</span> 
+<span class="ln">02350:</span>       if (nearest &amp;&amp; nearest.dist &lt;= POLISH_IMPORT_NEAR_POSITION_MAX_DISTANCE) {
+<span class="ln">02351:</span>         resolved.push({
+<span class="ln">02352:</span>           old_text: oldText,
+<span class="ln">02353:</span>           new_text: newText,
+<span class="ln">02354:</span>           reason,
+<span class="ln">02355:</span>           absoluteStart: nearest.hit,
+<span class="ln">02356:</span>           absoluteEnd: nearest.hit + oldText.length,
+<span class="ln">02357:</span>           chunkTag: chunkRange ? chunkRange.tag : buildChunkTagByNo(chunkNo),
+<span class="ln">02358:</span>           sourceType: &#x27;imported&#x27;,
+<span class="ln">02359:</span>           importLocateKind: &#x27;position-nearest&#x27;,
+<span class="ln">02360:</span>           overrideKind: &#x27;&#x27;,
+<span class="ln">02361:</span>         });
+<span class="ln">02362:</span>         continue;
+<span class="ln">02363:</span>       }
+<span class="ln">02364:</span>     }
+<span class="ln">02365:</span> 
+<span class="ln">02366:</span>     unresolved.push({
+<span class="ln">02367:</span>       ...item,
+<span class="ln">02368:</span>       old_text: oldText,
+<span class="ln">02369:</span>       new_text: newText,
+<span class="ln">02370:</span>       reason,
+<span class="ln">02371:</span>       unresolvedReason:
+<span class="ln">02372:</span>         hits.length === 0
+<span class="ln">02373:</span>           ? &#x27;基底正文中找不到 old_text&#x27;
+<span class="ln">02374:</span>           : &#x27;old_text 命中多处，且无法靠位置/分段可靠定位&#x27;,
+<span class="ln">02375:</span>     });
+<span class="ln">02376:</span>   }
+<span class="ln">02377:</span> 
+<span class="ln">02378:</span>   return { resolved, unresolved };
+<span class="ln">02379:</span> }
+<span class="ln">02380:</span> 
+<span class="ln">02381:</span> function getImportedIdentityKey(mod) {
+<span class="ln">02382:</span>   const start = Number.isInteger(mod.absoluteStart) ? mod.absoluteStart : &#x27;&#x27;;
+<span class="ln">02383:</span>   const oldText = String(mod.old_text || &#x27;&#x27;);
+<span class="ln">02384:</span>   return `${oldText}::${start}`;
+<span class="ln">02385:</span> }
+<span class="ln">02386:</span> 
+<span class="ln">02387:</span> function mergeImportedModsPreferLatest(existing = [], incoming = []) {
+<span class="ln">02388:</span>   const all = [...(existing || []), ...(incoming || [])];
+<span class="ln">02389:</span>   const kept = [];
+<span class="ln">02390:</span>   const seen = new Set();
+<span class="ln">02391:</span> 
+<span class="ln">02392:</span>   for (let i = all.length - 1; i &gt;= 0; i--) {
+<span class="ln">02393:</span>     const item = all[i];
+<span class="ln">02394:</span>     const key = getImportedIdentityKey(item);
+<span class="ln">02395:</span>     if (seen.has(key)) continue;
+<span class="ln">02396:</span>     seen.add(key);
+<span class="ln">02397:</span>     kept.push(item);
+<span class="ln">02398:</span>   }
+<span class="ln">02399:</span> 
+<span class="ln">02400:</span>   return kept.reverse();
+<span class="ln">02401:</span> }
+<span class="ln">02402:</span> 
+<span class="ln">02403:</span> function scoreImportedOverrideMatch(imp, scan) {
+<span class="ln">02404:</span>   if (!imp || !scan) return -Infinity;
+<span class="ln">02405:</span>   if (imp.old_text !== scan.old_text) return -Infinity;
+<span class="ln">02406:</span> 
+<span class="ln">02407:</span>   let score = 0;
+<span class="ln">02408:</span> 
+<span class="ln">02409:</span>   if (
+<span class="ln">02410:</span>     Number.isInteger(imp.absoluteStart) &amp;&amp;
+<span class="ln">02411:</span>     Number.isInteger(scan.absoluteStart) &amp;&amp;
+<span class="ln">02412:</span>     imp.absoluteStart === scan.absoluteStart &amp;&amp;
+<span class="ln">02413:</span>     imp.absoluteEnd === scan.absoluteEnd
+<span class="ln">02414:</span>   ) {
+<span class="ln">02415:</span>     score += 1000;
+<span class="ln">02416:</span>   }
+<span class="ln">02417:</span> 
+<span class="ln">02418:</span>   if (Number.isInteger(imp.absoluteStart) &amp;&amp; Number.isInteger(scan.absoluteStart)) {
+<span class="ln">02419:</span>     const dist = Math.abs(imp.absoluteStart - scan.absoluteStart);
+<span class="ln">02420:</span>     if (dist &lt;= POLISH_OVERRIDE_POSITION_TOLERANCE) {
+<span class="ln">02421:</span>       score += 700 - dist;
+<span class="ln">02422:</span>     } else if (dist &lt;= 300) {
+<span class="ln">02423:</span>       score += 350 - dist;
+<span class="ln">02424:</span>     }
+<span class="ln">02425:</span>   }
+<span class="ln">02426:</span> 
+<span class="ln">02427:</span>   const impChunk = extractPolishChunkNumber(imp.chunkTag);
+<span class="ln">02428:</span>   const scanChunk = extractPolishChunkNumber(scan.chunkTag);
+<span class="ln">02429:</span>   if (impChunk &amp;&amp; scanChunk &amp;&amp; impChunk === scanChunk) {
+<span class="ln">02430:</span>     score += 120;
+<span class="ln">02431:</span>   }
+<span class="ln">02432:</span> 
+<span class="ln">02433:</span>   if (imp.new_text === scan.new_text) {
+<span class="ln">02434:</span>     score += 20;
+<span class="ln">02435:</span>   }
+<span class="ln">02436:</span> 
+<span class="ln">02437:</span>   return score;
+<span class="ln">02438:</span> }
+<span class="ln">02439:</span> 
+<span class="ln">02440:</span> function matchImportedToScan(imp, scanMods = [], usedScan = new Set()) {
+<span class="ln">02441:</span>   let best = null;
+<span class="ln">02442:</span> 
+<span class="ln">02443:</span>   for (let i = 0; i &lt; scanMods.length; i++) {
+<span class="ln">02444:</span>     if (usedScan.has(i)) continue;
+<span class="ln">02445:</span>     const scan = scanMods[i];
+<span class="ln">02446:</span>     const score = scoreImportedOverrideMatch(imp, scan);
+<span class="ln">02447:</span>     if (score &lt; 400) continue;
+<span class="ln">02448:</span> 
+<span class="ln">02449:</span>     if (!best || score &gt; best.score) {
+<span class="ln">02450:</span>       best = { index: i, score };
+<span class="ln">02451:</span>     }
+<span class="ln">02452:</span>   }
+<span class="ln">02453:</span> 
+<span class="ln">02454:</span>   return best;
+<span class="ln">02455:</span> }
+<span class="ln">02456:</span> 
+<span class="ln">02457:</span> function getPolishModPriority(mod) {
+<span class="ln">02458:</span>   let p = 100;
+<span class="ln">02459:</span> 
+<span class="ln">02460:</span>   if (mod.sourceType === &#x27;imported&#x27;) p = 320;
+<span class="ln">02461:</span>   if (String(mod.overrideKind || &#x27;&#x27;).includes(&#x27;imported-override&#x27;)) p = 420;
+<span class="ln">02462:</span>   if (String(mod.overrideKind || &#x27;&#x27;).includes(&#x27;imported-new&#x27;)) p = 390;
+<span class="ln">02463:</span>   if (String(mod.sourceType || &#x27;&#x27;).includes(&#x27;effective(imported&#x27;)) p = 400;
+<span class="ln">02464:</span>   if (String(mod.sourceType || &#x27;&#x27;).includes(&#x27;effective(scan)&#x27;)) p = 200;
+<span class="ln">02465:</span>   if (mod.sourceType === &#x27;scan&#x27;) p = 180;
+<span class="ln">02466:</span> 
+<span class="ln">02467:</span>   switch (mod.importLocateKind) {
+<span class="ln">02468:</span>     case &#x27;explicit-position-exact&#x27;:
+<span class="ln">02469:</span>       p += 80;
+<span class="ln">02470:</span>       break;
+<span class="ln">02471:</span>     case &#x27;global-unique&#x27;:
+<span class="ln">02472:</span>       p += 60;
+<span class="ln">02473:</span>       break;
+<span class="ln">02474:</span>     case &#x27;chunk-unique&#x27;:
+<span class="ln">02475:</span>       p += 50;
+<span class="ln">02476:</span>       break;
+<span class="ln">02477:</span>     case &#x27;position-nearest&#x27;:
+<span class="ln">02478:</span>       p += 30;
+<span class="ln">02479:</span>       break;
+<span class="ln">02480:</span>     default:
+<span class="ln">02481:</span>       break;
+<span class="ln">02482:</span>   }
+<span class="ln">02483:</span> 
+<span class="ln">02484:</span>   if (Number.isInteger(mod.absoluteStart) &amp;&amp; Number.isInteger(mod.absoluteEnd)) {
+<span class="ln">02485:</span>     p += Math.min(40, mod.absoluteEnd - mod.absoluteStart);
+<span class="ln">02486:</span>   }
+<span class="ln">02487:</span> 
+<span class="ln">02488:</span>   return p;
+<span class="ln">02489:</span> }
+<span class="ln">02490:</span> 
+<span class="ln">02491:</span> function stabilizePolishMods(mods = []) {
+<span class="ln">02492:</span>   const candidates = (mods || [])
+<span class="ln">02493:</span>     .filter(
+<span class="ln">02494:</span>       (mod) =&gt;
+<span class="ln">02495:</span>         Number.isInteger(mod.absoluteStart) &amp;&amp;
+<span class="ln">02496:</span>         Number.isInteger(mod.absoluteEnd) &amp;&amp;
+<span class="ln">02497:</span>         typeof mod.old_text === &#x27;string&#x27; &amp;&amp;
+<span class="ln">02498:</span>         typeof mod.new_text === &#x27;string&#x27; &amp;&amp;
+<span class="ln">02499:</span>         mod.absoluteEnd &gt;= mod.absoluteStart &amp;&amp;
+<span class="ln">02500:</span>         mod.old_text,
+<span class="ln">02501:</span>     )
+<span class="ln">02502:</span>     .map((mod, idx) =&gt; ({
+<span class="ln">02503:</span>       ...mod,
+<span class="ln">02504:</span>       __priority: getPolishModPriority(mod),
+<span class="ln">02505:</span>       __length: Math.max(0, mod.absoluteEnd - mod.absoluteStart),
+<span class="ln">02506:</span>       __index: idx,
+<span class="ln">02507:</span>     }))
+<span class="ln">02508:</span>     .sort((a, b) =&gt; {
+<span class="ln">02509:</span>       if (b.__priority !== a.__priority) return b.__priority - a.__priority;
+<span class="ln">02510:</span>       if (b.__length !== a.__length) return b.__length - a.__length;
+<span class="ln">02511:</span>       if (a.absoluteStart !== b.absoluteStart) return a.absoluteStart - b.absoluteStart;
+<span class="ln">02512:</span>       return a.__index - b.__index;
+<span class="ln">02513:</span>     });
+<span class="ln">02514:</span> 
+<span class="ln">02515:</span>   const accepted = [];
+<span class="ln">02516:</span> 
+<span class="ln">02517:</span>   function overlaps(existing, current) {
+<span class="ln">02518:</span>     return current.absoluteStart &lt; existing.absoluteEnd &amp;&amp; current.absoluteEnd &gt; existing.absoluteStart;
+<span class="ln">02519:</span>   }
+<span class="ln">02520:</span> 
+<span class="ln">02521:</span>   for (const mod of candidates) {
+<span class="ln">02522:</span>     if (accepted.some((x) =&gt; overlaps(x, mod))) continue;
+<span class="ln">02523:</span>     accepted.push(mod);
+<span class="ln">02524:</span>   }
+<span class="ln">02525:</span> 
+<span class="ln">02526:</span>   return accepted
+<span class="ln">02527:</span>     .sort((a, b) =&gt; {
+<span class="ln">02528:</span>       if (a.absoluteStart !== b.absoluteStart) return a.absoluteStart - b.absoluteStart;
+<span class="ln">02529:</span>       if (a.absoluteEnd !== b.absoluteEnd) return a.absoluteEnd - b.absoluteEnd;
+<span class="ln">02530:</span>       return a.__index - b.__index;
+<span class="ln">02531:</span>     })
+<span class="ln">02532:</span>     .map(({ __priority, __length, __index, ...rest }) =&gt; rest);
+<span class="ln">02533:</span> }
+<span class="ln">02534:</span> 
+<span class="ln">02535:</span> function buildEffectivePolishMods(scanMods = [], importedMods = []) {
+<span class="ln">02536:</span>   const finalList = [];
+<span class="ln">02537:</span>   const usedScan = new Set();
+<span class="ln">02538:</span> 
+<span class="ln">02539:</span>   for (const imp of importedMods || []) {
+<span class="ln">02540:</span>     const match = matchImportedToScan(imp, scanMods, usedScan);
+<span class="ln">02541:</span> 
+<span class="ln">02542:</span>     if (match) {
+<span class="ln">02543:</span>       usedScan.add(match.index);
+<span class="ln">02544:</span>       finalList.push({
+<span class="ln">02545:</span>         ...imp,
+<span class="ln">02546:</span>         sourceType: &#x27;effective(imported-override)&#x27;,
+<span class="ln">02547:</span>         overrideKind: &#x27;imported-override&#x27;,
+<span class="ln">02548:</span>       });
+<span class="ln">02549:</span>     } else {
+<span class="ln">02550:</span>       finalList.push({
+<span class="ln">02551:</span>         ...imp,
+<span class="ln">02552:</span>         sourceType: &#x27;effective(imported-new)&#x27;,
+<span class="ln">02553:</span>         overrideKind: &#x27;imported-new&#x27;,
+<span class="ln">02554:</span>       });
+<span class="ln">02555:</span>     }
+<span class="ln">02556:</span>   }
+<span class="ln">02557:</span> 
+<span class="ln">02558:</span>   for (let i = 0; i &lt; (scanMods || []).length; i++) {
+<span class="ln">02559:</span>     if (usedScan.has(i)) continue;
+<span class="ln">02560:</span>     finalList.push({
+<span class="ln">02561:</span>       ...scanMods[i],
+<span class="ln">02562:</span>       sourceType: &#x27;effective(scan)&#x27;,
+<span class="ln">02563:</span>       overrideKind: &#x27;&#x27;,
+<span class="ln">02564:</span>     });
+<span class="ln">02565:</span>   }
+<span class="ln">02566:</span> 
+<span class="ln">02567:</span>   return stabilizePolishMods(finalList);
+<span class="ln">02568:</span> }
+<span class="ln">02569:</span> 
+<span class="ln">02570:</span> // =========================================
+<span class="ln">02571:</span> // 导入
+<span class="ln">02572:</span> // =========================================
+<span class="ln">02573:</span> async function runPolishImport(bookCtx, roundArg = &#x27;latest&#x27;, inputFilePath = &#x27;&#x27;) {
+<span class="ln">02574:</span>   const roundInfo = ensureRoundForRead(bookCtx, roundArg);
+<span class="ln">02575:</span>   const roundNo = roundInfo.roundNo;
+<span class="ln">02576:</span> 
+<span class="ln">02577:</span>   if (!inputFilePath) {
+<span class="ln">02578:</span>     throw new Error(&#x27;import 缺少 --input 文件路径&#x27;);
+<span class="ln">02579:</span>   }
+<span class="ln">02580:</span>   if (!fs.existsSync(inputFilePath)) {
+<span class="ln">02581:</span>     throw new Error(`导入文件不存在：${inputFilePath}`);
+<span class="ln">02582:</span>   }
+<span class="ln">02583:</span> 
+<span class="ln">02584:</span>   const baseText = fs.readFileSync(getPolishRoundBaseTextPath(bookCtx.bookOutputDir, roundNo), &#x27;utf-8&#x27;);
+<span class="ln">02585:</span>   const raw = fs.readFileSync(inputFilePath, &#x27;utf-8&#x27;);
+<span class="ln">02586:</span> 
+<span class="ln">02587:</span>   const parsedItems = parseFlexiblePolishImportText(raw);
+<span class="ln">02588:</span>   const resolvedResult = resolveImportedPolishItemsAgainstBase(parsedItems, baseText, {
+<span class="ln">02589:</span>     bookDir: bookCtx.bookOutputDir,
+<span class="ln">02590:</span>     roundNo,
+<span class="ln">02591:</span>   });
+<span class="ln">02592:</span> 
+<span class="ln">02593:</span>   const importDir = getPolishRoundImportDir(bookCtx.bookOutputDir, roundNo);
+<span class="ln">02594:</span>   ensureDir(importDir);
+<span class="ln">02595:</span> 
+<span class="ln">02596:</span>   const importCopyPath = path.join(importDir, `import_${getCompactTimeStamp()}.txt`);
+<span class="ln">02597:</span>   fs.writeFileSync(importCopyPath, raw, &#x27;utf-8&#x27;);
+<span class="ln">02598:</span> 
+<span class="ln">02599:</span>   const existingImported = readJsonFile(getPolishRoundImportedModsPath(bookCtx.bookOutputDir, roundNo), []);
+<span class="ln">02600:</span>   const mergedImported = mergeImportedModsPreferLatest(existingImported, resolvedResult.resolved);
+<span class="ln">02601:</span>   writeJsonFile(getPolishRoundImportedModsPath(bookCtx.bookOutputDir, roundNo), mergedImported);
+<span class="ln">02602:</span> 
+<span class="ln">02603:</span>   const existingUnresolved = readJsonFile(getPolishRoundImportedUnresolvedPath(bookCtx.bookOutputDir, roundNo), []);
+<span class="ln">02604:</span>   writeJsonFile(
+<span class="ln">02605:</span>     getPolishRoundImportedUnresolvedPath(bookCtx.bookOutputDir, roundNo),
+<span class="ln">02606:</span>     [...existingUnresolved, ...resolvedResult.unresolved],
+<span class="ln">02607:</span>   );
+<span class="ln">02608:</span> 
+<span class="ln">02609:</span>   console.log(
+<span class="ln">02610:</span>     `✅ [Polish Import] 新增导入 ${resolvedResult.resolved.length} 条，未定位 ${resolvedResult.unresolved.length} 条 -&gt; ${importCopyPath}`,
+<span class="ln">02611:</span>   );
+<span class="ln">02612:</span> }
+<span class="ln">02613:</span> 
+<span class="ln">02614:</span> // =========================================
+<span class="ln">02615:</span> // 应用润色
+<span class="ln">02616:</span> // =========================================
+<span class="ln">02617:</span> function applyModsToBaseText(baseText, mods = []) {
+<span class="ln">02618:</span>   let output = baseText;
+<span class="ln">02619:</span>   let replaceCount = 0;
+<span class="ln">02620:</span>   let skipCount = 0;
+<span class="ln">02621:</span> 
+<span class="ln">02622:</span>   const sorted = [...mods].sort((a, b) =&gt; {
+<span class="ln">02623:</span>     if (b.absoluteStart !== a.absoluteStart) return b.absoluteStart - a.absoluteStart;
+<span class="ln">02624:</span>     return (b.old_text || &#x27;&#x27;).length - (a.old_text || &#x27;&#x27;).length;
+<span class="ln">02625:</span>   });
+<span class="ln">02626:</span> 
+<span class="ln">02627:</span>   for (const mod of sorted) {
+<span class="ln">02628:</span>     if (!Number.isInteger(mod.absoluteStart) || !Number.isInteger(mod.absoluteEnd)) {
+<span class="ln">02629:</span>       skipCount += 1;
+<span class="ln">02630:</span>       continue;
+<span class="ln">02631:</span>     }
+<span class="ln">02632:</span> 
+<span class="ln">02633:</span>     const currentSlice = output.slice(mod.absoluteStart, mod.absoluteEnd);
+<span class="ln">02634:</span>     if (currentSlice !== mod.old_text) {
+<span class="ln">02635:</span>       skipCount += 1;
+<span class="ln">02636:</span>       continue;
+<span class="ln">02637:</span>     }
+<span class="ln">02638:</span> 
+<span class="ln">02639:</span>     output =
+<span class="ln">02640:</span>       output.slice(0, mod.absoluteStart) +
+<span class="ln">02641:</span>       mod.new_text +
+<span class="ln">02642:</span>       output.slice(mod.absoluteEnd);
+<span class="ln">02643:</span> 
+<span class="ln">02644:</span>     replaceCount += 1;
+<span class="ln">02645:</span>   }
+<span class="ln">02646:</span> 
+<span class="ln">02647:</span>   return { text: output, replaceCount, skipCount };
+<span class="ln">02648:</span> }
+<span class="ln">02649:</span> 
+<span class="ln">02650:</span> function buildPolishProofText(mods = [], sourceMode = &#x27;effective&#x27;, roundNo = 1) {
+<span class="ln">02651:</span>   const lines = [];
+<span class="ln">02652:</span>   lines.push(&#x27;=======================================&#x27;);
+<span class="ln">02653:</span>   lines.push(`润色记录 ${polishRoundLabel(roundNo)}`);
+<span class="ln">02654:</span>   lines.push(`来源: ${sourceMode}`);
+<span class="ln">02655:</span>   lines.push(`时间(BJT): ${getBeijingTimeStr()}`);
+<span class="ln">02656:</span>   lines.push(&#x27;=======================================&#x27;);
+<span class="ln">02657:</span>   lines.push(&#x27;&#x27;);
+<span class="ln">02658:</span> 
+<span class="ln">02659:</span>   mods.forEach((mod, idx) =&gt; {
+<span class="ln">02660:</span>     const newText = mod.new_text === &#x27;&#x27; ? &#x27;(已删除)&#x27; : mod.new_text;
+<span class="ln">02661:</span>     lines.push(`${idx + 1}. ${mod.reason || &#x27;润色&#x27;}`);
+<span class="ln">02662:</span>     lines.push(`原文: ${mod.old_text}`);
+<span class="ln">02663:</span>     lines.push(`校正: ${newText}`);
+<span class="ln">02664:</span>     if (Number.isInteger(mod.absoluteStart) &amp;&amp; Number.isInteger(mod.absoluteEnd)) {
+<span class="ln">02665:</span>       lines.push(`位置: ${mod.absoluteStart} - ${mod.absoluteEnd}`);
+<span class="ln">02666:</span>     }
+<span class="ln">02667:</span>     if (mod.chunkTag) {
+<span class="ln">02668:</span>       const chunkNo = extractPolishChunkNumber(mod.chunkTag);
+<span class="ln">02669:</span>       lines.push(`分段: ${chunkNo || mod.chunkTag}`);
+<span class="ln">02670:</span>     }
+<span class="ln">02671:</span>     lines.push(&#x27;&#x27;);
+<span class="ln">02672:</span>   });
+<span class="ln">02673:</span> 
+<span class="ln">02674:</span>   return lines.join(&#x27;\n&#x27;);
+<span class="ln">02675:</span> }
+<span class="ln">02676:</span> 
+<span class="ln">02677:</span> async function runPolishApply(
+<span class="ln">02678:</span>   bookCtx,
+<span class="ln">02679:</span>   roundArg = &#x27;latest&#x27;,
+<span class="ln">02680:</span>   sourceMode = POLISH_DEFAULT_APPLY_SOURCE,
+<span class="ln">02681:</span>   archiveSource = true,
+<span class="ln">02682:</span> ) {
+<span class="ln">02683:</span>   const roundInfo = ensureRoundForRead(bookCtx, roundArg);
+<span class="ln">02684:</span>   const roundNo = roundInfo.roundNo;
+<span class="ln">02685:</span>   const metaPath = getPolishRoundMetaPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">02686:</span>   const meta = readJsonFile(metaPath, {});
+<span class="ln">02687:</span> 
+<span class="ln">02688:</span>   const baseText = fs.readFileSync(getPolishRoundBaseTextPath(bookCtx.bookOutputDir, roundNo), &#x27;utf-8&#x27;);
+<span class="ln">02689:</span>   const scanMods = readJsonFile(getPolishRoundScanModsPath(bookCtx.bookOutputDir, roundNo), []);
+<span class="ln">02690:</span>   const importedMods = readJsonFile(getPolishRoundImportedModsPath(bookCtx.bookOutputDir, roundNo), []);
+<span class="ln">02691:</span>   const effectiveMods = buildEffectivePolishMods(scanMods, importedMods);
+<span class="ln">02692:</span> 
+<span class="ln">02693:</span>   writeJsonFile(getPolishRoundEffectiveModsPath(bookCtx.bookOutputDir, roundNo), effectiveMods);
+<span class="ln">02694:</span> 
+<span class="ln">02695:</span>   const resolved = loadPolishModsBySource(bookCtx.bookOutputDir, roundNo, sourceMode);
+<span class="ln">02696:</span>   if (!resolved.mods.length) {
+<span class="ln">02697:</span>     throw new Error(`没有可应用的润色数据：${resolved.source}`);
+<span class="ln">02698:</span>   }
+<span class="ln">02699:</span> 
+<span class="ln">02700:</span>   const stableMods = stabilizePolishMods(resolved.mods);
+<span class="ln">02701:</span>   const applied = applyModsToBaseText(baseText, stableMods);
+<span class="ln">02702:</span> 
+<span class="ln">02703:</span>   const bookName = sanitizeFileName(bookCtx.bookName);
+<span class="ln">02704:</span>   const roundShort = polishRoundLabel(roundNo);
+<span class="ln">02705:</span> 
+<span class="ln">02706:</span>   const roundFinalPath = getPolishRoundFinalPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">02707:</span>   const roundProofPath = getPolishRoundProofPath(bookCtx.bookOutputDir, roundNo);
+<span class="ln">02708:</span> 
+<span class="ln">02709:</span>   const rootCurrentAlias = path.join(bookCtx.bookOutputDir, `${bookName}_当前正文_润色后.txt`);
+<span class="ln">02710:</span>   const rootCurrentRoundPath = path.join(bookCtx.bookOutputDir, `${bookName}_当前正文_润色后_${roundShort}.txt`);
+<span class="ln">02711:</span>   const rootFullRoundPath = path.join(bookCtx.bookOutputDir, `${bookName}_全本_润色版_${roundShort}.txt`);
+<span class="ln">02712:</span>   const rootProofRoundPath = path.join(bookCtx.bookOutputDir, `${bookName}_润色记录_${roundShort}.txt`);
+<span class="ln">02713:</span>   const rootProofAlias = path.join(bookCtx.bookOutputDir, `${bookName}_当前润色记录.txt`);
+<span class="ln">02714:</span> 
+<span class="ln">02715:</span>   fs.writeFileSync(roundFinalPath, applied.text, &#x27;utf-8&#x27;);
+<span class="ln">02716:</span>   fs.writeFileSync(rootCurrentAlias, applied.text, &#x27;utf-8&#x27;);
+<span class="ln">02717:</span>   fs.writeFileSync(rootCurrentRoundPath, applied.text, &#x27;utf-8&#x27;);
+<span class="ln">02718:</span>   fs.writeFileSync(rootFullRoundPath, applied.text, &#x27;utf-8&#x27;);
+<span class="ln">02719:</span> 
+<span class="ln">02720:</span>   const proofText = buildPolishProofText(stableMods, resolved.source, roundNo);
+<span class="ln">02721:</span>   fs.writeFileSync(roundProofPath, proofText, &#x27;utf-8&#x27;);
+<span class="ln">02722:</span>   fs.writeFileSync(rootProofRoundPath, proofText, &#x27;utf-8&#x27;);
+<span class="ln">02723:</span>   fs.writeFileSync(rootProofAlias, proofText, &#x27;utf-8&#x27;);
+<span class="ln">02724:</span> 
+<span class="ln">02725:</span>   meta.status = &#x27;applied&#x27;;
+<span class="ln">02726:</span>   meta.appliedAtBjt = getBeijingTimeStr();
+<span class="ln">02727:</span>   meta.appliedSource = resolved.source;
+<span class="ln">02728:</span>   meta.finalTextLength = applied.text.length;
+<span class="ln">02729:</span>   meta.finalTextSha1 = sha1(applied.text);
+<span class="ln">02730:</span>   writeJsonFile(metaPath, meta);
+<span class="ln">02731:</span> 
+<span class="ln">02732:</span>   writePolishCurrentPointer(bookCtx.bookOutputDir, {
+<span class="ln">02733:</span>     roundNo,
+<span class="ln">02734:</span>     roundId: `${POLISH_ROUND_PREFIX}${polishPadRoundNo(roundNo)}`,
+<span class="ln">02735:</span>     currentBodyFile: path.basename(rootCurrentAlias),
+<span class="ln">02736:</span>     currentRoundFile: path.basename(rootCurrentRoundPath),
+<span class="ln">02737:</span>     currentFullRoundFile: path.basename(rootFullRoundPath),
+<span class="ln">02738:</span>     currentProofFile: path.basename(rootProofAlias),
+<span class="ln">02739:</span>     updatedAtBjt: getBeijingTimeStr(),
+<span class="ln">02740:</span>   });
+<span class="ln">02741:</span> 
+<span class="ln">02742:</span>   if (archiveSource &amp;&amp; bookCtx.sourceFilePath &amp;&amp; fs.existsSync(bookCtx.sourceFilePath)) {
+<span class="ln">02743:</span>     const archivePath = getUniqueArchivePath(path.basename(bookCtx.sourceFilePath));
+<span class="ln">02744:</span>     fs.renameSync(bookCtx.sourceFilePath, archivePath);
+<span class="ln">02745:</span>     console.log(`📦 原文件已归档至: ${archivePath}`);
+<span class="ln">02746:</span>   }
+<span class="ln">02747:</span> 
+<span class="ln">02748:</span>   console.log(
+<span class="ln">02749:</span>     `✅ [Polish Apply] ${bookCtx.bookName} ${roundShort} | 替换 ${applied.replaceCount} 处 | 跳过 ${applied.skipCount} 处`,
+<span class="ln">02750:</span>   );
+<span class="ln">02751:</span>   console.log(`   当前正文: ${rootCurrentAlias}`);
+<span class="ln">02752:</span>   console.log(`   覆盖版全本: ${rootFullRoundPath}`);
+<span class="ln">02753:</span>   console.log(`   润色记录: ${rootProofRoundPath}`);
+<span class="ln">02754:</span> }
+<span class="ln">02755:</span> 
+<span class="ln">02756:</span> // =========================================
+<span class="ln">02757:</span> // 状态
+<span class="ln">02758:</span> // =========================================
+<span class="ln">02759:</span> async function runPolishStatus(bookArg = &#x27;&#x27;) {
+<span class="ln">02760:</span>   const books = getAllKnownBooks();
+<span class="ln">02761:</span> 
+<span class="ln">02762:</span>   if (!books.length) {
+<span class="ln">02763:</span>     console.log(&#x27;没有找到任何书。&#x27;);
+<span class="ln">02764:</span>     return;
+<span class="ln">02765:</span>   }
+<span class="ln">02766:</span> 
+<span class="ln">02767:</span>   const targets = bookArg ? [resolveBookContextForRead(bookArg)] : books;
+<span class="ln">02768:</span> 
+<span class="ln">02769:</span>   for (const bookCtx of targets) {
+<span class="ln">02770:</span>     const rounds = listPolishRounds(bookCtx.bookOutputDir);
+<span class="ln">02771:</span>     if (!rounds.length) {
+<span class="ln">02772:</span>       console.log(`\n📘 ${bookCtx.bookName} | 无 polish round`);
+<span class="ln">02773:</span>       continue;
+<span class="ln">02774:</span>     }
+<span class="ln">02775:</span> 
+<span class="ln">02776:</span>     const pointer = readJsonFile(getPolishPointerPath(bookCtx.bookOutputDir), null);
+<span class="ln">02777:</span>     console.log(`\n📘 ${bookCtx.bookName}`);
+<span class="ln">02778:</span>     console.log(`   输入存在: ${bookCtx.sourceFilePath &amp;&amp; fs.existsSync(bookCtx.sourceFilePath) ? &#x27;是&#x27; : &#x27;否&#x27;}`);
+<span class="ln">02779:</span>     if (pointer &amp;&amp; pointer.currentBodyFile) {
+<span class="ln">02780:</span>       console.log(`   当前正文: ${pointer.currentBodyFile}`);
+<span class="ln">02781:</span>     }
+<span class="ln">02782:</span> 
+<span class="ln">02783:</span>     for (const item of rounds) {
+<span class="ln">02784:</span>       const scanMods = readJsonFile(getPolishRoundScanModsPath(bookCtx.bookOutputDir, item.roundNo), []);
+<span class="ln">02785:</span>       const importedMods = readJsonFile(getPolishRoundImportedModsPath(bookCtx.bookOutputDir, item.roundNo), []);
+<span class="ln">02786:</span>       const effectiveMods = readJsonFile(getPolishRoundEffectiveModsPath(bookCtx.bookOutputDir, item.roundNo), []);
+<span class="ln">02787:</span>       console.log(
+<span class="ln">02788:</span>         `   - ${polishRoundLabel(item.roundNo)} | status=${(item.meta &amp;&amp; item.meta.status) || &#x27;open&#x27;} | scan=${scanMods.length} | imported=${importedMods.length} | effective=${effectiveMods.length}`,
+<span class="ln">02789:</span>       );
+<span class="ln">02790:</span>     }
+<span class="ln">02791:</span>   }
+<span class="ln">02792:</span> }
+<span class="ln">02793:</span> 
+<span class="ln">02794:</span> // =========================================
+<span class="ln">02795:</span> // CLI
+<span class="ln">02796:</span> // =========================================
+<span class="ln">02797:</span> function parseCliArgs(argv = process.argv.slice(2)) {
+<span class="ln">02798:</span>   const args = [...argv];
+<span class="ln">02799:</span>   let command = &#x27;help&#x27;;
+<span class="ln">02800:</span> 
+<span class="ln">02801:</span>   if (args[0] &amp;&amp; !args[0].startsWith(&#x27;--&#x27;)) {
+<span class="ln">02802:</span>     command = String(args.shift()).trim();
+<span class="ln">02803:</span>   }
+<span class="ln">02804:</span> 
+<span class="ln">02805:</span>   const options = { _: [] };
+<span class="ln">02806:</span> 
+<span class="ln">02807:</span>   for (let i = 0; i &lt; args.length; i++) {
+<span class="ln">02808:</span>     const item = args[i];
+<span class="ln">02809:</span> 
+<span class="ln">02810:</span>     if (item.startsWith(&#x27;--&#x27;)) {
+<span class="ln">02811:</span>       const key = item.slice(2);
+<span class="ln">02812:</span>       const next = args[i + 1];
+<span class="ln">02813:</span> 
+<span class="ln">02814:</span>       if (next &amp;&amp; !next.startsWith(&#x27;--&#x27;)) {
+<span class="ln">02815:</span>         options[key] = next;
+<span class="ln">02816:</span>         i += 1;
+<span class="ln">02817:</span>       } else {
+<span class="ln">02818:</span>         options[key] = true;
+<span class="ln">02819:</span>       }
+<span class="ln">02820:</span>     } else {
+<span class="ln">02821:</span>       options._.push(item);
+<span class="ln">02822:</span>     }
+<span class="ln">02823:</span>   }
+<span class="ln">02824:</span> 
+<span class="ln">02825:</span>   return { command, options };
+<span class="ln">02826:</span> }
+<span class="ln">02827:</span> 
+<span class="ln">02828:</span> function printCliHelp() {
+<span class="ln">02829:</span>   console.log(`
+<span class="ln">02830:</span> =========================================
+<span class="ln">02831:</span>       run.js v2 独立润色系统
+<span class="ln">02832:</span> =========================================
+<span class="ln">02833:</span> 
+<span class="ln">02834:</span> 目录约定：
+<span class="ln">02835:</span> - 待润色 TXT：./润色
+<span class="ln">02836:</span> - 原文归档：./润色（原）
+<span class="ln">02837:</span> - 输出目录：./已润色
+<span class="ln">02838:</span> - API Key 文件：./api0.txt
+<span class="ln">02839:</span> 
+<span class="ln">02840:</span> 注意：
+<span class="ln">02841:</span> - scan 只会处理 “润色” 目录里的 txt
+<span class="ln">02842:</span> - 不会再扫描 “已润色” 的历史目录
+<span class="ln">02843:</span> - 一轮新的 round，其 base_text 一定来自 当前的 润色/书名.txt
+<span class="ln">02844:</span> 
+<span class="ln">02845:</span> 一、预检 Key
+<span class="ln">02846:</span> -----------------------------------------
+<span class="ln">02847:</span> node run.js test
+<span class="ln">02848:</span> 
+<span class="ln">02849:</span> 二、阶段一：扫描润色建议
+<span class="ln">02850:</span> -----------------------------------------
+<span class="ln">02851:</span> node run.js scan
+<span class="ln">02852:</span> node run.js 1
+<span class="ln">02853:</span> node run.js scan --book &quot;书名&quot;
+<span class="ln">02854:</span> node run.js scan --book &quot;书名&quot; --round next
+<span class="ln">02855:</span> node run.js scan --book &quot;书名&quot; --round latest
+<span class="ln">02856:</span> 
+<span class="ln">02857:</span> 说明：
+<span class="ln">02858:</span> - scan 不带 --book 时，只处理 ./润色 目录当前存在的 txt
+<span class="ln">02859:</span> - 如果 ./润色 为空，会直接提示为空
+<span class="ln">02860:</span> 
+<span class="ln">02861:</span> 三、导出给 ChatGPT / 我看的润色清单
+<span class="ln">02862:</span> -----------------------------------------
+<span class="ln">02863:</span> node run.js export --book &quot;书名&quot;
+<span class="ln">02864:</span> node run.js export --book &quot;书名&quot; --source scan
+<span class="ln">02865:</span> node run.js export --book &quot;书名&quot; --source imported
+<span class="ln">02866:</span> node run.js export --book &quot;书名&quot; --source effective
+<span class="ln">02867:</span> 
+<span class="ln">02868:</span> 四、导入你整理/我二次润的自由文本
+<span class="ln">02869:</span> -----------------------------------------
+<span class="ln">02870:</span> node run.js import --book &quot;书名&quot; --input &quot;我的二次润色.txt&quot;
+<span class="ln">02871:</span> 
+<span class="ln">02872:</span> 支持格式：
+<span class="ln">02873:</span> 1）标准格式
+<span class="ln">02874:</span> 删除生硬直译，使表达更自然
+<span class="ln">02875:</span> 原文: 开了狂野的第一枪
+<span class="ln">02876:</span> 校正: 开了第一枪
+<span class="ln">02877:</span> 位置: 20025 - 20033
+<span class="ln">02878:</span> 分段: 3
+<span class="ln">02879:</span> 
+<span class="ln">02880:</span> 2）箭头格式
+<span class="ln">02881:</span> 删除生硬直译，使表达更自然
+<span class="ln">02882:</span> 开了狂野的第一枪 -&gt; 开了第一枪
+<span class="ln">02883:</span> 20025-20033
+<span class="ln">02884:</span> 3
+<span class="ln">02885:</span> 
+<span class="ln">02886:</span> 3）自由格式
+<span class="ln">02887:</span> 删除生硬直译，使表达更自然
+<span class="ln">02888:</span> 原文 开了狂野的第一枪
+<span class="ln">02889:</span> 改成 开了第一枪
+<span class="ln">02890:</span> 位置 20025 - 20033
+<span class="ln">02891:</span> 
+<span class="ln">02892:</span> 五、阶段二：应用润色
+<span class="ln">02893:</span> -----------------------------------------
+<span class="ln">02894:</span> node run.js apply --book &quot;书名&quot;
+<span class="ln">02895:</span> node run.js 2 --book &quot;书名&quot;
+<span class="ln">02896:</span> node run.js apply --book &quot;书名&quot; --source imported
+<span class="ln">02897:</span> node run.js apply --book &quot;书名&quot; --source effective
+<span class="ln">02898:</span> node run.js apply --book &quot;书名&quot; --archive no
+<span class="ln">02899:</span> 
+<span class="ln">02900:</span> 默认：
+<span class="ln">02901:</span> - source=effective
+<span class="ln">02902:</span> - archive=yes（如果原文还在 ./润色，会自动归档到 ./润色（原））
+<span class="ln">02903:</span> 
+<span class="ln">02904:</span> 六、查看状态
+<span class="ln">02905:</span> -----------------------------------------
+<span class="ln">02906:</span> node run.js status
+<span class="ln">02907:</span> node run.js status --book &quot;书名&quot;
+<span class="ln">02908:</span> 
+<span class="ln">02909:</span> 七、帮助
+<span class="ln">02910:</span> -----------------------------------------
+<span class="ln">02911:</span> node run.js help
+<span class="ln">02912:</span> `);
+<span class="ln">02913:</span> }
+<span class="ln">02914:</span> 
+<span class="ln">02915:</span> async function main() {
+<span class="ln">02916:</span>   const { command, options } = parseCliArgs(process.argv.slice(2));
+<span class="ln">02917:</span> 
+<span class="ln">02918:</span>   if (command === &#x27;help&#x27; || command === &#x27;-h&#x27; || command === &#x27;--help&#x27; || !command) {
+<span class="ln">02919:</span>     printCliHelp();
+<span class="ln">02920:</span>     return;
+<span class="ln">02921:</span>   }
+<span class="ln">02922:</span> 
+<span class="ln">02923:</span>   if (command === &#x27;test&#x27;) {
+<span class="ln">02924:</span>     await preflightCheck();
+<span class="ln">02925:</span>     return;
+<span class="ln">02926:</span>   }
+<span class="ln">02927:</span> 
+<span class="ln">02928:</span>   if (command === &#x27;scan&#x27; || command === &#x27;1&#x27;) {
+<span class="ln">02929:</span>     const targetBook = options.book || options._[0] || &#x27;&#x27;;
+<span class="ln">02930:</span> 
+<span class="ln">02931:</span>     if (targetBook) {
+<span class="ln">02932:</span>       const bookCtx = resolveBookContextForScan(targetBook);
+<span class="ln">02933:</span>       await runPolishScanForBook(bookCtx, options.round || &#x27;auto&#x27;);
+<span class="ln">02934:</span>       return;
+<span class="ln">02935:</span>     }
+<span class="ln">02936:</span> 
+<span class="ln">02937:</span>     const inputBooks = listInputBooks();
+<span class="ln">02938:</span>     if (!inputBooks.length) {
+<span class="ln">02939:</span>       console.log(`没有找到需要处理的文件。请把 TXT 放到：${INPUT_DIR}`);
+<span class="ln">02940:</span>       return;
+<span class="ln">02941:</span>     }
+<span class="ln">02942:</span> 
+<span class="ln">02943:</span>     for (const bookCtx of inputBooks) {
+<span class="ln">02944:</span>       await runPolishScanForBook(bookCtx, options.round || &#x27;auto&#x27;);
+<span class="ln">02945:</span>     }
+<span class="ln">02946:</span>     return;
+<span class="ln">02947:</span>   }
+<span class="ln">02948:</span> 
+<span class="ln">02949:</span>   if (command === &#x27;export&#x27;) {
+<span class="ln">02950:</span>     const bookCtx = resolveBookContextForRead(options.book || options._[0] || &#x27;&#x27;);
+<span class="ln">02951:</span>     await runPolishExport(
+<span class="ln">02952:</span>       bookCtx,
+<span class="ln">02953:</span>       options.round || &#x27;latest&#x27;,
+<span class="ln">02954:</span>       options.source || POLISH_EXPORT_DEFAULT_SOURCE,
+<span class="ln">02955:</span>     );
+<span class="ln">02956:</span>     return;
+<span class="ln">02957:</span>   }
+<span class="ln">02958:</span> 
+<span class="ln">02959:</span>   if (command === &#x27;import&#x27;) {
+<span class="ln">02960:</span>     const bookCtx = resolveBookContextForRead(options.book || options._[0] || &#x27;&#x27;);
+<span class="ln">02961:</span>     const inputPath = options.input || options.file || options._[1] || &#x27;&#x27;;
+<span class="ln">02962:</span>     await runPolishImport(bookCtx, options.round || &#x27;latest&#x27;, inputPath);
+<span class="ln">02963:</span>     return;
+<span class="ln">02964:</span>   }
+<span class="ln">02965:</span> 
+<span class="ln">02966:</span>   if (command === &#x27;apply&#x27; || command === &#x27;2&#x27; || command === &#x27;merge&#x27;) {
+<span class="ln">02967:</span>     const bookCtx = resolveBookContextForRead(options.book || options._[0] || &#x27;&#x27;);
+<span class="ln">02968:</span>     const archiveSource = String(options.archive || &#x27;yes&#x27;).toLowerCase() !== &#x27;no&#x27;;
+<span class="ln">02969:</span>     await runPolishApply(
+<span class="ln">02970:</span>       bookCtx,
+<span class="ln">02971:</span>       options.round || &#x27;latest&#x27;,
+<span class="ln">02972:</span>       options.source || POLISH_DEFAULT_APPLY_SOURCE,
+<span class="ln">02973:</span>       archiveSource,
+<span class="ln">02974:</span>     );
+<span class="ln">02975:</span>     return;
+<span class="ln">02976:</span>   }
+<span class="ln">02977:</span> 
+<span class="ln">02978:</span>   if (command === &#x27;status&#x27;) {
+<span class="ln">02979:</span>     await runPolishStatus(options.book || options._[0] || &#x27;&#x27;);
+<span class="ln">02980:</span>     return;
+<span class="ln">02981:</span>   }
+<span class="ln">02982:</span> 
+<span class="ln">02983:</span>   throw new Error(`未知命令：${command}。可用 node run.js help 查看帮助。`);
+<span class="ln">02984:</span> }
+<span class="ln">02985:</span> 
+<span class="ln">02986:</span> main().catch((error) =&gt; {
+<span class="ln">02987:</span>   if (error &amp;&amp; error.code === &#x27;ALL_KEYS_DAILY_LIMIT_REACHED&#x27;) {
+<span class="ln">02988:</span>     console.error(`\n🛑 [Stop] ${error.message}`);
+<span class="ln">02989:</span>     process.exitCode = 1;
+<span class="ln">02990:</span>     return;
+<span class="ln">02991:</span>   }
+<span class="ln">02992:</span> 
+<span class="ln">02993:</span>   console.error(
+<span class="ln">02994:</span>     &#x27;\n❌ 运行失败：&#x27;,
+<span class="ln">02995:</span>     error &amp;&amp; (error.stack || error.message) ? (error.stack || error.message) : error,
+<span class="ln">02996:</span>   );
+<span class="ln">02997:</span>   process.exitCode = 1;
+<span class="ln">02998:</span> });
+
+</pre>
+</body>
+</html>
