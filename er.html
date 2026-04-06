@@ -137,9 +137,9 @@
   }
   .split2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .split3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-  .twoWide{
+  .three{
     display:grid;
-    grid-template-columns:340px 1fr;
+    grid-template-columns:340px 1fr 520px;
     gap:14px;
   }
   .workspace{
@@ -234,8 +234,12 @@
   }
   .editor-grid .full{grid-column:1/-1}
   .inline-help{font-size:12px;color:var(--muted);margin-top:4px}
+  @media (max-width:1550px){
+    .three{grid-template-columns:320px 1fr}
+    .three > :last-child{grid-column:1/-1}
+  }
   @media (max-width:1100px){
-    .grid,.split2,.split3,.twoWide,.workspace,.editor-grid,.compact-grid{grid-template-columns:1fr}
+    .grid,.split2,.split3,.three,.workspace,.editor-grid,.compact-grid{grid-template-columns:1fr}
     .listbox,.batch-list,.history-list{height:320px}
   }
 </style>
@@ -244,7 +248,8 @@
 <div class="wrap">
   <h1>缝合助手_超增强版（严格命中版）</h1>
   <div class="desc">
-    选择一润 JSON 会自动导入；选择润色前原文会自动载入。严格命中模式下：先用一润 JSON 100% 命中润色前原文，重建一润后全文，再严格应用二润结果。
+    文件一选中就自动导入；全文一选中就自动载入。严格命中模式下，不做模糊搜索、不做回退猜测：
+    <b>预校验 100% 通过，才能生成润色后全文。</b>
   </div>
 
   <section class="panel full">
@@ -330,7 +335,7 @@
         <div>
           <label>每批最多条数</label>
           <input type="number" id="batchMaxItems" data-save-key="batchMaxItems" value="42" min="1" max="500"
-            data-tip="修改后会自动重切批；若已有返回结果，默认阻止自动重切批">
+            data-tip="修改后会自动重切批；若已有返回结果，默认阻止自动重切批以保护映射关系">
         </div>
         <div>
           <label>每批最大字符预算</label>
@@ -359,7 +364,7 @@
 
     <section class="panel full">
       <h2>④ 批次列表 + ⑤ 当前批次返回框（强绑定）</h2>
-      <div class="twoWide">
+      <div class="three">
         <div>
           <div class="batch-list" id="batchList" data-tip="点击某个批次，右侧返回框和下方工作区都会联动切换"></div>
         </div>
@@ -380,11 +385,17 @@
 
           <div class="toolbar">
             <button class="btn ok" id="btnImportCurrentBatch" disabled data-tip="导入当前批次结果，然后自动跳下一批并自动复制下一批 prompt">导入当前批次结果</button>
-            <button class="btn secondary" id="btnImportAllSavedBatches" disabled data-tip="把当前页面里已保存的所有批次返回文本重新逐批导入">导入全部已保存批次结果</button>
+            <button class="btn secondary" id="btnImportAllSavedBatches" disabled data-tip="把所有已保存的批次返回文本重新逐批导入">导入全部批次结果</button>
             <button class="btn secondary" id="btnClearCurrentBatchResponse" disabled data-tip="清空当前批次返回框">清空当前批次返回框</button>
           </div>
 
           <div class="status" id="currentBatchLog" data-tip="当前批次导入日志">等待当前批次返回。</div>
+        </div>
+
+        <div>
+          <label>当前批次完整 prompt 包镜像</label>
+          <textarea id="batchPromptMirror" class="mono" readonly data-tip="这里和上方的当前批次完整 prompt 包保持一致，便于就近查看"></textarea>
+          <div class="inline-help">导入当前批次成功后，会自动跳到下一批并自动复制下一批 prompt。</div>
         </div>
       </div>
     </section>
@@ -531,38 +542,27 @@
     </section>
 
     <section class="panel">
-      <h2>⑦ 导入全部批次结果 / 生成新的润色记录</h2>
-
-      <label>上传“全部批次结果”文件</label>
-      <input type="file" id="allResultsFile" accept=".json,.txt,.html" data-tip="可上传所有批次汇总结果。支持单个 modifications 数组，或 batches 数组">
-
-      <label>或者粘贴“全部批次结果”</label>
-      <textarea id="allResultsPaste" class="mono" data-save-key="allResultsPaste"
-        placeholder='支持 {"modifications":[...]} 或 {"batches":[{"batchIndex":1,"modifications":[...]}]}'
-        data-tip="也可直接粘贴全部批次结果"></textarea>
-
+      <h2>⑦ 合并全部批次 → 新润色记录</h2>
       <div class="toolbar">
-        <button class="btn ok" id="btnImportAllResultsAnytime" data-tip="任何时候都可点击：导入全部批次结果，生成新的润色记录">导入全部批次结果</button>
-        <button class="btn ok" id="btnMergeAllBatches" disabled data-tip="把当前页面里逐批导回的结果合并为新的润色记录">合并已导回批次，生成新的润色记录</button>
+        <button class="btn ok" id="btnMergeAllBatches" disabled data-tip="把已导回批次合并为结果集和新的润色记录">合并已导回批次，生成新的润色记录</button>
         <button class="btn secondary" id="btnDownloadMergedRecord" disabled data-tip="下载新的润色记录 JSON">下载新的润色记录 JSON</button>
         <button class="btn secondary" id="btnCreateNextRound" disabled data-tip="用结果集生成下一轮工作集">用结果集生成下一轮工作集</button>
       </div>
-
-      <div class="status" id="mergeLog" data-tip="导入全部结果或合并批次后的日志">还没有新的润色记录。</div>
+      <div class="status" id="mergeLog" data-tip="合并日志">还没有合并结果。</div>
     </section>
 
     <section class="panel full">
-      <h2>⑧ 润色前原文（严格命中）</h2>
+      <h2>⑧ 一润后全文 / 合并文本（严格命中）</h2>
 
       <div class="row">
         <div>
-          <label>选择润色前原文 / 基底全文（选择后自动载入）</label>
+          <label>选择一润后全文 / 合并文本（选择后自动载入）</label>
           <input type="file" id="fullTextFile" accept=".txt,.md" data-tip="选择文件后会自动载入到下面编辑框">
         </div>
         <div>
           <label>选项</label>
           <div class="row tight" style="padding-top:10px">
-            <label style="margin:0;font-weight:600" title="严格命中模式固定开启">
+            <label style="margin:0;font-weight:600" title="默认开启严格命中模式，不允许模糊匹配">
               <input type="checkbox" id="strictMode" checked disabled data-tip="严格命中模式固定开启"> 严格命中模式（固定开启）
             </label>
             <label style="margin:0;font-weight:600" title="若文本中含 ### 标题，则按 331 风格整理输出">
@@ -572,14 +572,14 @@
         </div>
       </div>
 
-      <label>润色前原文 / 基底全文（可修改；生成时以这里的当前内容为准）</label>
+      <label>一润后全文 / 合并文本（可修改；生成时以这里的当前内容为准）</label>
       <textarea id="fullTextEditor" class="mono" style="min-height:220px" data-save-key="fullTextEditor"
-        data-tip="严格命中的基底文本。会先拿一润 JSON 严格命中这里，再重建一润后全文，再应用二润结果"></textarea>
+        data-tip="这里是严格命中的基底文本。只有和当前结果集完全对应时，预校验才会 100% 通过"></textarea>
 
       <div class="toolbar">
-        <button class="btn warn" id="btnValidateStrict" disabled data-tip="严格校验：先命中润色前原文，再校验重建出的一润后全文是否与新的润色记录匹配">预校验全文（严格 100%）</button>
+        <button class="btn warn" id="btnValidateStrict" disabled data-tip="严格校验全文是否与当前结果集 100% 匹配">预校验全文（严格 100%）</button>
         <button class="btn ok" id="btnBuildFinalText" disabled data-tip="只有严格预校验 100% 通过后，才能生成润色后全文">生成润色后全文</button>
-        <button class="btn secondary" id="btnDownloadFinalRaw" disabled data-tip="下载应用后二润全文">下载应用后二润全文.txt</button>
+        <button class="btn secondary" id="btnDownloadFinalRaw" disabled data-tip="下载应用后全文">下载应用后全文.txt</button>
         <button class="btn secondary" id="btnDownloadFinalRendered" disabled data-tip="下载 331 整理版">下载 331整理版.txt</button>
       </div>
 
@@ -593,11 +593,11 @@
       <h2>⑨ 结果预览</h2>
       <div class="split3">
         <div>
-          <label>润色前原文当前内容预览</label>
-          <textarea id="fullTextPreview" class="mono" readonly data-tip="预览当前原文编辑框内容"></textarea>
+          <label>一润后全文当前内容预览</label>
+          <textarea id="fullTextPreview" class="mono" readonly data-tip="预览当前全文编辑框内容"></textarea>
         </div>
         <div>
-          <label>应用后二润全文预览</label>
+          <label>应用后全文预览</label>
           <textarea id="finalRawPreview" class="mono" readonly data-tip="预览应用结果"></textarea>
         </div>
         <div>
@@ -613,50 +613,60 @@
 (() => {
   const $ = id => document.getElementById(id);
 
-  const STORAGE_KEY = 'stitch_helper_strict_v2';
-  const HISTORY_KEY = 'stitch_helper_strict_history_v2';
+  const STORAGE_KEY = 'stitch_helper_strict_v1';
+  const HISTORY_KEY = 'stitch_helper_strict_history_v1';
 
   const README_TEXT = `README_缝合助手（严格命中版）
 
-一、这版的关键逻辑
-1. 去掉了重复的“当前批次完整 prompt 包镜像”。
-2. 选择一润 JSON 文件后自动导入。
-3. 选择润色前原文文件后自动载入。
-4. 你可以逐批导回，也可以“任何时候”直接导入全部批次结果。
-5. 读取历史里完成的全批次结果后，也可以继续生成新的润色记录和润色全文。
+一、核心变化
+1. 选择一润 JSON 文件后，会自动导入。
+2. 选择一润后全文文件后，会自动载入到全文编辑框。
+3. 批次默认自动生成，不需要再点“用已勾选条目生成批次”。
+4. 当前批次 prompt 会自动复制。
+5. 导入当前批次结果后，会自动跳到下一批，并自动复制下一批 prompt。
+6. 当前批次 AI 返回框点击时，会自动尝试读取剪贴板内容。
+7. 严格命中模式固定开启：
+   - 不做模糊匹配
+   - 不做回退搜索
+   - 不做猜测
+   - 必须先“预校验全文（严格 100%）”通过，才允许生成润色后全文
 
-二、严格命中怎么做
-1. 先用一润 JSON 的：
-   - sourceAbsoluteStart/sourceAbsoluteEnd
-   - anchor_old_text
-   严格命中润色前原文。
-2. 100% 命中后，重建一润后全文。
-3. 再用新的润色记录里的：
-   - absoluteStart/absoluteEnd
-   - old_text
-   严格命中一润后全文。
-4. 100% 命中后，应用 new_text 生成二润全文。
-5. 整个过程不做模糊匹配、不做 fallback、不做猜测。
+二、严格命中是什么意思
+1. 你上传/粘贴的一润后全文，必须和当前一润 JSON 对应。
+2. 工具会逐条检查：
+   baseText.slice(absoluteStart, absoluteEnd) === old_text
+3. 必须 100% 成立，才算通过。
+4. 只要有 1 条不匹配，就不允许生成润色后全文。
 
-三、导入全部批次结果
-支持三种常见格式：
-1. 直接是：
-   { "modifications": [...] }
-2. 直接是 modifications 数组：
-   [ ... ]
-3. 批次形式：
-   { "batches": [ { "batchIndex": 1, "modifications": [...] }, ... ] }
+三、标准流程
+1. 选一润 JSON → 自动导入 → 自动全选 → 自动分批 → 自动复制当前批次 prompt。
+2. 把当前批次发给 AI。
+3. AI 返回后，点击“当前批次 AI 返回 JSON”文本框，它会尝试自动粘贴剪贴板。
+4. 导入当前批次结果。
+5. 自动跳到下一批，继续。
+6. 所有批次回收后，合并为新的润色记录。
+7. 若你还要导出全文，上传“一润后全文 / 合并文本”。
+8. 点击“预校验全文（严格 100%）”。
+9. 只有 100% 通过后，才能点击“生成润色后全文”。
 
 四、keep 逻辑
 1. keep 不会自动编造“无需改动”之类的新 reason。
-2. keep 且无新增 reason 时，可保持空字符串。
+2. 如果 AI 对 keep 没给 reason，可保持空 reason。
 
 五、历史记录
-1. 历史记录保存的是整个页面状态。
-2. 如果某个历史里已经有完整批次结果或结果集，恢复后就可以继续：
-   - 下载新的润色记录
-   - 预校验全文
-   - 生成润色全文
+1. 可保存当前状态到历史。
+2. 可恢复历史。
+3. 会显示时间、来源文件、批次数、条数。
+
+六、页面配置保存
+1. 提示词模板
+2. 批次设置
+3. checkbox
+4. 模型名
+5. 当前批次
+6. textarea 内容
+7. textarea 尺寸
+8. textarea 滚动位置
 `;
 
   const DEFAULT_PROMPT = `你是一位拥有二十年经验的资深中文文学翻译家，曾为国内一线出版社翻译过多部畅销外文小说。你的翻译作品以“信、达、雅”著称。
@@ -720,6 +730,7 @@ status 可用值：
   function escapeHtml(s=''){
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
+
   function debounce(fn, ms=300){
     let t = 0;
     return (...args) => {
@@ -727,6 +738,7 @@ status 可用值：
       t = setTimeout(() => fn(...args), ms);
     };
   }
+
   async function copyText(text){
     try {
       await navigator.clipboard.writeText(text);
@@ -746,12 +758,14 @@ status 可用值：
       }
     }
   }
+
   async function readClipboardText(){
     try {
       if (navigator.clipboard?.readText) return await navigator.clipboard.readText();
     } catch (_) {}
     return '';
   }
+
   function downloadText(name, text, mime='text/plain;charset=utf-8'){
     const blob = new Blob([text], { type:mime });
     const url = URL.createObjectURL(blob);
@@ -761,28 +775,39 @@ status 可用值：
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
+
   function extractJsonText(raw){
     let text = normalizeNewlines(raw || '').trim().replace(/^\uFEFF/, '');
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
     if (fenced) text = fenced[1].trim();
+
     if (text.startsWith('{') || text.startsWith('[')) return text;
+
     if (/^\s*</.test(text)) {
       const doc = new DOMParser().parseFromString(text, 'text/html');
       const bodyText = normalizeNewlines(doc.body?.textContent || '').trim();
       if (bodyText.startsWith('{') || bodyText.startsWith('[')) return bodyText;
       text = bodyText || text;
     }
+
     const fa = text.indexOf('['), la = text.lastIndexOf(']');
     if (fa !== -1 && la > fa) return text.slice(fa, la + 1).trim();
+
     const fo = text.indexOf('{'), lo = text.lastIndexOf('}');
     if (fo !== -1 && lo > fo) return text.slice(fo, lo + 1).trim();
+
     throw new Error('未能从输入中提取 JSON。');
   }
-  function parseAnyJson(raw){ return JSON.parse(extractJsonText(raw)); }
+
+  function parseAnyJson(raw){
+    return JSON.parse(extractJsonText(raw));
+  }
+
   function normalizeAiMods(obj){
     let arr = obj;
     if (!Array.isArray(arr) && obj && Array.isArray(obj.modifications)) arr = obj.modifications;
     if (!Array.isArray(arr)) throw new Error('AI 返回内容不是数组，也不包含 modifications 数组。');
+
     return arr.map((m, i) => ({
       id: (m.id !== undefined && m.id !== null) ? m.id : `ai_${i + 1}`,
       new_text: String(m.new_text ?? m.revised_text ?? m.current ?? ''),
@@ -987,6 +1012,7 @@ status 可用值：
 
     if (!normalized) return false;
     if (/^(?:\d+|[ivxlcdm]+|[零〇一二两三四五六七八九十百千万]+)$/iu.test(normalized)) return true;
+
     const enToken = /^(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(?:\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth))*$/i;
     return enToken.test(normalized);
   }
@@ -1171,8 +1197,12 @@ status 可用值：
     for (const item of frontBlocks) {
       if ((item.content || '').trim()) sections.push(`### ${item.title}\n\n${item.content.trim()}`);
     }
-    if (chapterBlocks.length) sections.push(`### 目录\n\n${chapterBlocks.map(item => item.title).join('\n')}`);
-    for (const item of chapterBlocks) sections.push(`### ${item.title}\n\n${(item.content || '').trim()}`);
+    if (chapterBlocks.length) {
+      sections.push(`### 目录\n\n${chapterBlocks.map(item => item.title).join('\n')}`);
+    }
+    for (const item of chapterBlocks) {
+      sections.push(`### ${item.title}\n\n${(item.content || '').trim()}`);
+    }
 
     return sections.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
   }
@@ -1210,6 +1240,7 @@ status 可用值：
     if (finalChapters.length === 0) {
       finalChapters.push({ title: '第1章', content: fullTranslatedText.trim() });
     }
+
     return finalChapters;
   }
 
@@ -1314,15 +1345,10 @@ status 可用值：
   }
 
   // =========================
-  // 数据集 / 工作区
+  // 数据集
   // =========================
   function activeDataset(){
     return state.activeKey ? state.datasets[state.activeKey] : null;
-  }
-
-  function importBaseDataset(){
-    if (state.batchSourceKey && state.datasets[state.batchSourceKey]) return state.datasets[state.batchSourceKey];
-    return state.datasets.working || state.datasets.next || null;
   }
 
   function setActiveDataset(key){
@@ -1377,13 +1403,10 @@ status 可用值：
     setText($('datasetStats'), lines.join('\n'));
   }
 
-  function currentBatch(){
-    return state.activeBatchIndex != null ? state.batches[state.activeBatchIndex] : null;
-  }
-
   function currentBatchIdSet(){
     const b = currentBatch();
-    return b ? new Set(b.ids.map(String)) : null;
+    if (!b) return null;
+    return new Set(b.ids.map(String));
   }
 
   function getVisibleMods(){
@@ -1457,9 +1480,13 @@ status 可用值：
         ds.modifications[+cb.dataset.idx].selected = cb.checked;
         renderModList();
         scheduleBatchRebuildFromCurrentSelection();
-        invalidateStrictValidation('勾选变化后，如需生成全文请重新预校验。');
         savePageStateDebounced();
       });
+    });
+
+    requestAnimationFrame(() => {
+      const act = box.querySelector('.item.active');
+      if (act) act.scrollIntoView({ block:'nearest' });
     });
   }
 
@@ -1476,11 +1503,14 @@ status 可用值：
     b = String(b || '');
     let p = 0;
     while (p < a.length && p < b.length && a[p] === b[p]) p++;
+
     let sa = a.length - 1;
     let sb = b.length - 1;
     while (sa >= p && sb >= p && a[sa] === b[sb]) { sa--; sb--; }
+
     const a1 = a.slice(0,p), a2 = a.slice(p,sa+1), a3 = a.slice(sa+1);
     const b1 = b.slice(0,p), b2 = b.slice(p,sb+1), b3 = b.slice(sb+1);
+
     return {
       oldHtml: `${escapeHtml(a1)}${a2 ? `<del>${escapeHtml(a2)}</del>` : ''}${escapeHtml(a3)}`,
       newHtml: `${escapeHtml(b1)}${b2 ? `<ins>${escapeHtml(b2)}</ins>` : ''}${escapeHtml(b3)}`,
@@ -1588,7 +1618,7 @@ status 可用值：
   }
 
   // =========================
-  // 批次
+  // 分批
   // =========================
   function selectVisible(mode){
     const ds = activeDataset();
@@ -1641,6 +1671,15 @@ status 可用值：
 
   function estimatePromptModChars(m){
     return JSON.stringify(promptModFromCurrent(m)).length;
+  }
+
+  function currentBatch(){
+    return state.activeBatchIndex != null ? state.batches[state.activeBatchIndex] : null;
+  }
+
+  function currentBatchIdSet(){
+    const b = currentBatch();
+    return b ? new Set(b.ids.map(String)) : null;
   }
 
   function hasReturnedBatchData(){
@@ -1723,6 +1762,16 @@ status 可用值：
     if (copyAfter) autoCopyCurrentBatchPrompt(true);
   }
 
+  const scheduleBatchRebuildFromCurrentSelection = debounce(() => {
+    if (hasReturnedBatchData()) {
+      setText($('batchStats'),
+        `检测到已有批次返回结果，已阻止自动重切批，避免打乱导回对应关系。\n如确需重切批，请先保存历史，再手动重建。`
+      );
+      return;
+    }
+    buildBatchesCore(true);
+  }, 250);
+
   function rebuildBatchPromptTexts(){
     const tpl = $('promptTemplate').value.trim();
     for (const b of state.batches) {
@@ -1733,16 +1782,6 @@ status 可用值：
     renderBatchArea();
     savePageStateDebounced();
   }
-
-  const scheduleBatchRebuildFromCurrentSelection = debounce(() => {
-    if (hasReturnedBatchData()) {
-      setText($('batchStats'),
-        `检测到已有批次返回结果，已阻止自动重切批，避免打乱导回对应关系。\n如确需重切批，请先保存历史，再手动重建。`
-      );
-      return;
-    }
-    buildBatchesCore(true);
-  }, 250);
 
   async function autoCopyCurrentBatchPrompt(silent=false){
     const b = currentBatch();
@@ -1797,7 +1836,9 @@ status 可用值：
     if (!b || !ds) return;
     const firstId = b.ids[0];
     const idx = ds.modifications.findIndex(m => String(m.id) === String(firstId));
-    if (idx !== -1) state.selectedIndexByKey[state.activeKey] = idx;
+    if (idx !== -1) {
+      state.selectedIndexByKey[state.activeKey] = idx;
+    }
   }
 
   function renderBatchArea(){
@@ -1805,6 +1846,7 @@ status 可用值：
     if (!state.batches.length) {
       box.innerHTML = '<div class="batch-item">暂无批次。导入一润 JSON 后会自动分批。</div>';
       $('promptPreview').value = '';
+      $('batchPromptMirror').value = '';
       $('batchResponseBox').value = '';
       setText($('currentBatchInfo'), '请先导入一润 JSON。');
       setText($('currentBatchLog'), '等待当前批次返回。');
@@ -1830,6 +1872,7 @@ status 可用值：
 
     const b = currentBatch();
     $('promptPreview').value = b ? b.promptText : '';
+    $('batchPromptMirror').value = b ? b.promptText : '';
     $('batchResponseBox').value = b ? (b.responseRaw || '') : '';
 
     if (b) {
@@ -1888,12 +1931,15 @@ status 可用值：
     for (const baseMod of b.mods) {
       const hit = byId.get(String(baseMod.id));
       if (hit) normalized.push(normalizeOneBatchReturn(baseMod, hit));
-      else if (fillMissingKeep) normalized.push({ id: baseMod.id, new_text: String(baseMod.old_text || ''), reason:'', status:'keep' });
+      else if (fillMissingKeep) {
+        normalized.push({ id: baseMod.id, new_text: String(baseMod.old_text || ''), reason:'', status:'keep' });
+      }
     }
 
     b.responseParsed = normalized;
     b.status = 'returned';
     b.importLog = `导入成功。\n当前批次：${b.index + 1}\n预期条目：${b.ids.length}\n返回条目：${arr.length}\n缺失：${missing.length}${missing.length ? '（已按 keep 补齐）' : ''}\n多余：0`;
+
     renderBatchArea();
     refreshButtons();
     savePageStateDebounced();
@@ -1920,11 +1966,16 @@ status 可用值：
     for (let i = 0; i < state.batches.length; i++) {
       const b = state.batches[i];
       if (!String(b.responseRaw || '').trim()) continue;
-      try { importBatchByIndex(i); ok++; } catch (_) { fail++; }
+      try {
+        importBatchByIndex(i);
+        ok++;
+      } catch (_) {
+        fail++;
+      }
     }
     renderBatchArea();
     refreshButtons();
-    setText($('currentBatchLog'), `导入全部已保存批次结果完成。\n成功：${ok}\n失败：${fail}`);
+    setText($('currentBatchLog'), `导入全部批次结果完成。\n成功：${ok}\n失败：${fail}`);
   }
 
   function clearCurrentBatchResponse(){
@@ -1940,43 +1991,34 @@ status 可用值：
   }
 
   // =========================
-  // 导入全部批次结果（任何时候）
+  // 合并批次
   // =========================
-  function parseAllResultsPayload(raw){
-    const obj = parseAnyJson(raw);
-
-    // 1) 直接 modifications 数组 / 对象
-    if (Array.isArray(obj)) {
-      if (obj.length && obj.every(x => x && typeof x === 'object' && Array.isArray(x.modifications))) {
-        const batches = obj.map((x, i) => ({ batchIndex: x.batchIndex ?? (i + 1), modifications: normalizeAiMods(x.modifications) }));
-        return { batches, combined: batches.flatMap(b => b.modifications) };
-      }
-      return { batches: null, combined: normalizeAiMods(obj) };
-    }
-
-    if (obj && Array.isArray(obj.modifications)) {
-      return { batches: null, combined: normalizeAiMods(obj.modifications) };
-    }
-
-    if (obj && Array.isArray(obj.batches)) {
-      const batches = obj.batches.map((x, i) => ({
-        batchIndex: x.batchIndex ?? (i + 1),
-        modifications: normalizeAiMods(x.modifications || [])
-      }));
-      return { batches, combined: batches.flatMap(b => b.modifications) };
-    }
-
-    throw new Error('未识别到可导入的“全部批次结果”格式。');
+  function invalidateStrictValidation(msg='尚未预校验。'){
+    state.strictValidation = null;
+    setText($('strictValidateLog'), msg);
+    refreshButtons();
+    savePageStateDebounced();
   }
 
-  function buildResultDatasetFromCombinedMods(base, combinedMods){
-    const byId = new Map();
-    for (const x of combinedMods) {
-      byId.set(String(x.id), x);
+  function mergeAllBatches(){
+    if (!state.batches.length) throw new Error('还没有批次。');
+    if (!state.batchSourceKey || !state.datasets[state.batchSourceKey]) throw new Error('找不到批次来源数据集。');
+
+    const base = state.datasets[state.batchSourceKey];
+    const returnedMap = new Map();
+    const duplicateIds = [];
+
+    for (const b of state.batches) {
+      if (!b.responseParsed) continue;
+      for (const item of b.responseParsed) {
+        const k = String(item.id);
+        if (returnedMap.has(k)) duplicateIds.push(k);
+        returnedMap.set(k, item);
+      }
     }
 
     const resultMods = base.modifications.map(m => {
-      const got = byId.get(String(m.id));
+      const got = returnedMap.get(String(m.id));
       if (!got) return clone(m);
 
       const merged = clone(m);
@@ -1988,7 +2030,7 @@ status 可用值：
 
     recomputeCurrentAnchors(resultMods);
 
-    return {
+    const resultDs = {
       key: 'result',
       label: '结果集',
       modifications: resultMods,
@@ -1996,65 +2038,11 @@ status 可用值：
         kind: 'patch_only_result_set',
         mergedAt: new Date().toISOString(),
         sourceFileName: base.meta.sourceFileName || state.importFileName,
-        fromImportedAllResults: true
+        fromBatches: state.batches.length,
+        returnedBatches: state.batches.filter(b => !!b.responseParsed).length,
+        batchSourceKey: state.batchSourceKey
       }
     };
-  }
-
-  function updateBatchesFromImportedAllResults(parsed){
-    if (!state.batches.length) return;
-    if (parsed.batches && parsed.batches.length) {
-      // 优先按 batchIndex 回填
-      for (const incoming of parsed.batches) {
-        const idx = safeNum(incoming.batchIndex, 0) - 1;
-        const batch = state.batches[idx];
-        if (!batch) continue;
-        batch.responseParsed = incoming.modifications.map(x => ({
-          id: x.id,
-          new_text: x.new_text || '',
-          reason: x.reason || '',
-          status: x.status || 'ok'
-        }));
-        batch.status = 'returned';
-        batch.responseRaw = JSON.stringify({ modifications: incoming.modifications }, null, 2);
-        batch.importLog = `已通过“导入全部批次结果”回填本批次。`;
-      }
-      return;
-    }
-
-    // 否则按 id 分发
-    const byId = new Map(parsed.combined.map(x => [String(x.id), x]));
-    for (const batch of state.batches) {
-      const arr = batch.ids
-        .map(id => byId.get(String(id)))
-        .filter(Boolean)
-        .map(x => ({
-          id: x.id,
-          new_text: x.new_text || '',
-          reason: x.reason || '',
-          status: x.status || 'ok'
-        }));
-      if (arr.length) {
-        batch.responseParsed = arr;
-        batch.status = 'returned';
-        batch.responseRaw = JSON.stringify({ modifications: arr }, null, 2);
-        batch.importLog = `已通过“导入全部批次结果”按 id 分发回填。`;
-      }
-    }
-  }
-
-  async function importAllResultsAnytime(){
-    let raw = '';
-    const file = $('allResultsFile').files[0];
-    if (file) raw = normalizeNewlines(await file.text());
-    if (!raw.trim()) raw = normalizeNewlines($('allResultsPaste').value.trim());
-    if (!raw) throw new Error('请先上传或粘贴“全部批次结果”。');
-
-    const base = importBaseDataset();
-    if (!base) throw new Error('请先导入一润 JSON。');
-
-    const parsed = parseAllResultsPayload(raw);
-    const resultDs = buildResultDatasetFromCombinedMods(base, parsed.combined);
 
     state.datasets.result = resultDs;
     state.mergedRecordObject = datasetToExportObject(resultDs);
@@ -2062,93 +2050,96 @@ status 可用值：
     state.finalRenderedText = '';
     $('finalRawPreview').value = '';
     $('finalRenderedPreview').value = '';
+    invalidateStrictValidation('结果集已更新，请重新预校验全文。');
 
-    updateBatchesFromImportedAllResults(parsed);
-    invalidateStrictValidation('已导入全部批次结果，请重新预校验全文。');
+    const returnedCount = state.batches.filter(b => !!b.responseParsed).length;
+    const pending = state.batches.filter(b => !b.responseParsed).map(b => b.index + 1);
 
-    setText($('mergeLog'),
-      `已通过“导入全部批次结果”生成新的润色记录。\n结果集条目：${resultDs.modifications.length}\n导入结果条目：${parsed.combined.length}\n批次回填：${state.batches.length ? '已尝试回填' : '当前无批次可回填'}`
-    );
+    const lines = [];
+    lines.push(`已合并批次：${returnedCount} / ${state.batches.length}`);
+    lines.push(`结果集条目：${resultMods.length}`);
+    lines.push(`未导回批次：${pending.length ? pending.join(', ') : '无'}`);
+    if (duplicateIds.length) lines.push(`重复 id：${duplicateIds.join(', ')}`);
+    setText($('mergeLog'), lines.join('\n'));
 
     setActiveDataset('result');
-    saveSnapshot('自动快照：导入全部批次结果');
-    renderBatchArea();
+    saveSnapshot('自动快照：合并批次');
     refreshButtons();
-    savePageStateDebounced();
   }
 
-  // =========================
-  // 严格命中：原文 -> 一润后全文 -> 二润后全文
-  // =========================
-  function invalidateStrictValidation(msg='尚未预校验。'){
-    state.strictValidation = null;
-    setText($('strictValidateLog'), msg);
-    refreshButtons();
-    savePageStateDebounced();
-  }
+  function createNextRound(){
+    const base = state.datasets.result;
+    if (!base) throw new Error('请先生成结果集。');
 
-  function validateOriginalAgainstSourceText(originalText, baseDataset){
-    const failures = [];
-    const mods = baseDataset.modifications;
+    const mods = base.modifications.map(m => {
+      const accepted = (m.status === 'skip' || m.status === 'ambiguous' || m.status === 'conflict')
+        ? m.old_text
+        : (m.new_text || m.old_text);
 
-    for (const m of mods) {
-      const start = safeNum(m.anchorStart, 0);
-      const end = safeNum(m.anchorEnd, start);
-      const expected = String(m.anchor_old_text || '');
-      const actual = originalText.slice(start, end);
-      if (actual !== expected) {
-        failures.push({
-          id: m.id,
-          start,
-          end,
-          expected,
-          actual
-        });
+      return {
+        id: m.id,
+        orderIndex: m.orderIndex,
+        selected: true,
+        chunkIndex: m.chunkIndex,
+        anchorStart: m.anchorStart,
+        anchorEnd: m.anchorEnd,
+        anchor_old_text: m.anchor_old_text,
+        previous_old_text: m.previous_old_text,
+        old_text: accepted,
+        new_text: accepted,
+        first_reason: m.reason || m.first_reason || '',
+        reason: '',
+        contextBefore: m.contextBefore,
+        contextAfter: m.contextAfter,
+        status: 'pending',
+        currentStart: 0,
+        currentEnd: 0
+      };
+    });
+
+    recomputeCurrentAnchors(mods);
+
+    state.datasets.next = {
+      key: 'next',
+      label: '下一轮工作集',
+      modifications: mods,
+      meta: {
+        kind: 'patch_only_next_round',
+        createdAt: new Date().toISOString(),
+        sourceFileName: base.meta.sourceFileName || state.importFileName,
+        fromDataset: 'result'
       }
-    }
-
-    return {
-      ok: failures.length === 0,
-      total: mods.length,
-      matched: mods.length - failures.length,
-      failures
     };
+
+    setActiveDataset('next');
+    buildBatchesCore(true);
+    invalidateStrictValidation('进入下一轮后，如需生成全文，请先重新合并并预校验。');
+    saveSnapshot('自动快照：进入下一轮');
   }
 
-  function reconstructPass1TextStrict(originalText, baseDataset){
-    const ordered = [...baseDataset.modifications].sort((a,b) => b.anchorStart - a.anchorStart || b.anchorEnd - a.anchorEnd);
-    let out = originalText;
-
-    for (const m of ordered) {
-      const start = safeNum(m.anchorStart, 0);
-      const end = safeNum(m.anchorEnd, start);
-      const expected = String(m.anchor_old_text || '');
-      const replacement = String(m.old_text || '');
-      const actual = out.slice(start, end);
-      if (actual !== expected) {
-        throw new Error(`重建一润后全文失败：id=${m.id}，位置 ${start}-${end} 未命中 anchor_old_text。`);
-      }
-      out = out.slice(0, start) + replacement + out.slice(end);
-    }
-    return out;
+  // =========================
+  // 严格命中全文
+  // =========================
+  function applicableResultMods(resultDs){
+    return (resultDs?.modifications || []).filter(m => !['skip','ambiguous','conflict'].includes(String(m.status || '')));
   }
 
-  function validatePass1AgainstResult(pass1Text, resultDs){
+  function validateFullTextStrict(baseText, resultDs){
+    const text = String(baseText || '');
+    const mods = applicableResultMods(resultDs);
     const failures = [];
-    const mods = (resultDs.modifications || []).filter(m => !['skip','ambiguous','conflict'].includes(String(m.status || '')));
 
     for (const m of mods) {
       const start = safeNum(m.currentStart, 0);
       const end = safeNum(m.currentEnd, start);
-      const expected = String(m.old_text || '');
-      const actual = pass1Text.slice(start, end);
-      if (actual !== expected) {
+      const sliced = text.slice(start, end);
+      if (sliced !== String(m.old_text || '')) {
         failures.push({
           id: m.id,
           start,
           end,
-          expected,
-          actual
+          expected: String(m.old_text || ''),
+          actual: sliced
         });
       }
     }
@@ -2167,55 +2158,22 @@ status 可用值：
 
   async function validateStrictNow(){
     const resultDs = state.datasets.result;
-    const baseDs = importBaseDataset();
-    if (!baseDs) throw new Error('请先导入一润 JSON。');
-    if (!resultDs) throw new Error('请先生成新的润色记录（结果集）。');
+    if (!resultDs) throw new Error('请先生成结果集。');
 
-    const originalText = await readFullTextEditorValue();
-    if (!originalText.trim()) throw new Error('请先上传或粘贴润色前原文。');
+    const fullText = await readFullTextEditorValue();
+    if (!fullText.trim()) throw new Error('请先上传或粘贴一润后全文 / 合并文本。');
 
-    const phase1 = validateOriginalAgainstSourceText(originalText, baseDs);
-    if (!phase1.ok) {
-      state.strictValidation = {
-        ok: false,
-        phase1,
-        phase2: null
-      };
-      const first = phase1.failures[0];
+    const report = validateFullTextStrict(fullText, resultDs);
+    state.strictValidation = report;
+
+    if (report.ok) {
       setText($('strictValidateLog'),
-        `严格预校验失败（阶段 1：润色前原文 → 一润 JSON）。\n总条目：${phase1.total}\n命中：${phase1.matched}\n失败：${phase1.failures.length}\n\n首个失败 id：${first.id}\n位置：${first.start} - ${first.end}\n预期 anchor_old_text：${first.expected}\n实际切片：${first.actual}`
-      );
-      refreshButtons();
-      savePageStateDebounced();
-      return;
-    }
-
-    let pass1Text = '';
-    try {
-      pass1Text = reconstructPass1TextStrict(originalText, baseDs);
-    } catch (err) {
-      state.strictValidation = { ok:false, phase1, phase2:null };
-      setText($('strictValidateLog'), '重建一润后全文失败：\n' + (err?.message || String(err)));
-      refreshButtons();
-      savePageStateDebounced();
-      return;
-    }
-
-    const phase2 = validatePass1AgainstResult(pass1Text, resultDs);
-    state.strictValidation = {
-      ok: phase1.ok && phase2.ok,
-      phase1,
-      phase2
-    };
-
-    if (phase2.ok) {
-      setText($('strictValidateLog'),
-        `严格预校验通过。\n\n阶段 1（润色前原文 → 一润 JSON）：${phase1.total} / ${phase1.total}\n阶段 2（一润后全文 → 新润色记录）：${phase2.total} / ${phase2.total}\n\n现在可以生成润色后全文。`
+        `严格预校验通过。\n总条目：${report.total}\n命中：${report.matched}\n失败：0\n\n现在可以生成润色后全文。`
       );
     } else {
-      const first = phase2.failures[0];
+      const first = report.failures[0];
       setText($('strictValidateLog'),
-        `严格预校验失败（阶段 2：一润后全文 → 新润色记录）。\n总条目：${phase2.total}\n命中：${phase2.matched}\n失败：${phase2.failures.length}\n\n首个失败 id：${first.id}\n位置：${first.start} - ${first.end}\n预期 old_text：${first.expected}\n实际切片：${first.actual}`
+        `严格预校验失败。\n总条目：${report.total}\n命中：${report.matched}\n失败：${report.failures.length}\n\n首个失败 id：${first.id}\n位置：${first.start} - ${first.end}\n预期 old_text：${first.expected}\n实际切片：${first.actual}`
       );
     }
 
@@ -2225,48 +2183,44 @@ status 可用值：
 
   async function buildFinalTextStrict(){
     const resultDs = state.datasets.result;
-    const baseDs = importBaseDataset();
-    if (!baseDs) throw new Error('请先导入一润 JSON。');
     if (!resultDs) throw new Error('请先生成结果集。');
     if (!state.strictValidation?.ok) throw new Error('请先完成严格预校验，并确保 100% 通过。');
 
-    const originalText = await readFullTextEditorValue();
-    let pass1Text = reconstructPass1TextStrict(originalText, baseDs);
-
-    const applicable = (resultDs.modifications || [])
-      .filter(m => !['skip','ambiguous','conflict'].includes(String(m.status || '')))
+    const fullText = await readFullTextEditorValue();
+    const mods = applicableResultMods(resultDs)
       .map(m => clone(m))
       .sort((a,b) => b.currentStart - a.currentStart || b.currentEnd - a.currentEnd);
 
-    for (const m of applicable) {
+    let output = fullText;
+    for (const m of mods) {
       const start = safeNum(m.currentStart, 0);
       const end = safeNum(m.currentEnd, start);
       const oldText = String(m.old_text || '');
       const newText = String(m.new_text || oldText);
-      const actual = pass1Text.slice(start, end);
-      if (actual !== oldText) {
+      const sliced = output.slice(start, end);
+      if (sliced !== oldText) {
         throw new Error(`严格应用失败：id=${m.id}，位置 ${start}-${end} 不再匹配 old_text。`);
       }
-      pass1Text = pass1Text.slice(0, start) + newText + pass1Text.slice(end);
+      output = output.slice(0, start) + newText + output.slice(end);
     }
 
-    state.finalRawText = pass1Text;
+    state.finalRawText = output;
     state.finalRenderedText = $('use331Render').checked
       ? (() => {
-          const cleaned = cleanTranslatedText(pass1Text);
+          const cleaned = cleanTranslatedText(output);
           if (/(?:^|\n)###\s*/.test(cleaned)) {
             return renderTxtWithCatalog(buildFinalChapters(cleaned));
           }
           return normalizeTxtBodyWhitespace(cleaned);
         })()
-      : pass1Text;
+      : output;
 
-    $('fullTextPreview').value = originalText.slice(0, 30000);
+    $('fullTextPreview').value = fullText.slice(0, 30000);
     $('finalRawPreview').value = state.finalRawText.slice(0, 30000);
     $('finalRenderedPreview').value = state.finalRenderedText.slice(0, 30000);
 
     setText($('finalTextLog'),
-      `生成成功。\n阶段 1 严格命中：${state.strictValidation.phase1.total} / ${state.strictValidation.phase1.total}\n阶段 2 严格命中：${state.strictValidation.phase2.total} / ${state.strictValidation.phase2.total}\n输出模式：${$('use331Render').checked ? '331风格整理' : '纯应用结果'}`
+      `生成成功。\n严格命中：${state.strictValidation.total} / ${state.strictValidation.total}\n输出模式：${$('use331Render').checked ? '331风格整理' : '纯应用结果'}`
     );
 
     refreshButtons();
@@ -2377,8 +2331,7 @@ status 可用值：
         autoWriteCurrentBatch: $('autoWriteCurrentBatch').checked,
         use331Render: $('use331Render').checked,
         fullTextEditor: $('fullTextEditor').value,
-        sourcePaste: $('sourcePaste').value,
-        allResultsPaste: $('allResultsPaste').value
+        sourcePaste: $('sourcePaste').value
       }
     };
   }
@@ -2410,11 +2363,12 @@ status 可用值：
     $('use331Render').checked = c.use331Render ?? true;
     $('fullTextEditor').value = c.fullTextEditor ?? '';
     $('sourcePaste').value = c.sourcePaste ?? '';
-    $('allResultsPaste').value = c.allResultsPaste ?? '';
   }
 
   function saveHistory(){
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.historyList.slice(0, 8))); } catch {}
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(state.historyList.slice(0, 5)));
+    } catch {}
   }
 
   function loadHistory(){
@@ -2441,7 +2395,7 @@ status 可用值：
   function saveSnapshot(label='手动快照'){
     const snap = getHistoryMetaSnapshot(label);
     state.historyList.unshift(snap);
-    state.historyList = state.historyList.slice(0, 8);
+    state.historyList = state.historyList.slice(0, 5);
     saveHistory();
     renderHistory();
   }
@@ -2476,7 +2430,6 @@ status 可用值：
         renderAll();
       });
     });
-
     [...box.querySelectorAll('.hist-delete')].forEach(btn => {
       btn.addEventListener('click', ev => {
         ev.stopPropagation();
@@ -2500,7 +2453,9 @@ status 可用值：
         scrollLeft: el.scrollLeft || 0
       };
     });
-    try { localStorage.setItem(STORAGE_KEY + '_textarea_layout', JSON.stringify(layout)); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY + '_textarea_layout', JSON.stringify(layout));
+    } catch {}
   }
 
   function loadTextareaLayout(){
@@ -2522,7 +2477,9 @@ status 可用值：
   }
 
   function saveWindowScroll(){
-    try { localStorage.setItem(STORAGE_KEY + '_scroll', JSON.stringify({ x: window.scrollX, y: window.scrollY })); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY + '_scroll', JSON.stringify({ x: window.scrollX, y: window.scrollY }));
+    } catch {}
   }
 
   function loadWindowScroll(){
@@ -2535,7 +2492,9 @@ status 可用值：
   }
 
   function savePageState(){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(exportAppState())); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(exportAppState()));
+    } catch {}
     saveTextareaLayout();
     saveWindowScroll();
   }
@@ -2559,10 +2518,12 @@ status 可用值：
     document.querySelectorAll('[data-save-key]').forEach(el => {
       const ev = (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') ? 'input' : 'change';
       el.addEventListener(ev, () => {
-        if (el.id === 'promptTemplate') rebuildBatchPromptTexts();
+        if (el.id === 'promptTemplate') {
+          rebuildBatchPromptTexts();
+        }
         if (el.id === 'fullTextEditor') {
           $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
-          invalidateStrictValidation('原文已修改，请重新预校验。');
+          invalidateStrictValidation('全文已修改，请重新预校验。');
         }
         savePageStateDebounced();
       });
@@ -2635,8 +2596,7 @@ status 可用值：
     const hasDs = !!ds;
     const hasBatch = !!currentBatch();
     const hasResult = !!state.datasets.result;
-    const hasOriginal = !!String($('fullTextEditor').value || '').trim();
-    const canImportAllAnytime = !!importBaseDataset();
+    const hasFullText = !!String($('fullTextEditor').value || '').trim();
 
     $('btnDownloadActiveDataset').disabled = !hasDs;
     $('btnRebuildBatches').disabled = !hasDs || ds.key === 'result';
@@ -2647,14 +2607,11 @@ status 可用值：
     $('btnImportAllSavedBatches').disabled = !state.batches.length;
     $('btnClearCurrentBatchResponse').disabled = !hasBatch;
     $('btnCallGeminiCurrentBatch').disabled = !(hasBatch && state.apiKeys.length);
-
-    $('btnImportAllResultsAnytime').disabled = !canImportAllAnytime;
     $('btnMergeAllBatches').disabled = !state.batches.length;
     $('btnDownloadMergedRecord').disabled = !state.mergedRecordObject;
     $('btnCreateNextRound').disabled = !hasResult;
-
-    $('btnValidateStrict').disabled = !(hasResult && hasOriginal);
-    $('btnBuildFinalText').disabled = !(hasResult && hasOriginal && state.strictValidation?.ok);
+    $('btnValidateStrict').disabled = !(hasResult && hasFullText);
+    $('btnBuildFinalText').disabled = !(hasResult && hasFullText && state.strictValidation?.ok);
     $('btnDownloadFinalRaw').disabled = !state.finalRawText;
     $('btnDownloadFinalRendered').disabled = !state.finalRenderedText;
   }
@@ -2676,7 +2633,7 @@ status 可用值：
   }
 
   // =========================
-  // 事件
+  // 导入事件
   // =========================
   async function importSourceFromAny(){
     let raw = '';
@@ -2711,11 +2668,9 @@ status 可用值：
     lines.push(`首条锚点：${sourceMods[0] ? sourceMods[0].absoluteStart + ' - ' + sourceMods[0].absoluteEnd : '-'}`);
     lines.push(`末条锚点：${sourceMods[sourceMods.length-1] ? sourceMods[sourceMods.length-1].absoluteStart + ' - ' + sourceMods[sourceMods.length-1].absoluteEnd : '-'}`);
     setText($('importLog'), lines.join('\n'));
-    setText($('mergeLog'), '还没有新的润色记录。');
+    setText($('mergeLog'), '还没有合并结果。');
     setText($('strictValidateLog'), '尚未预校验。');
     setText($('finalTextLog'), '尚未生成润色后全文。');
-    $('finalRawPreview').value = '';
-    $('finalRenderedPreview').value = '';
 
     buildBatchesCore(true);
     saveSnapshot('自动快照：导入一润 JSON');
@@ -2723,13 +2678,19 @@ status 可用值：
   }
 
   $('sourceFile').addEventListener('change', async () => {
-    try { await importSourceFromAny(); }
-    catch (err) { setText($('importLog'), '导入失败：\n' + (err?.message || String(err))); }
+    try {
+      await importSourceFromAny();
+    } catch (err) {
+      setText($('importLog'), '导入失败：\n' + (err?.message || String(err)));
+    }
   });
 
   $('btnImportSource').addEventListener('click', async () => {
-    try { await importSourceFromAny(); }
-    catch (err) { setText($('importLog'), '导入失败：\n' + (err?.message || String(err))); }
+    try {
+      await importSourceFromAny();
+    } catch (err) {
+      setText($('importLog'), '导入失败：\n' + (err?.message || String(err)));
+    }
   });
 
   $('fullTextFile').addEventListener('change', async () => {
@@ -2737,10 +2698,13 @@ status 可用值：
     if (!f) return;
     $('fullTextEditor').value = normalizeNewlines(await f.text());
     $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
-    invalidateStrictValidation('已载入润色前原文，请点击“预校验全文（严格 100%）”。');
+    invalidateStrictValidation('已载入一润后全文，请点击“预校验全文（严格 100%）”。');
     savePageStateDebounced();
   });
 
+  // =========================
+  // 其他事件
+  // =========================
   $('btnCopyReadme').addEventListener('click', async () => {
     const ok = await copyText(README_TEXT);
     alert(ok ? 'README 已复制。' : '复制失败，请手动复制。');
@@ -2814,8 +2778,9 @@ status 可用值：
   });
 
   $('btnImportCurrentBatch').addEventListener('click', async () => {
-    try { await importCurrentBatchAndAdvance(); }
-    catch (err) {
+    try {
+      await importCurrentBatchAndAdvance();
+    } catch (err) {
       const b = currentBatch();
       if (b) {
         b.status = 'error';
@@ -2831,17 +2796,12 @@ status 可用值：
 
   $('btnClearCurrentBatchResponse').addEventListener('click', clearCurrentBatchResponse);
 
-  $('btnImportAllResultsAnytime').addEventListener('click', async () => {
-    try {
-      await importAllResultsAnytime();
-    } catch (err) {
-      setText($('mergeLog'), '导入全部批次结果失败：\n' + (err?.message || String(err)));
-    }
-  });
-
   $('btnMergeAllBatches').addEventListener('click', () => {
-    try { mergeAllBatches(); }
-    catch (err) { setText($('mergeLog'), '合并失败：\n' + (err?.message || String(err))); }
+    try {
+      mergeAllBatches();
+    } catch (err) {
+      setText($('mergeLog'), '合并失败：\n' + (err?.message || String(err)));
+    }
   });
 
   $('btnDownloadMergedRecord').addEventListener('click', () => {
@@ -2854,18 +2814,27 @@ status 可用值：
   });
 
   $('btnCreateNextRound').addEventListener('click', () => {
-    try { createNextRound(); }
-    catch (err) { alert(err?.message || String(err)); }
+    try {
+      createNextRound();
+    } catch (err) {
+      alert(err?.message || String(err));
+    }
   });
 
   $('btnValidateStrict').addEventListener('click', async () => {
-    try { await validateStrictNow(); }
-    catch (err) { setText($('strictValidateLog'), '预校验失败：\n' + (err?.message || String(err))); }
+    try {
+      await validateStrictNow();
+    } catch (err) {
+      setText($('strictValidateLog'), '预校验失败：\n' + (err?.message || String(err)));
+    }
   });
 
   $('btnBuildFinalText').addEventListener('click', async () => {
-    try { await buildFinalTextStrict(); }
-    catch (err) { setText($('finalTextLog'), '生成失败：\n' + (err?.message || String(err))); }
+    try {
+      await buildFinalTextStrict();
+    } catch (err) {
+      setText($('finalTextLog'), '生成失败：\n' + (err?.message || String(err)));
+    }
   });
 
   $('btnDownloadFinalRaw').addEventListener('click', () => {
@@ -2892,8 +2861,11 @@ status 可用值：
   });
 
   $('btnCallGeminiCurrentBatch').addEventListener('click', async () => {
-    try { await callGeminiForCurrentBatch(); }
-    catch (err) { setText($('apiLog'), '调用失败：\n' + (err?.message || String(err))); }
+    try {
+      await callGeminiForCurrentBatch();
+    } catch (err) {
+      setText($('apiLog'), '调用失败：\n' + (err?.message || String(err)));
+    }
   });
 
   $('btnSaveMod').addEventListener('click', saveEditor);
@@ -2909,81 +2881,18 @@ status 可用值：
   });
 
   // =========================
-  // 页面状态保存
+  // 初始化
   // =========================
-  function saveTextareaLayout(){
-    const layout = {};
-    document.querySelectorAll('textarea').forEach(el => {
-      layout[el.id] = {
-        width: el.offsetWidth,
-        height: el.offsetHeight,
-        scrollTop: el.scrollTop || 0,
-        scrollLeft: el.scrollLeft || 0
-      };
-    });
-    try { localStorage.setItem(STORAGE_KEY + '_textarea_layout', JSON.stringify(layout)); } catch {}
-  }
-
-  function loadTextareaLayout(){
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY + '_textarea_layout');
-      if (!raw) return;
-      const layout = JSON.parse(raw);
-      document.querySelectorAll('textarea').forEach(el => {
-        const x = layout[el.id];
-        if (!x) return;
-        if (x.width) el.style.width = x.width + 'px';
-        if (x.height) el.style.height = x.height + 'px';
-        requestAnimationFrame(() => {
-          el.scrollTop = x.scrollTop || 0;
-          el.scrollLeft = x.scrollLeft || 0;
-        });
-      });
-    } catch {}
-  }
-
-  function saveWindowScroll(){
-    try { localStorage.setItem(STORAGE_KEY + '_scroll', JSON.stringify({ x: window.scrollX, y: window.scrollY })); } catch {}
-  }
-
-  function loadWindowScroll(){
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY + '_scroll');
-      if (!raw) return;
-      const s = JSON.parse(raw);
-      requestAnimationFrame(() => window.scrollTo(s.x || 0, s.y || 0));
-    } catch {}
-  }
-
-  function savePageState(){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(exportAppState())); } catch {}
-    saveTextareaLayout();
-    saveWindowScroll();
-  }
-
-  const savePageStateDebounced = debounce(savePageState, 200);
-
-  function loadPageState(){
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        $('promptTemplate').value = DEFAULT_PROMPT;
-        return;
-      }
-      importAppState(JSON.parse(raw));
-    } catch {
-      $('promptTemplate').value = DEFAULT_PROMPT;
-    }
-  }
-
   function bindAutoSaveControls(){
     document.querySelectorAll('[data-save-key]').forEach(el => {
       const ev = (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') ? 'input' : 'change';
       el.addEventListener(ev, () => {
-        if (el.id === 'promptTemplate') rebuildBatchPromptTexts();
+        if (el.id === 'promptTemplate') {
+          rebuildBatchPromptTexts();
+        }
         if (el.id === 'fullTextEditor') {
           $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
-          invalidateStrictValidation('原文已修改，请重新预校验。');
+          invalidateStrictValidation('全文已修改，请重新预校验。');
         }
         savePageStateDebounced();
       });
@@ -3006,61 +2915,53 @@ status 可用值：
     });
 
     window.addEventListener('beforeunload', savePageState);
-    window.addEventListener('scroll', debounce(saveWindowScroll, 150));
+    window.addEventListener('scroll', debounce(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY + '_scroll', JSON.stringify({ x: window.scrollX, y: window.scrollY }));
+      } catch {}
+    }, 150));
   }
 
-  function applyAutoTitles(root = document){
-    const controls = root.querySelectorAll('button,input,textarea,select,.status,.preview-box,.batch-list,.listbox,.history-list,.readme');
-    controls.forEach(el => {
-      if (el.getAttribute('title')) return;
-      const dataTip = el.getAttribute('data-tip');
-      if (dataTip) { el.setAttribute('title', dataTip); return; }
-      let tip = '';
-      const id = el.id;
-      if (id) {
-        const explicit = document.querySelector(`label[for="${CSS.escape(id)}"]`);
-        if (explicit) tip = explicit.textContent.trim();
+  function loadPageState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        $('promptTemplate').value = DEFAULT_PROMPT;
+        return;
       }
-      if (!tip) {
-        const prev = el.previousElementSibling;
-        if (prev && prev.tagName === 'LABEL') tip = prev.textContent.trim();
-      }
-      if (!tip) {
-        const wrapLabel = el.closest('label');
-        if (wrapLabel) tip = wrapLabel.textContent.replace(/\s+/g,' ').trim();
-      }
-      if (!tip && el.getAttribute('placeholder')) tip = el.getAttribute('placeholder');
-      if (!tip) {
-        if (el.classList.contains('status')) tip = '状态/日志显示区域';
-        else if (el.classList.contains('preview-box')) tip = '预览区域';
-        else if (el.classList.contains('batch-list')) tip = '批次列表区域';
-        else if (el.classList.contains('listbox')) tip = '补丁列表区域';
-        else if (el.classList.contains('history-list')) tip = '历史记录区域';
-        else if (el.classList.contains('readme')) tip = '说明文档区域';
-      }
-      if (tip) el.title = tip;
-    });
+      importAppState(JSON.parse(raw));
+    } catch {
+      $('promptTemplate').value = DEFAULT_PROMPT;
+    }
   }
 
-  function renderAll(){
-    renderDatasetTabs();
-    renderDatasetStats();
-    renderBatchArea();
-    focusWorkAreaToCurrentBatch();
-    renderModList();
-    ensureSelectedMod();
-    renderEditor();
-    renderHistory();
-    $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
-    $('finalRawPreview').value = (state.finalRawText || '').slice(0, 30000);
-    $('finalRenderedPreview').value = (state.finalRenderedText || '').slice(0, 30000);
-    refreshButtons();
-    applyAutoTitles();
+  function loadTextareaLayout(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + '_textarea_layout');
+      if (!raw) return;
+      const layout = JSON.parse(raw);
+      document.querySelectorAll('textarea').forEach(el => {
+        const x = layout[el.id];
+        if (!x) return;
+        if (x.width) el.style.width = x.width + 'px';
+        if (x.height) el.style.height = x.height + 'px';
+        requestAnimationFrame(() => {
+          el.scrollTop = x.scrollTop || 0;
+          el.scrollLeft = x.scrollLeft || 0;
+        });
+      });
+    } catch {}
   }
 
-  // =========================
-  // 初始化
-  // =========================
+  function loadWindowScroll(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + '_scroll');
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      requestAnimationFrame(() => window.scrollTo(s.x || 0, s.y || 0));
+    } catch {}
+  }
+
   loadHistory();
   loadPageState();
   if (!$('promptTemplate').value) $('promptTemplate').value = DEFAULT_PROMPT;
