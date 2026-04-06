@@ -1,0 +1,3074 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>缝合助手_超增强版（严格命中版）</title>
+<style>
+  :root{
+    --bg:#0a1122;
+    --panel:#111a33;
+    --line:#2b3e73;
+    --text:#edf2ff;
+    --muted:#a8b6da;
+    --blue:#4f7cff;
+    --blue2:#375fd6;
+    --green:#1fa56f;
+    --green2:#167d54;
+    --orange:#b87911;
+    --orange2:#8d5d0d;
+    --red:#b34343;
+    --red2:#8e3131;
+    --chip:#0d1530;
+    --shadow:0 10px 30px rgba(0,0,0,.28);
+    --ins:#7df2c1;
+    --del:#ffb1b1;
+    --hl:#ffd869;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    color:var(--text);
+    background:
+      radial-gradient(circle at top right, rgba(79,124,255,.12), transparent 22%),
+      linear-gradient(180deg,#08101f,#0d1530 42%,#0a1122);
+    font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .wrap{max-width:1860px;margin:0 auto;padding:16px}
+  h1{margin:0 0 8px;font-size:28px}
+  h2{margin:0 0 10px;font-size:18px}
+  .desc{color:var(--muted);margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .full{grid-column:1/-1}
+  .panel{
+    background:rgba(17,26,51,.96);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px;
+    box-shadow:var(--shadow);
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .row>*{flex:1}
+  .row.tight>*{flex:0 0 auto}
+  label{display:block;font-weight:700;margin:8px 0 5px}
+  input[type="file"],input[type="number"],input[type="text"],select,textarea{
+    width:100%;
+    background:#0b1330;
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:9px 11px;
+    outline:none;
+    font:inherit;
+  }
+  input[type="number"]{min-width:80px}
+  textarea{
+    resize:both;
+    min-height:84px;
+    min-width:180px;
+    overflow:auto;
+  }
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .btn{
+    border:none;
+    background:var(--blue);
+    color:#fff;
+    border-radius:10px;
+    padding:9px 12px;
+    font-weight:700;
+    cursor:pointer;
+    transition:.15s ease;
+  }
+  .btn:hover{background:var(--blue2)}
+  .btn.secondary{background:#2b385d}
+  .btn.secondary:hover{background:#344777}
+  .btn.ok{background:var(--green)}
+  .btn.ok:hover{background:var(--green2)}
+  .btn.warn{background:var(--orange)}
+  .btn.warn:hover{background:var(--orange2)}
+  .btn.bad{background:var(--red)}
+  .btn.bad:hover{background:var(--red2)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .small{font-size:12px;color:var(--muted)}
+  .status{
+    min-height:90px;
+    background:#0a1230;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px;
+    white-space:pre-wrap;
+  }
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{
+    padding:7px 11px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:#0d1531;
+    color:var(--muted);
+    cursor:pointer;
+    font-weight:700;
+  }
+  .tab.active{
+    background:#1a2a5e;
+    color:#fff;
+    border-color:#5b83ff;
+  }
+  details{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 12px;
+    background:#0b1330;
+  }
+  summary{
+    cursor:pointer;
+    font-weight:800;
+    color:#dbe5ff;
+  }
+  .readme{
+    margin-top:8px;
+    white-space:pre-wrap;
+    max-height:300px;
+    overflow:auto;
+    background:#09112a;
+    border:1px solid rgba(66,93,163,.35);
+    border-radius:10px;
+    padding:12px;
+    color:#dce7ff;
+  }
+  .split2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .split3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .twoWide{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:14px;
+  }
+  .workspace{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:12px;
+  }
+  .listbox,.batch-list,.history-list{
+    height:620px;
+    overflow:auto;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#0a1230;
+  }
+  .item,.batch-item,.history-item{
+    padding:9px 10px;
+    border-bottom:1px solid rgba(70,95,160,.25);
+    cursor:pointer;
+  }
+  .item:hover,.batch-item:hover,.history-item:hover{background:#101a40}
+  .item.active,.batch-item.active,.history-item.active{
+    background:#162756;
+    outline:1px solid #4f7cff;
+  }
+  .item-top,.batch-head,.history-head{
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    align-items:center;
+    margin-bottom:4px;
+  }
+  .badge{
+    font-size:12px;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid #3d5796;
+    background:#1a2649;
+    color:#d6e0ff;
+  }
+  .item-snippet,.batch-meta,.history-meta{
+    font-size:12px;
+    line-height:1.45;
+    color:#dce6ff;
+    word-break:break-word;
+  }
+  .toolbar{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:10px;
+  }
+  .preview-box{
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:#0a1230;
+    min-height:90px;
+    padding:10px;
+    overflow:auto;
+    word-break:break-word;
+  }
+  .preview-box mark{
+    background:var(--hl);
+    color:#111;
+    padding:1px 2px;
+    border-radius:3px;
+  }
+  .diff-old del{
+    background:rgba(255,177,177,.25);
+    color:#ffd3d3;
+    text-decoration:none;
+    border-radius:3px;
+    padding:1px 2px;
+  }
+  .diff-new ins{
+    background:rgba(125,242,193,.22);
+    color:#c8ffe6;
+    text-decoration:none;
+    border-radius:3px;
+    padding:1px 2px;
+  }
+  .compact-grid{
+    display:grid;
+    grid-template-columns:110px 110px 110px 110px 110px 1fr;
+    gap:10px;
+    align-items:end;
+  }
+  .compact-grid .full{grid-column:1/-1}
+  .editor-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .editor-grid .full{grid-column:1/-1}
+  .inline-help{font-size:12px;color:var(--muted);margin-top:4px}
+  @media (max-width:1100px){
+    .grid,.split2,.split3,.twoWide,.workspace,.editor-grid,.compact-grid{grid-template-columns:1fr}
+    .listbox,.batch-list,.history-list{height:320px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>缝合助手_超增强版（严格命中版）</h1>
+  <div class="desc">
+    选择一润 JSON 会自动导入；选择润色前原文会自动载入。严格命中模式下：先用一润 JSON 100% 命中润色前原文，重建一润后全文，再严格应用二润结果。
+  </div>
+
+  <section class="panel full">
+    <details>
+      <summary title="展开查看使用说明">README_缝合助手（点开查看）</summary>
+      <div class="readme mono" id="readmeBox" data-tip="这里显示内置 README"></div>
+      <div class="toolbar">
+        <button class="btn secondary" id="btnCopyReadme" data-tip="复制 README">复制 README</button>
+      </div>
+    </details>
+  </section>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>① 一润 JSON</h2>
+      <label>选择一润 JSON / .json.html（选择后自动导入）</label>
+      <input type="file" id="sourceFile" accept=".json,.html,.txt,.json.html" data-tip="选择文件后会自动导入">
+
+      <label>或者粘贴 JSON / HTML 后手动导入</label>
+      <textarea id="sourcePaste" class="mono" placeholder="支持 0.json 文本，或 body 中直接是 JSON 的 html"
+        data-save-key="sourcePaste" data-tip="如果不选文件，也可粘贴后点击‘导入一润 JSON’"></textarea>
+
+      <div class="toolbar">
+        <button class="btn ok" id="btnImportSource" data-tip="从粘贴框手动导入一润 JSON">导入一润 JSON</button>
+        <button class="btn secondary" id="btnDownloadActiveDataset" disabled data-tip="下载当前激活数据集">下载当前激活数据集</button>
+      </div>
+
+      <div class="split2" style="margin-top:10px">
+        <div class="status" id="importLog" data-tip="导入日志">等待导入。</div>
+        <div class="status" id="datasetStats" data-tip="当前数据集统计">暂无数据集。</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>② 提示词模板 / 当前批次完整 prompt 包</h2>
+      <label>提示词模板</label>
+      <textarea id="promptTemplate" class="mono" data-save-key="promptTemplate"
+        data-tip="修改后，当前批次完整 prompt 包会实时更新；复制时复制的也是最新内容"></textarea>
+
+      <div class="toolbar">
+        <button class="btn ok" id="btnCopyPromptPreview" disabled data-tip="复制当前批次完整 prompt 包">复制当前批次完整 prompt 包</button>
+        <button class="btn secondary" id="btnCopyPromptTemplate" data-tip="只复制提示词模板">复制提示词模板（仅模板）</button>
+      </div>
+
+      <label>当前批次完整 prompt 包</label>
+      <textarea id="promptPreview" class="mono" readonly data-tip="复制按钮复制的就是这里的全部内容"></textarea>
+    </section>
+
+    <section class="panel">
+      <h2>③ 自动分批设置</h2>
+
+      <div class="tabs" id="datasetTabs" data-tip="切换当前工作集 / 结果集 / 下一轮工作集"></div>
+
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>搜索</label>
+          <input type="text" id="filterText" data-save-key="filterText" placeholder="按 id / old_text / new_text / reason 搜索"
+            data-tip="按内容筛选补丁">
+        </div>
+        <div>
+          <label>状态筛选</label>
+          <select id="filterStatus" data-save-key="filterStatus" data-tip="按状态过滤补丁">
+            <option value="all">全部</option>
+            <option value="pending">pending</option>
+            <option value="ok">ok</option>
+            <option value="keep">keep</option>
+            <option value="skip">skip</option>
+            <option value="ambiguous">ambiguous</option>
+            <option value="conflict">conflict</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn secondary" id="btnSelectVisible" data-tip="勾选当前筛选结果">勾选当前筛选结果</button>
+        <button class="btn secondary" id="btnClearVisible" data-tip="取消当前筛选结果">取消当前筛选结果</button>
+        <button class="btn secondary" id="btnInvertVisible" data-tip="反选当前筛选结果">反选当前筛选结果</button>
+        <button class="btn secondary" id="btnSelectPending" data-tip="勾选所有 pending 条目">勾选 pending</button>
+        <button class="btn secondary" id="btnClearAllSelection" data-tip="清空全部勾选">清空全部勾选</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>每批最多条数</label>
+          <input type="number" id="batchMaxItems" data-save-key="batchMaxItems" value="42" min="1" max="500"
+            data-tip="修改后会自动重切批；若已有返回结果，默认阻止自动重切批">
+        </div>
+        <div>
+          <label>每批最大字符预算</label>
+          <input type="number" id="batchMaxChars" data-save-key="batchMaxChars" value="18000" min="1000" max="200000"
+            data-tip="修改后会自动重切批">
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn secondary" id="btnRebuildBatches" disabled data-tip="手动重建批次">手动重建批次</button>
+        <button class="btn secondary" id="btnDownloadCurrentBatchJson" disabled data-tip="下载当前批次 JSON">下载当前批次 JSON</button>
+        <button class="btn secondary" id="btnDownloadCurrentBatchPrompt" disabled data-tip="下载当前批次 prompt.txt">下载当前批次 prompt.txt</button>
+      </div>
+
+      <div class="status" id="batchStats" data-tip="批次统计">尚未生成批次。</div>
+    </section>
+
+    <section class="panel">
+      <h2>历史记录</h2>
+      <div class="toolbar">
+        <button class="btn secondary" id="btnSaveSnapshot" data-tip="保存当前状态到历史">保存当前状态到历史</button>
+        <button class="btn bad" id="btnDeleteAllHistory" data-tip="清空全部历史">清空全部历史</button>
+      </div>
+      <div class="history-list" id="historyList" data-tip="历史记录列表"></div>
+    </section>
+
+    <section class="panel full">
+      <h2>④ 批次列表 + ⑤ 当前批次返回框（强绑定）</h2>
+      <div class="twoWide">
+        <div>
+          <div class="batch-list" id="batchList" data-tip="点击某个批次，右侧返回框和下方工作区都会联动切换"></div>
+        </div>
+
+        <div>
+          <div class="status" id="currentBatchInfo" data-tip="当前选中批次信息">请先导入一润 JSON。</div>
+
+          <label>当前批次 AI 返回 JSON</label>
+          <textarea id="batchResponseBox" class="mono"
+            placeholder="点击这里会自动尝试粘贴剪贴板内容；也可以手工重新粘贴修正"
+            data-tip="这个框严格绑定当前选中的批次；点击时会尝试自动读取剪贴板"></textarea>
+
+          <div class="row tight">
+            <label style="margin:0;font-weight:600" title="AI 漏条目时自动补 keep">
+              <input type="checkbox" id="fillMissingKeep" data-save-key="fillMissingKeep" checked data-tip="AI 漏掉本批次某些 id 时自动补 keep"> 当前批次缺失 id 自动补 keep
+            </label>
+          </div>
+
+          <div class="toolbar">
+            <button class="btn ok" id="btnImportCurrentBatch" disabled data-tip="导入当前批次结果，然后自动跳下一批并自动复制下一批 prompt">导入当前批次结果</button>
+            <button class="btn secondary" id="btnImportAllSavedBatches" disabled data-tip="把当前页面里已保存的所有批次返回文本重新逐批导入">导入全部已保存批次结果</button>
+            <button class="btn secondary" id="btnClearCurrentBatchResponse" disabled data-tip="清空当前批次返回框">清空当前批次返回框</button>
+          </div>
+
+          <div class="status" id="currentBatchLog" data-tip="当前批次导入日志">等待当前批次返回。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel full">
+      <h2>⑩ 补丁工作区（自动跟随当前批次）</h2>
+      <div class="workspace">
+        <div>
+          <div class="small" id="listSummary" data-tip="当前列表摘要">暂无条目</div>
+          <div class="listbox" id="modList" data-tip="优先显示当前批次对应的补丁条目"></div>
+        </div>
+
+        <div>
+          <div class="compact-grid">
+            <div>
+              <label>ID</label>
+              <input id="edId" readonly data-tip="当前条目 id">
+            </div>
+            <div>
+              <label>status</label>
+              <select id="edStatus" data-tip="当前条目状态">
+                <option value="pending">pending</option>
+                <option value="ok">ok</option>
+                <option value="keep">keep</option>
+                <option value="skip">skip</option>
+                <option value="ambiguous">ambiguous</option>
+                <option value="conflict">conflict</option>
+              </select>
+            </div>
+            <div>
+              <label>chunk</label>
+              <input id="edChunkIndex" type="number" data-tip="chunkIndex">
+            </div>
+            <div>
+              <label>srcStart</label>
+              <input id="edAnchorStart" type="number" data-tip="源 absoluteStart">
+            </div>
+            <div>
+              <label>srcEnd</label>
+              <input id="edAnchorEnd" type="number" data-tip="源 absoluteEnd">
+            </div>
+            <div class="row" style="gap:8px;align-items:end">
+              <div style="flex:1">
+                <label>absStart</label>
+                <input id="edCurrentStart" type="number" readonly data-tip="当前工作 absoluteStart">
+              </div>
+              <div style="flex:1">
+                <label>absEnd</label>
+                <input id="edCurrentEnd" type="number" readonly data-tip="当前工作 absoluteEnd">
+              </div>
+            </div>
+          </div>
+
+          <div class="editor-grid" style="margin-top:10px">
+            <div>
+              <label>previous_old_text</label>
+              <textarea id="edPrevOld" class="mono" style="min-height:72px" data-tip="上一轮旧文本"></textarea>
+            </div>
+            <div>
+              <label>old_text（当前基准文本）</label>
+              <textarea id="edOld" class="mono" style="min-height:72px" data-tip="当前基准文本"></textarea>
+            </div>
+
+            <div class="full">
+              <label>new_text（本轮候选文本）</label>
+              <textarea id="edNew" class="mono" style="min-height:92px" data-tip="当前候选文本"></textarea>
+            </div>
+
+            <div class="full">
+              <label>reason</label>
+              <textarea id="edReason" class="mono" style="min-height:84px" data-tip="keep 时可为空，不会自动编造新 reason"></textarea>
+            </div>
+
+            <div>
+              <label>contextBefore</label>
+              <textarea id="edCtxBefore" class="mono" style="min-height:84px" data-tip="局部前文"></textarea>
+            </div>
+            <div>
+              <label>contextAfter</label>
+              <textarea id="edCtxAfter" class="mono" style="min-height:84px" data-tip="局部后文"></textarea>
+            </div>
+
+            <div class="full">
+              <div class="toolbar">
+                <button class="btn ok" id="btnSaveMod" data-tip="保存当前条目修改">保存当前条目</button>
+                <button class="btn secondary" id="btnMarkKeep" data-tip="标记 keep；不自动生成新 reason">标记 keep</button>
+                <button class="btn bad" id="btnMarkSkip" data-tip="标记 skip">标记 skip</button>
+                <button class="btn secondary" id="btnUseNewAsOld" data-tip="把 new_text 提升为 old_text">把 new_text 提升为 old_text</button>
+              </div>
+            </div>
+
+            <div>
+              <label>old_text 差异预览</label>
+              <div class="preview-box diff-old" id="oldPreview" data-tip="old_text 相对 new_text 的差异"></div>
+            </div>
+            <div>
+              <label>new_text 差异预览</label>
+              <div class="preview-box diff-new" id="newPreview" data-tip="new_text 相对 old_text 的差异"></div>
+            </div>
+
+            <div class="full">
+              <label>差异摘要</label>
+              <div class="preview-box" id="diffSummary" data-tip="差异摘要"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>⑥ 可选：直接调用 Gemini 处理当前批次</h2>
+      <label>上传 api.txt</label>
+      <input type="file" id="apiFile" accept=".txt" data-tip="上传 api.txt，每行一个 KEY">
+
+      <label>或者粘贴 API KEY（每行一个）</label>
+      <textarea id="apiPaste" class="mono" placeholder="AIza...&#10;AIza..." data-tip="也可直接粘贴多个 KEY"></textarea>
+
+      <div class="row">
+        <div>
+          <label>模型名</label>
+          <input type="text" id="modelId" class="mono" data-save-key="modelId" value="gemini-2.5-flash-lite" data-tip="Gemini 模型名">
+        </div>
+        <div>
+          <label>当前 KEY 序号</label>
+          <input type="number" id="apiIndex" value="1" min="1" data-tip="当前使用的 KEY 序号">
+        </div>
+      </div>
+
+      <div class="row tight">
+        <label style="margin:0;font-weight:600" title="429 时自动切换下一个 KEY">
+          <input type="checkbox" id="autoSwitch429" data-save-key="autoSwitch429" checked data-tip="429 自动切 KEY"> 429 自动切下一个 KEY
+        </label>
+        <label style="margin:0;font-weight:600" title="调用成功后自动写回当前批次返回框">
+          <input type="checkbox" id="autoWriteCurrentBatch" data-save-key="autoWriteCurrentBatch" checked data-tip="成功后自动写回当前批次返回框"> 成功后自动写回当前批次返回框
+        </label>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn secondary" id="btnLoadApiKeys" data-tip="载入 KEY 列表">载入 KEY 列表</button>
+        <button class="btn ok" id="btnCallGeminiCurrentBatch" disabled data-tip="把当前批次完整 prompt 包发给 Gemini">调用 Gemini 处理当前批次</button>
+      </div>
+
+      <div class="status" id="apiLog" data-tip="API 日志">尚未载入 API KEY。</div>
+    </section>
+
+    <section class="panel">
+      <h2>⑦ 导入全部批次结果 / 生成新的润色记录</h2>
+
+      <label>上传“全部批次结果”文件</label>
+      <input type="file" id="allResultsFile" accept=".json,.txt,.html" data-tip="可上传所有批次汇总结果。支持单个 modifications 数组，或 batches 数组">
+
+      <label>或者粘贴“全部批次结果”</label>
+      <textarea id="allResultsPaste" class="mono" data-save-key="allResultsPaste"
+        placeholder='支持 {"modifications":[...]} 或 {"batches":[{"batchIndex":1,"modifications":[...]}]}'
+        data-tip="也可直接粘贴全部批次结果"></textarea>
+
+      <div class="toolbar">
+        <button class="btn ok" id="btnImportAllResultsAnytime" data-tip="任何时候都可点击：导入全部批次结果，生成新的润色记录">导入全部批次结果</button>
+        <button class="btn ok" id="btnMergeAllBatches" disabled data-tip="把当前页面里逐批导回的结果合并为新的润色记录">合并已导回批次，生成新的润色记录</button>
+        <button class="btn secondary" id="btnDownloadMergedRecord" disabled data-tip="下载新的润色记录 JSON">下载新的润色记录 JSON</button>
+        <button class="btn secondary" id="btnCreateNextRound" disabled data-tip="用结果集生成下一轮工作集">用结果集生成下一轮工作集</button>
+      </div>
+
+      <div class="status" id="mergeLog" data-tip="导入全部结果或合并批次后的日志">还没有新的润色记录。</div>
+    </section>
+
+    <section class="panel full">
+      <h2>⑧ 润色前原文（严格命中）</h2>
+
+      <div class="row">
+        <div>
+          <label>选择润色前原文 / 基底全文（选择后自动载入）</label>
+          <input type="file" id="fullTextFile" accept=".txt,.md" data-tip="选择文件后会自动载入到下面编辑框">
+        </div>
+        <div>
+          <label>选项</label>
+          <div class="row tight" style="padding-top:10px">
+            <label style="margin:0;font-weight:600" title="严格命中模式固定开启">
+              <input type="checkbox" id="strictMode" checked disabled data-tip="严格命中模式固定开启"> 严格命中模式（固定开启）
+            </label>
+            <label style="margin:0;font-weight:600" title="若文本中含 ### 标题，则按 331 风格整理输出">
+              <input type="checkbox" id="use331Render" data-save-key="use331Render" checked data-tip="使用 331 风格章节整理"> 使用 331 风格章节整理
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <label>润色前原文 / 基底全文（可修改；生成时以这里的当前内容为准）</label>
+      <textarea id="fullTextEditor" class="mono" style="min-height:220px" data-save-key="fullTextEditor"
+        data-tip="严格命中的基底文本。会先拿一润 JSON 严格命中这里，再重建一润后全文，再应用二润结果"></textarea>
+
+      <div class="toolbar">
+        <button class="btn warn" id="btnValidateStrict" disabled data-tip="严格校验：先命中润色前原文，再校验重建出的一润后全文是否与新的润色记录匹配">预校验全文（严格 100%）</button>
+        <button class="btn ok" id="btnBuildFinalText" disabled data-tip="只有严格预校验 100% 通过后，才能生成润色后全文">生成润色后全文</button>
+        <button class="btn secondary" id="btnDownloadFinalRaw" disabled data-tip="下载应用后二润全文">下载应用后二润全文.txt</button>
+        <button class="btn secondary" id="btnDownloadFinalRendered" disabled data-tip="下载 331 整理版">下载 331整理版.txt</button>
+      </div>
+
+      <div class="split2">
+        <div class="status" id="strictValidateLog" data-tip="严格预校验结果">尚未预校验。</div>
+        <div class="status" id="finalTextLog" data-tip="全文生成结果">尚未生成润色后全文。</div>
+      </div>
+    </section>
+
+    <section class="panel full">
+      <h2>⑨ 结果预览</h2>
+      <div class="split3">
+        <div>
+          <label>润色前原文当前内容预览</label>
+          <textarea id="fullTextPreview" class="mono" readonly data-tip="预览当前原文编辑框内容"></textarea>
+        </div>
+        <div>
+          <label>应用后二润全文预览</label>
+          <textarea id="finalRawPreview" class="mono" readonly data-tip="预览应用结果"></textarea>
+        </div>
+        <div>
+          <label>331 整理版预览</label>
+          <textarea id="finalRenderedPreview" class="mono" readonly data-tip="预览 331 整理版结果"></textarea>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  const STORAGE_KEY = 'stitch_helper_strict_v2';
+  const HISTORY_KEY = 'stitch_helper_strict_history_v2';
+
+  const README_TEXT = `README_缝合助手（严格命中版）
+
+一、这版的关键逻辑
+1. 去掉了重复的“当前批次完整 prompt 包镜像”。
+2. 选择一润 JSON 文件后自动导入。
+3. 选择润色前原文文件后自动载入。
+4. 你可以逐批导回，也可以“任何时候”直接导入全部批次结果。
+5. 读取历史里完成的全批次结果后，也可以继续生成新的润色记录和润色全文。
+
+二、严格命中怎么做
+1. 先用一润 JSON 的：
+   - sourceAbsoluteStart/sourceAbsoluteEnd
+   - anchor_old_text
+   严格命中润色前原文。
+2. 100% 命中后，重建一润后全文。
+3. 再用新的润色记录里的：
+   - absoluteStart/absoluteEnd
+   - old_text
+   严格命中一润后全文。
+4. 100% 命中后，应用 new_text 生成二润全文。
+5. 整个过程不做模糊匹配、不做 fallback、不做猜测。
+
+三、导入全部批次结果
+支持三种常见格式：
+1. 直接是：
+   { "modifications": [...] }
+2. 直接是 modifications 数组：
+   [ ... ]
+3. 批次形式：
+   { "batches": [ { "batchIndex": 1, "modifications": [...] }, ... ] }
+
+四、keep 逻辑
+1. keep 不会自动编造“无需改动”之类的新 reason。
+2. keep 且无新增 reason 时，可保持空字符串。
+
+五、历史记录
+1. 历史记录保存的是整个页面状态。
+2. 如果某个历史里已经有完整批次结果或结果集，恢复后就可以继续：
+   - 下载新的润色记录
+   - 预校验全文
+   - 生成润色全文
+`;
+
+  const DEFAULT_PROMPT = `你是一位拥有二十年经验的资深中文文学翻译家，曾为国内一线出版社翻译过多部畅销外文小说。你的翻译作品以“信、达、雅”著称。
+
+这是“补丁级二次润色”任务，不是全文重写任务。你将看到一个 JSON 对象，其中只有当前批次的 modifications。请只逐条处理这些补丁，不要试图重建全文，不要补写上下文，不要扩写。
+
+处理原则：
+1. 只依据每条记录的 old_text、previous_old_text、contextBefore、contextAfter、first_reason、reason 做二次润色判断。
+2. old_text 是当前基准文本；如果你认为还可优化，请把终稿写回 new_text。
+3. 不要修改 id。
+4. 除非非常必要，不要改动 chunkIndex / absoluteStart / absoluteEnd / sourceAbsoluteStart / sourceAbsoluteEnd。
+5. 如果当前表达已经很好，可保留，并在 reason 中写清楚理由；若保持 keep 且无新增理由，可保持空 reason。
+6. 不得改剧情、设定、事实与人物关系。
+7. 不要输出任何解释或 Markdown，只输出纯 JSON。
+
+输出格式必须严格为：
+{
+  "modifications": [
+    {
+      "id": 1,
+      "new_text": "",
+      "reason": "",
+      "status": "ok"
+    }
+  ]
+}
+
+status 可用值：
+- ok
+- keep
+- skip
+- ambiguous`;
+
+  const state = {
+    datasets: { working:null, result:null, next:null },
+    activeKey: null,
+    selectedIndexByKey: { working:null, result:null, next:null },
+    importFileName: '0.json',
+    batchSourceKey: null,
+    batches: [],
+    activeBatchIndex: null,
+    apiKeys: [],
+    mergedRecordObject: null,
+    finalRawText: '',
+    finalRenderedText: '',
+    historyList: [],
+    strictValidation: null,
+    autoCopyBusy: false
+  };
+
+  $('readmeBox').textContent = README_TEXT;
+
+  // =========================
+  // 基础工具
+  // =========================
+  function normalizeNewlines(s=''){ return String(s).replace(/\r\n?/g, '\n'); }
+  function setText(el, text){ el.textContent = text; }
+  function safeNum(v, fallback=0){ return Number.isFinite(+v) ? +v : fallback; }
+  function getBaseName(name){ return String(name || 'output').replace(/\.[^.]+$/, ''); }
+  function clone(x){ return JSON.parse(JSON.stringify(x)); }
+  function escapeHtml(s=''){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function debounce(fn, ms=300){
+    let t = 0;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+  async function copyText(text){
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        return true;
+      } catch(e) {
+        document.body.removeChild(ta);
+        return false;
+      }
+    }
+  }
+  async function readClipboardText(){
+    try {
+      if (navigator.clipboard?.readText) return await navigator.clipboard.readText();
+    } catch (_) {}
+    return '';
+  }
+  function downloadText(name, text, mime='text/plain;charset=utf-8'){
+    const blob = new Blob([text], { type:mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+  function extractJsonText(raw){
+    let text = normalizeNewlines(raw || '').trim().replace(/^\uFEFF/, '');
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced) text = fenced[1].trim();
+    if (text.startsWith('{') || text.startsWith('[')) return text;
+    if (/^\s*</.test(text)) {
+      const doc = new DOMParser().parseFromString(text, 'text/html');
+      const bodyText = normalizeNewlines(doc.body?.textContent || '').trim();
+      if (bodyText.startsWith('{') || bodyText.startsWith('[')) return bodyText;
+      text = bodyText || text;
+    }
+    const fa = text.indexOf('['), la = text.lastIndexOf(']');
+    if (fa !== -1 && la > fa) return text.slice(fa, la + 1).trim();
+    const fo = text.indexOf('{'), lo = text.lastIndexOf('}');
+    if (fo !== -1 && lo > fo) return text.slice(fo, lo + 1).trim();
+    throw new Error('未能从输入中提取 JSON。');
+  }
+  function parseAnyJson(raw){ return JSON.parse(extractJsonText(raw)); }
+  function normalizeAiMods(obj){
+    let arr = obj;
+    if (!Array.isArray(arr) && obj && Array.isArray(obj.modifications)) arr = obj.modifications;
+    if (!Array.isArray(arr)) throw new Error('AI 返回内容不是数组，也不包含 modifications 数组。');
+    return arr.map((m, i) => ({
+      id: (m.id !== undefined && m.id !== null) ? m.id : `ai_${i + 1}`,
+      new_text: String(m.new_text ?? m.revised_text ?? m.current ?? ''),
+      reason: String(m.reason ?? ''),
+      status: String(m.status ?? 'ok')
+    }));
+  }
+
+  // =========================
+  // 331-lite
+  // =========================
+  function decodeBasicHtmlEntities(text = '') {
+    return String(text || '')
+      .replace(/&#x([0-9a-fA-F]+);/g, (all, hex) => {
+        const code = Number.parseInt(hex, 16);
+        if (!Number.isFinite(code)) return all;
+        try { return String.fromCodePoint(code); } catch { return all; }
+      })
+      .replace(/&#(\d+);/g, (all, num) => {
+        const code = Number.parseInt(num, 10);
+        if (!Number.isFinite(code)) return all;
+        try { return String.fromCodePoint(code); } catch { return all; }
+      })
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&apos;/gi, "'");
+  }
+
+  function escapeRegExp(text = '') {
+    return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function normalizeLooseLine(text = '') {
+    return decodeBasicHtmlEntities(String(text || ''))
+      .replace(/\u00A0/g, ' ')
+      .replace(/[‐‑‒–—―]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function normalizeCompareKey(text = '') {
+    return normalizeLooseLine(text)
+      .toLowerCase()
+      .replace(/[“”"'‘’`]/g, '')
+      .replace(/[.,:;!?()[\]{}<>《》〈〉〖〗「」『』、，。！？：；—\-_/\\]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function normalizeTitlePayload(text = '') {
+    return decodeBasicHtmlEntities(text || '')
+      .replace(/^#+\s*/, '')
+      .replace(/^\d+\.\s*/, '')
+      .replace(/^chapter\s*[0-9ivxlcdm]+\s*[:：.\-]?\s*/i, '')
+      .replace(/^(?:第\s*)?[0-9零〇一二两三四五六七八九十百千IVXLCDMivxlcdm]+\s*(?:章|回|节|集|卷|部|篇)\s*[:：.\-]?\s*/u, '')
+      .replace(/^[：:、.\-—\s]+/, '')
+      .replace(/\s+/g, '')
+      .trim();
+  }
+
+  function normalizeTxtBodyWhitespace(text = '') {
+    return decodeBasicHtmlEntities(text || '')
+      .replace(/\u00A0/g, ' ')
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function romanToInt(str = '') {
+    const map = {I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+    let s = String(str || '').toUpperCase().trim();
+    if (!/^[IVXLCDM]+$/.test(s)) return null;
+    let total = 0;
+    for (let i=0;i<s.length;i++) {
+      const cur = map[s[i]] || 0;
+      const next = map[s[i+1]] || 0;
+      total += cur < next ? -cur : cur;
+    }
+    return total || null;
+  }
+
+  function intToRoman(num) {
+    const n = Number(num);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const table = [
+      ['M',1000],['CM',900],['D',500],['CD',400],['C',100],['XC',90],
+      ['L',50],['XL',40],['X',10],['IX',9],['V',5],['IV',4],['I',1]
+    ];
+    let rest = n, out = '';
+    for (const [sym,val] of table) {
+      while (rest >= val) { out += sym; rest -= val; }
+    }
+    return out;
+  }
+
+  function intToChinese(num) {
+    const n = Number(num);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    const d = ['零','一','二','三','四','五','六','七','八','九'];
+    if (n < 10) return d[n];
+    if (n < 20) return n === 10 ? '十' : `十${d[n - 10]}`;
+    if (n < 100) {
+      const tens = Math.floor(n / 10), ones = n % 10;
+      return `${d[tens]}十${ones ? d[ones] : ''}`;
+    }
+    if (n < 1000) {
+      const h = Math.floor(n / 100), rest = n % 100;
+      if (!rest) return `${d[h]}百`;
+      if (rest < 10) return `${d[h]}百零${d[rest]}`;
+      return `${d[h]}百${intToChinese(rest)}`;
+    }
+    return String(n);
+  }
+
+  function parseChineseNumberToken(text='') {
+    const s = String(text || '').trim();
+    if (!s) return null;
+    const digit = {零:0,〇:0,一:1,二:2,两:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};
+    const unit = {十:10,百:100,千:1000,万:10000};
+    if (/^\d+$/.test(s)) return Number(s);
+    let total = 0, current = 0, used = false;
+    for (const ch of s) {
+      if (ch in digit) { current = digit[ch]; used = true; continue; }
+      if (ch in unit) {
+        const u = unit[ch];
+        if (u === 10000) { total += (current || 1) * 10000; current = 0; used = true; continue; }
+        total += (current || 1) * u;
+        current = 0;
+        used = true;
+        continue;
+      }
+      return null;
+    }
+    total += current;
+    return used ? total : null;
+  }
+
+  function parseEnglishNumberToken(text='') {
+    const s = normalizeCompareKey(text);
+    const dict = {
+      zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10,
+      eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17,
+      eighteen:18, nineteen:19, twenty:20, thirty:30, forty:40, fourty:40, fifty:50,
+      sixty:60, seventy:70, eighty:80, ninety:90,
+      first:1, second:2, third:3, fourth:4, fifth:5, sixth:6, seventh:7, eighth:8, ninth:9, tenth:10
+    };
+    if (dict[s] != null) return dict[s];
+    const parts = s.split(/\s+|-/).filter(Boolean);
+    let total = 0;
+    for (const p of parts) {
+      if (dict[p] == null) return null;
+      total += dict[p];
+    }
+    return total || null;
+  }
+
+  function parseLooseChapterNumber(input) {
+    const raw = String(input || '').trim().replace(/^第/u, '').replace(/[章节回集卷部篇]/gu, '').trim();
+    if (!raw) return null;
+    if (/^\d{1,4}$/.test(raw)) return Number(raw);
+    if (/^[IVXLCDM]+$/i.test(raw)) return romanToInt(raw);
+    if (/^[零〇一二两三四五六七八九十百千]+$/u.test(raw)) return parseChineseNumberToken(raw);
+    if (/^[A-Za-z][A-Za-z\s-]{1,30}$/.test(raw)) return parseEnglishNumberToken(raw);
+    return null;
+  }
+
+  function stripRedundantLeadingChapterNumber(title, expectedIndex) {
+    let working = String(title || '').trim();
+    const patterns = [
+      /^(?:第\s*)?([0-9零〇一二两三四五六七八九十百千IVXLCDMivxlcdm]+)\s*(?:章|回|节|集|卷|部|篇)?\s*[:：、.\-]\s*(.+)$/u,
+      /^([0-9零〇一二两三四五六七八九十百千IVXLCDMivxlcdm]{1,8})\s*[:：、.\-]\s*(.+)$/u,
+      /^([A-Za-z][A-Za-z\s-]{1,24})\s*[:：、.\-]\s*(.+)$/u,
+    ];
+    for (const pattern of patterns) {
+      const match = working.match(pattern);
+      if (!match) continue;
+      const num = parseLooseChapterNumber(match[1]);
+      const rest = (match[2] || '').trim();
+      if (!rest) continue;
+      if (num && num <= 300 && Math.abs(num - expectedIndex) <= 3) {
+        working = rest;
+        break;
+      }
+    }
+    return working.trim();
+  }
+
+  function isPureNumericLikeRedundantTitleFragment(text = '') {
+    const normalized = normalizeLooseLine(text)
+      .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 65248))
+      .replace(/^[\s"'“”‘’`~!@#$%^&*_=+|\\/<>\[\]{}()（）〖〗《》「」『』]+/u, '')
+      .replace(/[\s"'“”‘’`~!@#$%^&*_=+|\\/<>\[\]{}()（）〖〗《》「」『』]+$/u, '')
+      .replace(/[：:.\-—、·•]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!normalized) return false;
+    if (/^(?:\d+|[ivxlcdm]+|[零〇一二两三四五六七八九十百千万]+)$/iu.test(normalized)) return true;
+    const enToken = /^(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)(?:\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth))*$/i;
+    return enToken.test(normalized);
+  }
+
+  const NON_CONTENT_SECTION_TITLE = '非正文';
+
+  function normalizeChapterTitleForIndex(rawTitle, expectedIndex) {
+    let title = decodeBasicHtmlEntities(rawTitle || '')
+      .replace(/^#+\s*/, '')
+      .replace(/^\d+\.\s*/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!title) return `第${expectedIndex}章`;
+    if (title === NON_CONTENT_SECTION_TITLE) return NON_CONTENT_SECTION_TITLE;
+    if (/^(contents?|toc)$/i.test(title) || title === '目录') return '目录';
+
+    title = title
+      .replace(/^chapter\s*[0-9ivxlcdm]+\s*[:：.\-]?\s*/i, '')
+      .replace(/^(?:第\s*)?[0-9零〇一二两三四五六七八九十百千IVXLCDMivxlcdm]+\s*(?:章|回|节|集|卷|部|篇)\s*[:：.\-]?\s*/u, '')
+      .trim();
+
+    title = stripRedundantLeadingChapterNumber(title, expectedIndex);
+    title = stripRedundantLeadingChapterNumber(title, expectedIndex);
+    title = title.replace(/^[：:、.\-—\s]+/, '').trim();
+
+    return title ? `第${expectedIndex}章: ${title}` : `第${expectedIndex}章`;
+  }
+
+  function isDuplicateChapterTitleLine(line, title) {
+    const a = normalizeTitlePayload(line);
+    const b = normalizeTitlePayload(title);
+    if (!a || !b) return false;
+    return a === b || a.startsWith(b) || b.startsWith(a);
+  }
+
+  function buildFlexibleTitlePrefixRegex(title) {
+    const payload = normalizeTitlePayload(title);
+    if (!payload) return null;
+    const escapedPayload = [...payload].map(ch => escapeRegExp(ch)).join('\\s*');
+    return new RegExp(
+      `^(?:#+\\s*)?(?:\\d+\\.\\s*)?(?:(?:第\\s*[0-9零〇一二两三四五六七八九十百千IVXLCDMivxlcdm]+\\s*(?:章|回|节|集|卷|部|篇))|(?:chapter\\s*[0-9ivxlcdm]+))?\\s*[:：、.\\-—]*\\s*${escapedPayload}\\s*[:：、.\\-—]*\\s*`,
+      'iu'
+    );
+  }
+
+  function stripPossibleTitlePrefixFromLine(line, title) {
+    const decoded = decodeBasicHtmlEntities(line || '');
+    const regex = buildFlexibleTitlePrefixRegex(title);
+    if (!regex) return decoded;
+    const stripped = decoded.replace(regex, '').trimStart();
+    return stripped === decoded ? decoded : stripped;
+  }
+
+  function stripLeadingDuplicateTitleLine(body, title) {
+    const lines = decodeBasicHtmlEntities(body || '').replace(/\r\n/g, '\n').split('\n');
+    let firstNonEmpty = 0;
+    while (firstNonEmpty < lines.length && !lines[firstNonEmpty].trim()) firstNonEmpty += 1;
+    if (firstNonEmpty >= lines.length) return lines.join('\n').trim();
+
+    if (isDuplicateChapterTitleLine(lines[firstNonEmpty], title)) {
+      lines.splice(firstNonEmpty, 1);
+    } else {
+      const stripped = stripPossibleTitlePrefixFromLine(lines[firstNonEmpty], title);
+      lines[firstNonEmpty] = stripped;
+    }
+
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function isNonContentSectionTitle(title = '') {
+    return normalizeLooseLine(title) === NON_CONTENT_SECTION_TITLE;
+  }
+
+  function isCatalogSectionTitle(title = '') {
+    const key = normalizeCompareKey(title);
+    return key === '目录' || key === 'contents' || key === 'toc' || key === 'table of contents';
+  }
+
+  function buildRedundantHeadingCandidates(title, chapterIndex) {
+    const normalizedTitle = normalizeLooseLine(title);
+    const pureTitleRaw = normalizedTitle.replace(/^第\s*\d+\s*章\s*(?:[：:.\-—、]\s*)?/u, '').trim();
+    const pureTitle = isPureNumericLikeRedundantTitleFragment(pureTitleRaw) ? '' : pureTitleRaw;
+    const roman = intToRoman(chapterIndex);
+    const zh = intToChinese(chapterIndex);
+
+    const variants = [
+      normalizedTitle,
+      pureTitle,
+      '第' + chapterIndex + '章',
+      pureTitle ? '第' + chapterIndex + '章 ' + pureTitle : '',
+      pureTitle ? '第' + chapterIndex + '章: ' + pureTitle : '',
+      zh ? '第' + zh + '章' : '',
+      pureTitle && zh ? '第' + zh + '章 ' + pureTitle : '',
+      String(chapterIndex),
+      pureTitle ? String(chapterIndex) + ' ' + pureTitle : '',
+      roman,
+      pureTitle && roman ? roman + ' ' + pureTitle : '',
+      'Chapter ' + chapterIndex,
+      roman ? 'Chapter ' + roman : '',
+      pureTitle ? 'Chapter ' + chapterIndex + ': ' + pureTitle : '',
+      pureTitle && roman ? 'Chapter ' + roman + ': ' + pureTitle : '',
+    ];
+    return [...new Set(variants.map(normalizeCompareKey).filter(Boolean))];
+  }
+
+  function stripLeadingRedundantHeadingBlock(text = '', title = '', chapterIndex = 0) {
+    const lines = normalizeTxtBodyWhitespace(text).split('\n');
+    const candidates = buildRedundantHeadingCandidates(title, chapterIndex);
+
+    while (lines.length) {
+      while (lines.length && !lines[0].trim()) lines.shift();
+      if (!lines.length) break;
+
+      const first = normalizeCompareKey(lines[0]);
+      const firstTwo = normalizeCompareKey([lines[0], lines[1] || ''].join(' '));
+      let removed = false;
+
+      if (first && candidates.includes(first)) {
+        lines.shift();
+        removed = true;
+      } else if (firstTwo && candidates.includes(firstTwo)) {
+        lines.shift();
+        if (lines.length) lines.shift();
+        removed = true;
+      }
+
+      if (!removed) break;
+    }
+
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function cleanTranslatedText(text) {
+    return String(text || '')
+      .replace(/〖?\s*全\s*书\s*完\s*〗?[\s\S]*/i, '')
+      .replace(/（\s*注\s*：\s*.*）/g, '')
+      .replace(/出版说明/g, '')
+      .trim();
+  }
+
+  function prepareFinalOutputChapters(finalChapters = []) {
+    const prepared = [];
+    let chapterCounter = 0;
+
+    for (const item of finalChapters || []) {
+      const rawTitle = normalizeLooseLine(item?.title || '');
+      if (!rawTitle) continue;
+
+      if (isCatalogSectionTitle(rawTitle)) {
+        prepared.push({ ...item, title: '目录', content: normalizeTxtBodyWhitespace(item.content || '') });
+        continue;
+      }
+
+      if (isNonContentSectionTitle(rawTitle)) {
+        prepared.push({ ...item, title: NON_CONTENT_SECTION_TITLE, content: normalizeTxtBodyWhitespace(item.content || '') });
+        continue;
+      }
+
+      chapterCounter += 1;
+      const finalTitle = normalizeChapterTitleForIndex(rawTitle, chapterCounter);
+      const finalBody = stripLeadingRedundantHeadingBlock(item.content || '', finalTitle, chapterCounter);
+
+      prepared.push({ ...item, title: finalTitle, content: finalBody });
+    }
+
+    return prepared;
+  }
+
+  function renderTxtWithCatalog(finalChapters = []) {
+    const prepared = prepareFinalOutputChapters(finalChapters);
+    const frontBlocks = [];
+    const chapterBlocks = [];
+
+    for (const item of prepared) {
+      if (isCatalogSectionTitle(item.title)) continue;
+      if (isNonContentSectionTitle(item.title)) frontBlocks.push(item);
+      else chapterBlocks.push(item);
+    }
+
+    const sections = [];
+    for (const item of frontBlocks) {
+      if ((item.content || '').trim()) sections.push(`### ${item.title}\n\n${item.content.trim()}`);
+    }
+    if (chapterBlocks.length) sections.push(`### 目录\n\n${chapterBlocks.map(item => item.title).join('\n')}`);
+    for (const item of chapterBlocks) sections.push(`### ${item.title}\n\n${(item.content || '').trim()}`);
+
+    return sections.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function buildFinalChapters(fullTranslatedText) {
+    const splitRegex = /(?:^|\n)###\s*(.+?)(?:\n|$)/g;
+    const finalChapters = [];
+    let match;
+    let globalChapterCount = 0;
+
+    while ((match = splitRegex.exec(fullTranslatedText)) !== null) {
+      const rawMatchedTitle = normalizeLooseLine(match[1]);
+      const contentStartIndex = match.index + match[0].length;
+      const nextTitleIndex = fullTranslatedText.slice(contentStartIndex).search(/(?:^|\n)###\s*/);
+
+      let chapterContent =
+        nextTitleIndex === -1
+          ? fullTranslatedText.slice(contentStartIndex)
+          : fullTranslatedText.slice(contentStartIndex, contentStartIndex + nextTitleIndex);
+
+      if (chapterContent.trim().length > 0) {
+        let normalizedTitle = rawMatchedTitle;
+        if (isNonContentSectionTitle(rawMatchedTitle)) normalizedTitle = NON_CONTENT_SECTION_TITLE;
+        else if (isCatalogSectionTitle(rawMatchedTitle)) normalizedTitle = '目录';
+        else {
+          globalChapterCount += 1;
+          normalizedTitle = normalizeChapterTitleForIndex(rawMatchedTitle, globalChapterCount);
+        }
+
+        chapterContent = stripLeadingDuplicateTitleLine(chapterContent.trim(), normalizedTitle);
+        finalChapters.push({ title: normalizedTitle, content: chapterContent.trim() });
+      }
+    }
+
+    if (finalChapters.length === 0) {
+      finalChapters.push({ title: '第1章', content: fullTranslatedText.trim() });
+    }
+    return finalChapters;
+  }
+
+  // =========================
+  // 一润 JSON -> 工作集
+  // =========================
+  function parseSourceMods(obj){
+    let arr = obj;
+    if (!Array.isArray(arr) && obj && Array.isArray(obj.modifications)) arr = obj.modifications;
+    if (!Array.isArray(arr)) throw new Error('源数据不是数组，也不包含 modifications 数组。');
+
+    const mods = arr.map((m, i) => ({
+      id: (m.id !== undefined && m.id !== null) ? m.id : (i + 1),
+      chunkIndex: safeNum(m.chunkIndex, 0),
+      absoluteStart: safeNum(m.absoluteStart, 0),
+      absoluteEnd: safeNum(m.absoluteEnd, safeNum(m.absoluteStart, 0)),
+      old_text: String(m.old_text ?? m.old ?? ''),
+      new_text: String(m.new_text ?? m.current ?? ''),
+      reason: String(m.reason ?? ''),
+      contextBefore: String(m.contextBefore ?? ''),
+      contextAfter: String(m.contextAfter ?? ''),
+      __sourceIndex: i
+    })).filter(x => x.old_text || x.new_text);
+
+    mods.sort((a,b) => a.absoluteStart - b.absoluteStart || a.absoluteEnd - b.absoluteEnd || String(a.id).localeCompare(String(b.id),'zh-CN'));
+    return mods;
+  }
+
+  function recomputeCurrentAnchors(mods){
+    const ordered = [...mods].sort((a,b) => a.anchorStart - b.anchorStart || a.anchorEnd - b.anchorEnd || String(a.id).localeCompare(String(b.id),'zh-CN'));
+    let delta = 0;
+    for (const m of ordered) {
+      const anchorOldLen = String(m.anchor_old_text || '').length;
+      const currentOldLen = String(m.old_text || '').length;
+      m.currentStart = m.anchorStart + delta;
+      m.currentEnd = m.currentStart + currentOldLen;
+      delta += currentOldLen - anchorOldLen;
+    }
+  }
+
+  function createWorkingDataset(sourceMods){
+    const mods = sourceMods.map((m, idx) => ({
+      id: m.id,
+      orderIndex: idx,
+      selected: true,
+      chunkIndex: m.chunkIndex,
+      anchorStart: m.absoluteStart,
+      anchorEnd: m.absoluteEnd,
+      anchor_old_text: m.old_text,
+      previous_old_text: m.old_text,
+      old_text: m.new_text,
+      new_text: m.new_text,
+      first_reason: m.reason,
+      reason: '',
+      contextBefore: m.contextBefore,
+      contextAfter: m.contextAfter,
+      status: 'pending',
+      currentStart: 0,
+      currentEnd: 0
+    }));
+    recomputeCurrentAnchors(mods);
+    return {
+      key: 'working',
+      label: '当前工作集',
+      modifications: mods,
+      meta: {
+        kind: 'patch_only_working_set',
+        importedAt: new Date().toISOString(),
+        sourceCount: mods.length,
+        sourceFileName: state.importFileName
+      }
+    };
+  }
+
+  function datasetToExportObject(ds){
+    return {
+      meta: {
+        ...ds.meta,
+        exportedAt: new Date().toISOString(),
+        datasetKey: ds.key,
+        datasetLabel: ds.label,
+        count: ds.modifications.length
+      },
+      modifications: ds.modifications.map(m => ({
+        id: m.id,
+        chunkIndex: m.chunkIndex,
+        absoluteStart: m.currentStart,
+        absoluteEnd: m.currentEnd,
+        sourceAbsoluteStart: m.anchorStart,
+        sourceAbsoluteEnd: m.anchorEnd,
+        anchor_old_text: m.anchor_old_text,
+        previous_old_text: m.previous_old_text,
+        old_text: m.old_text,
+        new_text: m.new_text,
+        first_reason: m.first_reason,
+        reason: m.reason,
+        contextBefore: m.contextBefore,
+        contextAfter: m.contextAfter,
+        status: m.status
+      }))
+    };
+  }
+
+  // =========================
+  // 数据集 / 工作区
+  // =========================
+  function activeDataset(){
+    return state.activeKey ? state.datasets[state.activeKey] : null;
+  }
+
+  function importBaseDataset(){
+    if (state.batchSourceKey && state.datasets[state.batchSourceKey]) return state.datasets[state.batchSourceKey];
+    return state.datasets.working || state.datasets.next || null;
+  }
+
+  function setActiveDataset(key){
+    if (!state.datasets[key]) return;
+    state.activeKey = key;
+    renderDatasetTabs();
+    renderDatasetStats();
+    focusWorkAreaToCurrentBatch();
+    renderModList();
+    ensureSelectedMod();
+    renderEditor();
+    refreshButtons();
+    savePageStateDebounced();
+    applyAutoTitles();
+  }
+
+  function ensureSelectedMod(){
+    const ds = activeDataset();
+    if (!ds) return;
+    const idx = state.selectedIndexByKey[state.activeKey];
+    if (idx == null || !ds.modifications[idx]) {
+      state.selectedIndexByKey[state.activeKey] = ds.modifications.length ? 0 : null;
+    }
+  }
+
+  function renderDatasetTabs(){
+    const defs = [['working','当前工作集'],['result','结果集'],['next','下一轮工作集']];
+    const html = defs
+      .filter(([k]) => !!state.datasets[k])
+      .map(([k,label]) => `<button class="tab ${state.activeKey===k?'active':''}" data-key="${k}" title="切换到${label}">${label}</button>`)
+      .join('');
+    $('datasetTabs').innerHTML = html || '<span class="small">暂无数据集</span>';
+    [...$('datasetTabs').querySelectorAll('.tab')].forEach(btn => {
+      btn.addEventListener('click', () => setActiveDataset(btn.dataset.key));
+    });
+  }
+
+  function renderDatasetStats(){
+    const ds = activeDataset();
+    if (!ds) {
+      setText($('datasetStats'), '暂无数据集。');
+      return;
+    }
+    const c = {};
+    ds.modifications.forEach(m => c[m.status] = (c[m.status] || 0) + 1);
+    const lines = [
+      `激活数据集：${ds.label}`,
+      `条目数：${ds.modifications.length}`,
+      `来源文件：${ds.meta.sourceFileName || '-'}`,
+      ...Object.entries(c).map(([k,v]) => `${k}: ${v}`)
+    ];
+    setText($('datasetStats'), lines.join('\n'));
+  }
+
+  function currentBatch(){
+    return state.activeBatchIndex != null ? state.batches[state.activeBatchIndex] : null;
+  }
+
+  function currentBatchIdSet(){
+    const b = currentBatch();
+    return b ? new Set(b.ids.map(String)) : null;
+  }
+
+  function getVisibleMods(){
+    const ds = activeDataset();
+    if (!ds) return [];
+    const q = $('filterText').value.trim().toLowerCase();
+    const st = $('filterStatus').value;
+    const batchSet = currentBatchIdSet();
+
+    return ds.modifications.map((m, idx) => ({m, idx})).filter(({m}) => {
+      if (batchSet && !batchSet.has(String(m.id))) return false;
+      if (st !== 'all' && String(m.status || '') !== st) return false;
+      if (!q) return true;
+      const hay = [m.id, m.old_text, m.new_text, m.reason, m.first_reason, m.contextBefore, m.contextAfter].join('\n').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function renderModList(){
+    const ds = activeDataset();
+    const box = $('modList');
+    if (!ds) {
+      box.innerHTML = '<div class="item">暂无条目。</div>';
+      setText($('listSummary'), '暂无条目');
+      return;
+    }
+
+    ensureSelectedMod();
+    const selected = state.selectedIndexByKey[state.activeKey];
+    const items = getVisibleMods();
+    const selectedCount = ds.modifications.filter(m=>m.selected).length;
+    const batchTxt = currentBatch() ? `当前批次 ${currentBatch().index + 1}：` : '';
+    setText($('listSummary'), `${batchTxt}显示 ${items.length} / ${ds.modifications.length} 条；已勾选 ${selectedCount} 条`);
+
+    if (!items.length) {
+      box.innerHTML = '<div class="item">当前批次/筛选条件下没有匹配条目。</div>';
+      return;
+    }
+
+    box.innerHTML = items.map(({m, idx}) => {
+      const head = escapeHtml(String(m.old_text || '').slice(0, 42) || '(空)');
+      const rs = escapeHtml(String(m.reason || m.first_reason || '').slice(0, 72));
+      return `
+        <div class="item ${selected===idx?'active':''}" data-idx="${idx}" title="点击查看并编辑 #${escapeHtml(String(m.id))}">
+          <div class="item-top">
+            <div>
+              <input type="checkbox" class="selbox" data-idx="${idx}" ${m.selected?'checked':''} title="勾选或取消勾选这条补丁">
+              <b>#${escapeHtml(String(m.id))}</b>
+            </div>
+            <div class="badge">${escapeHtml(m.status || 'pending')}</div>
+          </div>
+          <div class="item-snippet">${head}</div>
+          <div class="history-meta">${rs}</div>
+        </div>
+      `;
+    }).join('');
+
+    [...box.querySelectorAll('.item')].forEach(el => {
+      el.addEventListener('click', ev => {
+        if (ev.target.classList.contains('selbox')) return;
+        state.selectedIndexByKey[state.activeKey] = +el.dataset.idx;
+        renderModList();
+        renderEditor();
+        savePageStateDebounced();
+      });
+    });
+
+    [...box.querySelectorAll('.selbox')].forEach(cb => {
+      cb.addEventListener('click', ev => {
+        ev.stopPropagation();
+        ds.modifications[+cb.dataset.idx].selected = cb.checked;
+        renderModList();
+        scheduleBatchRebuildFromCurrentSelection();
+        invalidateStrictValidation('勾选变化后，如需生成全文请重新预校验。');
+        savePageStateDebounced();
+      });
+    });
+  }
+
+  function selectedMod(){
+    const ds = activeDataset();
+    if (!ds) return null;
+    const idx = state.selectedIndexByKey[state.activeKey];
+    if (idx == null) return null;
+    return ds.modifications[idx] || null;
+  }
+
+  function simpleDiffHtml(a,b){
+    a = String(a || '');
+    b = String(b || '');
+    let p = 0;
+    while (p < a.length && p < b.length && a[p] === b[p]) p++;
+    let sa = a.length - 1;
+    let sb = b.length - 1;
+    while (sa >= p && sb >= p && a[sa] === b[sb]) { sa--; sb--; }
+    const a1 = a.slice(0,p), a2 = a.slice(p,sa+1), a3 = a.slice(sa+1);
+    const b1 = b.slice(0,p), b2 = b.slice(p,sb+1), b3 = b.slice(sb+1);
+    return {
+      oldHtml: `${escapeHtml(a1)}${a2 ? `<del>${escapeHtml(a2)}</del>` : ''}${escapeHtml(a3)}`,
+      newHtml: `${escapeHtml(b1)}${b2 ? `<ins>${escapeHtml(b2)}</ins>` : ''}${escapeHtml(b3)}`,
+      summary: `${a2 ? '删改：' + a2 : '无删除'}${a2 && b2 ? ' ｜ ' : ''}${b2 ? '新增/替换：' + b2 : '无新增'}`
+    };
+  }
+
+  function renderEditor(){
+    const m = selectedMod();
+    if (!m) {
+      ['edId','edChunkIndex','edAnchorStart','edAnchorEnd','edCurrentStart','edCurrentEnd','edPrevOld','edOld','edNew','edReason','edCtxBefore','edCtxAfter'].forEach(id => $(id).value = '');
+      $('edStatus').value = 'pending';
+      $('oldPreview').innerHTML = '暂无选中条目。';
+      $('newPreview').innerHTML = '暂无选中条目。';
+      $('diffSummary').textContent = '';
+      return;
+    }
+
+    $('edId').value = m.id ?? '';
+    $('edStatus').value = m.status || 'pending';
+    $('edChunkIndex').value = m.chunkIndex ?? 0;
+    $('edAnchorStart').value = m.anchorStart ?? 0;
+    $('edAnchorEnd').value = m.anchorEnd ?? 0;
+    $('edCurrentStart').value = m.currentStart ?? 0;
+    $('edCurrentEnd').value = m.currentEnd ?? 0;
+    $('edPrevOld').value = m.previous_old_text ?? '';
+    $('edOld').value = m.old_text ?? '';
+    $('edNew').value = m.new_text ?? '';
+    $('edReason').value = m.reason ?? '';
+    $('edCtxBefore').value = m.contextBefore ?? '';
+    $('edCtxAfter').value = m.contextAfter ?? '';
+
+    const diff = simpleDiffHtml(m.old_text, m.new_text);
+    $('oldPreview').innerHTML = diff.oldHtml || '<span class="small">空</span>';
+    $('newPreview').innerHTML = diff.newHtml || '<span class="small">空</span>';
+    $('diffSummary').innerHTML = `
+      <div><b>sourceAbsolute:</b> ${escapeHtml(String(m.anchorStart))} - ${escapeHtml(String(m.anchorEnd))}</div>
+      <div><b>absolute:</b> ${escapeHtml(String(m.currentStart))} - ${escapeHtml(String(m.currentEnd))}</div>
+      <div><b>first_reason:</b> ${escapeHtml(m.first_reason || '')}</div>
+      <div><b>diff:</b> ${escapeHtml(diff.summary)}</div>
+      <div style="margin-top:8px"><b>contextBefore:</b> ${escapeHtml((m.contextBefore || '').slice(-120))}</div>
+      <div><b>contextAfter:</b> ${escapeHtml((m.contextAfter || '').slice(0,120))}</div>
+    `;
+  }
+
+  function saveEditor(){
+    const ds = activeDataset();
+    const m = selectedMod();
+    if (!ds || !m) return;
+    m.status = $('edStatus').value;
+    m.chunkIndex = safeNum($('edChunkIndex').value, m.chunkIndex);
+    m.anchorStart = safeNum($('edAnchorStart').value, m.anchorStart);
+    m.anchorEnd = safeNum($('edAnchorEnd').value, m.anchorEnd);
+    m.previous_old_text = $('edPrevOld').value;
+    m.old_text = $('edOld').value;
+    m.new_text = $('edNew').value;
+    m.reason = $('edReason').value;
+    m.contextBefore = $('edCtxBefore').value;
+    m.contextAfter = $('edCtxAfter').value;
+    recomputeCurrentAnchors(ds.modifications);
+    invalidateStrictValidation('数据已修改，请重新预校验全文。');
+    renderDatasetStats();
+    renderModList();
+    renderEditor();
+    savePageStateDebounced();
+  }
+
+  function markKeep(){
+    const m = selectedMod();
+    if (!m) return;
+    saveEditor();
+    m.status = 'keep';
+    if (!m.new_text) m.new_text = m.old_text;
+    renderModList();
+    renderEditor();
+    renderDatasetStats();
+    savePageStateDebounced();
+  }
+
+  function markSkip(){
+    const m = selectedMod();
+    if (!m) return;
+    saveEditor();
+    m.status = 'skip';
+    renderModList();
+    renderEditor();
+    renderDatasetStats();
+    savePageStateDebounced();
+  }
+
+  function useNewAsOld(){
+    const ds = activeDataset();
+    const m = selectedMod();
+    if (!ds || !m) return;
+    saveEditor();
+    m.old_text = m.new_text;
+    m.status = 'pending';
+    m.reason = '';
+    recomputeCurrentAnchors(ds.modifications);
+    invalidateStrictValidation('基准文本已变，请重新预校验全文。');
+    renderModList();
+    renderEditor();
+    renderDatasetStats();
+    savePageStateDebounced();
+  }
+
+  // =========================
+  // 批次
+  // =========================
+  function selectVisible(mode){
+    const ds = activeDataset();
+    if (!ds) return;
+    const list = getVisibleMods();
+    if (mode === 'on') list.forEach(({m}) => m.selected = true);
+    if (mode === 'off') list.forEach(({m}) => m.selected = false);
+    if (mode === 'invert') list.forEach(({m}) => m.selected = !m.selected);
+    renderModList();
+    scheduleBatchRebuildFromCurrentSelection();
+    savePageStateDebounced();
+  }
+
+  function selectPending(){
+    const ds = activeDataset();
+    if (!ds) return;
+    ds.modifications.forEach(m => m.selected = (m.status === 'pending'));
+    renderModList();
+    scheduleBatchRebuildFromCurrentSelection();
+    savePageStateDebounced();
+  }
+
+  function clearAllSelection(){
+    const ds = activeDataset();
+    if (!ds) return;
+    ds.modifications.forEach(m => m.selected = false);
+    renderModList();
+    scheduleBatchRebuildFromCurrentSelection();
+    savePageStateDebounced();
+  }
+
+  function promptModFromCurrent(m){
+    return {
+      id: m.id,
+      chunkIndex: m.chunkIndex,
+      absoluteStart: m.currentStart,
+      absoluteEnd: m.currentEnd,
+      sourceAbsoluteStart: m.anchorStart,
+      sourceAbsoluteEnd: m.anchorEnd,
+      old_text: m.old_text,
+      previous_old_text: m.previous_old_text,
+      new_text: m.old_text,
+      first_reason: m.first_reason,
+      reason: m.reason,
+      contextBefore: m.contextBefore,
+      contextAfter: m.contextAfter,
+      status: m.status
+    };
+  }
+
+  function estimatePromptModChars(m){
+    return JSON.stringify(promptModFromCurrent(m)).length;
+  }
+
+  function hasReturnedBatchData(){
+    return state.batches.some(b => b.status === 'returned' || String(b.responseRaw || '').trim() || b.responseParsed);
+  }
+
+  function buildBatchesCore(copyAfter=false){
+    const ds = activeDataset();
+    if (!ds || ds.key === 'result') return;
+
+    const list = ds.modifications
+      .filter(m => m.selected)
+      .sort((a,b) => a.currentStart - b.currentStart || String(a.id).localeCompare(String(b.id),'zh-CN'));
+
+    state.batchSourceKey = ds.key;
+    state.batches = [];
+    state.activeBatchIndex = null;
+
+    if (!list.length) {
+      renderBatchArea();
+      refreshButtons();
+      savePageStateDebounced();
+      return;
+    }
+
+    const maxItems = Math.max(1, safeNum($('batchMaxItems').value, 42));
+    const maxChars = Math.max(1000, safeNum($('batchMaxChars').value, 18000));
+
+    const chunks = [];
+    let cur = [], curChars = 0;
+    for (const m of list) {
+      const size = estimatePromptModChars(m);
+      const exceedItems = cur.length >= maxItems;
+      const exceedChars = (curChars + size) > maxChars;
+      if (cur.length && (exceedItems || exceedChars)) {
+        chunks.push(cur);
+        cur = [];
+        curChars = 0;
+      }
+      cur.push(m);
+      curChars += size;
+    }
+    if (cur.length) chunks.push(cur);
+
+    state.batches = chunks.map((mods, i) => {
+      const jsonObj = {
+        meta: {
+          mode: 'patch_only_second_pass',
+          batchIndex: i + 1,
+          totalBatches: chunks.length,
+          datasetKey: ds.key,
+          datasetLabel: ds.label,
+          sourceFileName: ds.meta.sourceFileName || state.importFileName,
+          itemCount: mods.length
+        },
+        modifications: mods.map(promptModFromCurrent)
+      };
+      return {
+        index: i,
+        ids: mods.map(m => String(m.id)),
+        mods,
+        jsonObj,
+        jsonText: '',
+        promptText: '',
+        charCount: 0,
+        status: 'pending',
+        responseRaw: '',
+        responseParsed: null,
+        importLog: ''
+      };
+    });
+
+    state.activeBatchIndex = 0;
+    rebuildBatchPromptTexts();
+    renderBatchArea();
+    focusWorkAreaToCurrentBatch();
+    refreshButtons();
+    savePageStateDebounced();
+
+    if (copyAfter) autoCopyCurrentBatchPrompt(true);
+  }
+
+  function rebuildBatchPromptTexts(){
+    const tpl = $('promptTemplate').value.trim();
+    for (const b of state.batches) {
+      b.jsonText = JSON.stringify(b.jsonObj, null, 2);
+      b.promptText = tpl + '\n\n' + b.jsonText;
+      b.charCount = b.promptText.length;
+    }
+    renderBatchArea();
+    savePageStateDebounced();
+  }
+
+  const scheduleBatchRebuildFromCurrentSelection = debounce(() => {
+    if (hasReturnedBatchData()) {
+      setText($('batchStats'),
+        `检测到已有批次返回结果，已阻止自动重切批，避免打乱导回对应关系。\n如确需重切批，请先保存历史，再手动重建。`
+      );
+      return;
+    }
+    buildBatchesCore(true);
+  }, 250);
+
+  async function autoCopyCurrentBatchPrompt(silent=false){
+    const b = currentBatch();
+    if (!b || !b.promptText) return false;
+    if (state.autoCopyBusy) return false;
+    state.autoCopyBusy = true;
+    try {
+      const ok = await copyText($('promptPreview').value || b.promptText);
+      if (ok) {
+        if (b.status !== 'returned') b.status = 'copied';
+        renderBatchArea();
+        refreshButtons();
+        if (!silent) alert(`批次 ${b.index + 1} 的完整 prompt 包已复制。`);
+      }
+      return ok;
+    } finally {
+      state.autoCopyBusy = false;
+    }
+  }
+
+  function renderBatchStats(){
+    if (!state.batches.length) {
+      setText($('batchStats'), '尚未生成批次。');
+      return;
+    }
+    const total = state.batches.length;
+    const copied = state.batches.filter(b => b.status === 'copied').length;
+    const returned = state.batches.filter(b => b.status === 'returned').length;
+    const error = state.batches.filter(b => b.status === 'error').length;
+    const src = state.batchSourceKey || '-';
+    setText($('batchStats'),
+      `总批次：${total}\n已复制：${copied}\n已导回：${returned}\n异常：${error}\n来源数据集：${src}`
+    );
+  }
+
+  function setActiveBatch(idx, autoCopy=false){
+    if (!state.batches[idx]) return;
+    state.activeBatchIndex = idx;
+    renderBatchArea();
+    focusWorkAreaToCurrentBatch();
+    renderModList();
+    ensureSelectedMod();
+    renderEditor();
+    refreshButtons();
+    savePageStateDebounced();
+    if (autoCopy) autoCopyCurrentBatchPrompt(true);
+  }
+
+  function focusWorkAreaToCurrentBatch(){
+    const b = currentBatch();
+    const ds = activeDataset();
+    if (!b || !ds) return;
+    const firstId = b.ids[0];
+    const idx = ds.modifications.findIndex(m => String(m.id) === String(firstId));
+    if (idx !== -1) state.selectedIndexByKey[state.activeKey] = idx;
+  }
+
+  function renderBatchArea(){
+    const box = $('batchList');
+    if (!state.batches.length) {
+      box.innerHTML = '<div class="batch-item">暂无批次。导入一润 JSON 后会自动分批。</div>';
+      $('promptPreview').value = '';
+      $('batchResponseBox').value = '';
+      setText($('currentBatchInfo'), '请先导入一润 JSON。');
+      setText($('currentBatchLog'), '等待当前批次返回。');
+      renderBatchStats();
+      $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+      return;
+    }
+
+    box.innerHTML = state.batches.map((b, idx) => `
+      <div class="batch-item ${state.activeBatchIndex===idx?'active':''}" data-idx="${idx}" title="点击切换到批次 ${idx+1}">
+        <div class="batch-head">
+          <div><b>批次 ${idx+1}</b></div>
+          <div class="badge">${b.status}</div>
+        </div>
+        <div class="batch-meta">${b.mods.length} 条 ｜ ${b.charCount} 字</div>
+        <div class="batch-meta">ID：${b.ids.slice(0,8).join(', ')}${b.ids.length>8?' ...':''}</div>
+      </div>
+    `).join('');
+
+    [...box.querySelectorAll('.batch-item')].forEach(el => {
+      el.addEventListener('click', () => setActiveBatch(+el.dataset.idx, false));
+    });
+
+    const b = currentBatch();
+    $('promptPreview').value = b ? b.promptText : '';
+    $('batchResponseBox').value = b ? (b.responseRaw || '') : '';
+
+    if (b) {
+      setText($('currentBatchInfo'),
+        `当前批次：${b.index + 1}\n状态：${b.status}\n预期条目：${b.ids.length}\n预期 ID：${b.ids.join(', ')}`
+      );
+      setText($('currentBatchLog'), b.importLog || '该批次还没有导入结果。');
+    }
+
+    renderBatchStats();
+    $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+  }
+
+  function persistCurrentBatchResponse(){
+    const b = currentBatch();
+    if (!b) return;
+    b.responseRaw = $('batchResponseBox').value;
+    savePageStateDebounced();
+  }
+
+  function normalizeOneBatchReturn(baseMod, hit){
+    const status = String(hit?.status || 'ok');
+    const newText = (hit && hit.new_text !== '') ? String(hit.new_text) : String(baseMod.old_text || '');
+    const reason = status === 'keep' && !String(hit?.reason || '') ? '' : String(hit?.reason || '');
+    return { id: baseMod.id, new_text: newText, reason, status };
+  }
+
+  function importBatchByIndex(idx){
+    const b = state.batches[idx];
+    if (!b) throw new Error('批次不存在。');
+
+    const raw = String(b.responseRaw || '').trim();
+    if (!raw) throw new Error(`批次 ${idx + 1} 返回框为空。`);
+
+    const obj = parseAnyJson(raw);
+    const arr = normalizeAiMods(obj);
+
+    const expectedIds = new Set(b.ids.map(String));
+    const gotIds = arr.map(x => String(x.id));
+    const outside = gotIds.filter(id => !expectedIds.has(id));
+    const missing = b.ids.filter(id => !gotIds.includes(String(id)));
+
+    if (outside.length) {
+      b.status = 'error';
+      b.importLog = `导入失败：检测到不属于当前批次的 id。\n当前批次：${b.index + 1}\n不属于本批次的 id：${outside.join(', ')}\n请检查是否粘贴错了批次。`;
+      renderBatchArea();
+      refreshButtons();
+      savePageStateDebounced();
+      throw new Error('当前批次返回内容疑似属于别的批次。');
+    }
+
+    const byId = new Map(arr.map(x => [String(x.id), x]));
+    const fillMissingKeep = $('fillMissingKeep').checked;
+    const normalized = [];
+
+    for (const baseMod of b.mods) {
+      const hit = byId.get(String(baseMod.id));
+      if (hit) normalized.push(normalizeOneBatchReturn(baseMod, hit));
+      else if (fillMissingKeep) normalized.push({ id: baseMod.id, new_text: String(baseMod.old_text || ''), reason:'', status:'keep' });
+    }
+
+    b.responseParsed = normalized;
+    b.status = 'returned';
+    b.importLog = `导入成功。\n当前批次：${b.index + 1}\n预期条目：${b.ids.length}\n返回条目：${arr.length}\n缺失：${missing.length}${missing.length ? '（已按 keep 补齐）' : ''}\n多余：0`;
+    renderBatchArea();
+    refreshButtons();
+    savePageStateDebounced();
+    return true;
+  }
+
+  async function importCurrentBatchAndAdvance(){
+    const idx = state.activeBatchIndex;
+    if (idx == null) throw new Error('请先选中一个批次。');
+    importBatchByIndex(idx);
+
+    const nextIdx = state.batches.findIndex((b, i) => i > idx && b.status !== 'returned');
+    if (nextIdx !== -1) {
+      setActiveBatch(nextIdx, false);
+      await autoCopyCurrentBatchPrompt(true);
+      setText($('currentBatchLog'),
+        `上一个批次已导入成功。\n已自动跳到批次 ${nextIdx + 1}，并自动复制了它的完整 prompt 包。\n\n` + $('currentBatchLog').textContent
+      );
+    }
+  }
+
+  async function importAllSavedBatches(){
+    let ok = 0, fail = 0;
+    for (let i = 0; i < state.batches.length; i++) {
+      const b = state.batches[i];
+      if (!String(b.responseRaw || '').trim()) continue;
+      try { importBatchByIndex(i); ok++; } catch (_) { fail++; }
+    }
+    renderBatchArea();
+    refreshButtons();
+    setText($('currentBatchLog'), `导入全部已保存批次结果完成。\n成功：${ok}\n失败：${fail}`);
+  }
+
+  function clearCurrentBatchResponse(){
+    const b = currentBatch();
+    if (!b) return;
+    b.responseRaw = '';
+    b.responseParsed = null;
+    b.importLog = '已清空当前批次返回内容。';
+    if (b.status !== 'pending') b.status = 'pending';
+    renderBatchArea();
+    refreshButtons();
+    savePageStateDebounced();
+  }
+
+  // =========================
+  // 导入全部批次结果（任何时候）
+  // =========================
+  function parseAllResultsPayload(raw){
+    const obj = parseAnyJson(raw);
+
+    // 1) 直接 modifications 数组 / 对象
+    if (Array.isArray(obj)) {
+      if (obj.length && obj.every(x => x && typeof x === 'object' && Array.isArray(x.modifications))) {
+        const batches = obj.map((x, i) => ({ batchIndex: x.batchIndex ?? (i + 1), modifications: normalizeAiMods(x.modifications) }));
+        return { batches, combined: batches.flatMap(b => b.modifications) };
+      }
+      return { batches: null, combined: normalizeAiMods(obj) };
+    }
+
+    if (obj && Array.isArray(obj.modifications)) {
+      return { batches: null, combined: normalizeAiMods(obj.modifications) };
+    }
+
+    if (obj && Array.isArray(obj.batches)) {
+      const batches = obj.batches.map((x, i) => ({
+        batchIndex: x.batchIndex ?? (i + 1),
+        modifications: normalizeAiMods(x.modifications || [])
+      }));
+      return { batches, combined: batches.flatMap(b => b.modifications) };
+    }
+
+    throw new Error('未识别到可导入的“全部批次结果”格式。');
+  }
+
+  function buildResultDatasetFromCombinedMods(base, combinedMods){
+    const byId = new Map();
+    for (const x of combinedMods) {
+      byId.set(String(x.id), x);
+    }
+
+    const resultMods = base.modifications.map(m => {
+      const got = byId.get(String(m.id));
+      if (!got) return clone(m);
+
+      const merged = clone(m);
+      merged.new_text = got.new_text || m.old_text;
+      merged.status = got.status || 'ok';
+      merged.reason = (merged.status === 'keep' && !got.reason) ? '' : String(got.reason || '');
+      return merged;
+    });
+
+    recomputeCurrentAnchors(resultMods);
+
+    return {
+      key: 'result',
+      label: '结果集',
+      modifications: resultMods,
+      meta: {
+        kind: 'patch_only_result_set',
+        mergedAt: new Date().toISOString(),
+        sourceFileName: base.meta.sourceFileName || state.importFileName,
+        fromImportedAllResults: true
+      }
+    };
+  }
+
+  function updateBatchesFromImportedAllResults(parsed){
+    if (!state.batches.length) return;
+    if (parsed.batches && parsed.batches.length) {
+      // 优先按 batchIndex 回填
+      for (const incoming of parsed.batches) {
+        const idx = safeNum(incoming.batchIndex, 0) - 1;
+        const batch = state.batches[idx];
+        if (!batch) continue;
+        batch.responseParsed = incoming.modifications.map(x => ({
+          id: x.id,
+          new_text: x.new_text || '',
+          reason: x.reason || '',
+          status: x.status || 'ok'
+        }));
+        batch.status = 'returned';
+        batch.responseRaw = JSON.stringify({ modifications: incoming.modifications }, null, 2);
+        batch.importLog = `已通过“导入全部批次结果”回填本批次。`;
+      }
+      return;
+    }
+
+    // 否则按 id 分发
+    const byId = new Map(parsed.combined.map(x => [String(x.id), x]));
+    for (const batch of state.batches) {
+      const arr = batch.ids
+        .map(id => byId.get(String(id)))
+        .filter(Boolean)
+        .map(x => ({
+          id: x.id,
+          new_text: x.new_text || '',
+          reason: x.reason || '',
+          status: x.status || 'ok'
+        }));
+      if (arr.length) {
+        batch.responseParsed = arr;
+        batch.status = 'returned';
+        batch.responseRaw = JSON.stringify({ modifications: arr }, null, 2);
+        batch.importLog = `已通过“导入全部批次结果”按 id 分发回填。`;
+      }
+    }
+  }
+
+  async function importAllResultsAnytime(){
+    let raw = '';
+    const file = $('allResultsFile').files[0];
+    if (file) raw = normalizeNewlines(await file.text());
+    if (!raw.trim()) raw = normalizeNewlines($('allResultsPaste').value.trim());
+    if (!raw) throw new Error('请先上传或粘贴“全部批次结果”。');
+
+    const base = importBaseDataset();
+    if (!base) throw new Error('请先导入一润 JSON。');
+
+    const parsed = parseAllResultsPayload(raw);
+    const resultDs = buildResultDatasetFromCombinedMods(base, parsed.combined);
+
+    state.datasets.result = resultDs;
+    state.mergedRecordObject = datasetToExportObject(resultDs);
+    state.finalRawText = '';
+    state.finalRenderedText = '';
+    $('finalRawPreview').value = '';
+    $('finalRenderedPreview').value = '';
+
+    updateBatchesFromImportedAllResults(parsed);
+    invalidateStrictValidation('已导入全部批次结果，请重新预校验全文。');
+
+    setText($('mergeLog'),
+      `已通过“导入全部批次结果”生成新的润色记录。\n结果集条目：${resultDs.modifications.length}\n导入结果条目：${parsed.combined.length}\n批次回填：${state.batches.length ? '已尝试回填' : '当前无批次可回填'}`
+    );
+
+    setActiveDataset('result');
+    saveSnapshot('自动快照：导入全部批次结果');
+    renderBatchArea();
+    refreshButtons();
+    savePageStateDebounced();
+  }
+
+  // =========================
+  // 严格命中：原文 -> 一润后全文 -> 二润后全文
+  // =========================
+  function invalidateStrictValidation(msg='尚未预校验。'){
+    state.strictValidation = null;
+    setText($('strictValidateLog'), msg);
+    refreshButtons();
+    savePageStateDebounced();
+  }
+
+  function validateOriginalAgainstSourceText(originalText, baseDataset){
+    const failures = [];
+    const mods = baseDataset.modifications;
+
+    for (const m of mods) {
+      const start = safeNum(m.anchorStart, 0);
+      const end = safeNum(m.anchorEnd, start);
+      const expected = String(m.anchor_old_text || '');
+      const actual = originalText.slice(start, end);
+      if (actual !== expected) {
+        failures.push({
+          id: m.id,
+          start,
+          end,
+          expected,
+          actual
+        });
+      }
+    }
+
+    return {
+      ok: failures.length === 0,
+      total: mods.length,
+      matched: mods.length - failures.length,
+      failures
+    };
+  }
+
+  function reconstructPass1TextStrict(originalText, baseDataset){
+    const ordered = [...baseDataset.modifications].sort((a,b) => b.anchorStart - a.anchorStart || b.anchorEnd - a.anchorEnd);
+    let out = originalText;
+
+    for (const m of ordered) {
+      const start = safeNum(m.anchorStart, 0);
+      const end = safeNum(m.anchorEnd, start);
+      const expected = String(m.anchor_old_text || '');
+      const replacement = String(m.old_text || '');
+      const actual = out.slice(start, end);
+      if (actual !== expected) {
+        throw new Error(`重建一润后全文失败：id=${m.id}，位置 ${start}-${end} 未命中 anchor_old_text。`);
+      }
+      out = out.slice(0, start) + replacement + out.slice(end);
+    }
+    return out;
+  }
+
+  function validatePass1AgainstResult(pass1Text, resultDs){
+    const failures = [];
+    const mods = (resultDs.modifications || []).filter(m => !['skip','ambiguous','conflict'].includes(String(m.status || '')));
+
+    for (const m of mods) {
+      const start = safeNum(m.currentStart, 0);
+      const end = safeNum(m.currentEnd, start);
+      const expected = String(m.old_text || '');
+      const actual = pass1Text.slice(start, end);
+      if (actual !== expected) {
+        failures.push({
+          id: m.id,
+          start,
+          end,
+          expected,
+          actual
+        });
+      }
+    }
+
+    return {
+      ok: failures.length === 0,
+      total: mods.length,
+      matched: mods.length - failures.length,
+      failures
+    };
+  }
+
+  async function readFullTextEditorValue(){
+    return normalizeNewlines($('fullTextEditor').value || '');
+  }
+
+  async function validateStrictNow(){
+    const resultDs = state.datasets.result;
+    const baseDs = importBaseDataset();
+    if (!baseDs) throw new Error('请先导入一润 JSON。');
+    if (!resultDs) throw new Error('请先生成新的润色记录（结果集）。');
+
+    const originalText = await readFullTextEditorValue();
+    if (!originalText.trim()) throw new Error('请先上传或粘贴润色前原文。');
+
+    const phase1 = validateOriginalAgainstSourceText(originalText, baseDs);
+    if (!phase1.ok) {
+      state.strictValidation = {
+        ok: false,
+        phase1,
+        phase2: null
+      };
+      const first = phase1.failures[0];
+      setText($('strictValidateLog'),
+        `严格预校验失败（阶段 1：润色前原文 → 一润 JSON）。\n总条目：${phase1.total}\n命中：${phase1.matched}\n失败：${phase1.failures.length}\n\n首个失败 id：${first.id}\n位置：${first.start} - ${first.end}\n预期 anchor_old_text：${first.expected}\n实际切片：${first.actual}`
+      );
+      refreshButtons();
+      savePageStateDebounced();
+      return;
+    }
+
+    let pass1Text = '';
+    try {
+      pass1Text = reconstructPass1TextStrict(originalText, baseDs);
+    } catch (err) {
+      state.strictValidation = { ok:false, phase1, phase2:null };
+      setText($('strictValidateLog'), '重建一润后全文失败：\n' + (err?.message || String(err)));
+      refreshButtons();
+      savePageStateDebounced();
+      return;
+    }
+
+    const phase2 = validatePass1AgainstResult(pass1Text, resultDs);
+    state.strictValidation = {
+      ok: phase1.ok && phase2.ok,
+      phase1,
+      phase2
+    };
+
+    if (phase2.ok) {
+      setText($('strictValidateLog'),
+        `严格预校验通过。\n\n阶段 1（润色前原文 → 一润 JSON）：${phase1.total} / ${phase1.total}\n阶段 2（一润后全文 → 新润色记录）：${phase2.total} / ${phase2.total}\n\n现在可以生成润色后全文。`
+      );
+    } else {
+      const first = phase2.failures[0];
+      setText($('strictValidateLog'),
+        `严格预校验失败（阶段 2：一润后全文 → 新润色记录）。\n总条目：${phase2.total}\n命中：${phase2.matched}\n失败：${phase2.failures.length}\n\n首个失败 id：${first.id}\n位置：${first.start} - ${first.end}\n预期 old_text：${first.expected}\n实际切片：${first.actual}`
+      );
+    }
+
+    refreshButtons();
+    savePageStateDebounced();
+  }
+
+  async function buildFinalTextStrict(){
+    const resultDs = state.datasets.result;
+    const baseDs = importBaseDataset();
+    if (!baseDs) throw new Error('请先导入一润 JSON。');
+    if (!resultDs) throw new Error('请先生成结果集。');
+    if (!state.strictValidation?.ok) throw new Error('请先完成严格预校验，并确保 100% 通过。');
+
+    const originalText = await readFullTextEditorValue();
+    let pass1Text = reconstructPass1TextStrict(originalText, baseDs);
+
+    const applicable = (resultDs.modifications || [])
+      .filter(m => !['skip','ambiguous','conflict'].includes(String(m.status || '')))
+      .map(m => clone(m))
+      .sort((a,b) => b.currentStart - a.currentStart || b.currentEnd - a.currentEnd);
+
+    for (const m of applicable) {
+      const start = safeNum(m.currentStart, 0);
+      const end = safeNum(m.currentEnd, start);
+      const oldText = String(m.old_text || '');
+      const newText = String(m.new_text || oldText);
+      const actual = pass1Text.slice(start, end);
+      if (actual !== oldText) {
+        throw new Error(`严格应用失败：id=${m.id}，位置 ${start}-${end} 不再匹配 old_text。`);
+      }
+      pass1Text = pass1Text.slice(0, start) + newText + pass1Text.slice(end);
+    }
+
+    state.finalRawText = pass1Text;
+    state.finalRenderedText = $('use331Render').checked
+      ? (() => {
+          const cleaned = cleanTranslatedText(pass1Text);
+          if (/(?:^|\n)###\s*/.test(cleaned)) {
+            return renderTxtWithCatalog(buildFinalChapters(cleaned));
+          }
+          return normalizeTxtBodyWhitespace(cleaned);
+        })()
+      : pass1Text;
+
+    $('fullTextPreview').value = originalText.slice(0, 30000);
+    $('finalRawPreview').value = state.finalRawText.slice(0, 30000);
+    $('finalRenderedPreview').value = state.finalRenderedText.slice(0, 30000);
+
+    setText($('finalTextLog'),
+      `生成成功。\n阶段 1 严格命中：${state.strictValidation.phase1.total} / ${state.strictValidation.phase1.total}\n阶段 2 严格命中：${state.strictValidation.phase2.total} / ${state.strictValidation.phase2.total}\n输出模式：${$('use331Render').checked ? '331风格整理' : '纯应用结果'}`
+    );
+
+    refreshButtons();
+    saveSnapshot('自动快照：生成全文');
+    savePageStateDebounced();
+  }
+
+  // =========================
+  // Gemini
+  // =========================
+  function loadApiKeysFromText(text){
+    const keys = normalizeNewlines(text).split('\n').map(s => s.trim()).filter(Boolean);
+    state.apiKeys = keys;
+    $('apiIndex').max = Math.max(1, keys.length);
+    $('apiIndex').value = Math.min(Math.max(1, safeNum($('apiIndex').value, 1)), Math.max(1, keys.length));
+    setText($('apiLog'), keys.length ? `已载入 ${keys.length} 个 KEY。` : '未识别到任何 KEY。');
+    refreshButtons();
+    savePageStateDebounced();
+  }
+
+  async function callGeminiForCurrentBatch(){
+    const b = currentBatch();
+    if (!b) throw new Error('请先选中一个批次。');
+    if (!state.apiKeys.length) throw new Error('请先载入 API KEY。');
+
+    const modelId = $('modelId').value.trim();
+    if (!modelId) throw new Error('请填写模型名。');
+
+    const promptText = b.promptText;
+    const autoSwitch = $('autoSwitch429').checked;
+    let startIdx = Math.max(0, safeNum($('apiIndex').value, 1) - 1);
+    let attempts = autoSwitch ? state.apiKeys.length : 1;
+    let lastErr = null;
+
+    for (let step = 0; step < attempts; step++) {
+      const idx = (startIdx + step) % state.apiKeys.length;
+      const key = state.apiKeys[idx];
+      $('apiIndex').value = idx + 1;
+      setText($('apiLog'), `正在调用 Gemini...\n当前批次：${b.index + 1}\n模型：${modelId}\nKEY 序号：${idx + 1}`);
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': key
+          },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: promptText }] }],
+            generationConfig: {
+              temperature: 0.2,
+              responseMimeType: 'application/json'
+            }
+          })
+        });
+
+        if (res.status === 429 && autoSwitch && state.apiKeys.length > 1) {
+          lastErr = new Error('HTTP 429，自动切换下一个 KEY。');
+          continue;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        const text = (data?.candidates?.[0]?.content?.parts || []).map(p => p?.text || '').join('').trim();
+        if (!text) throw new Error('Gemini 返回为空。');
+
+        if ($('autoWriteCurrentBatch').checked) {
+          b.responseRaw = text;
+          if (state.activeBatchIndex === b.index) $('batchResponseBox').value = text;
+        }
+
+        setText($('apiLog'), `调用成功。\n当前批次：${b.index + 1}\n模型：${modelId}\nKEY 序号：${idx + 1}`);
+        renderBatchArea();
+        savePageStateDebounced();
+        return;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    throw lastErr || new Error('Gemini 调用失败。');
+  }
+
+  // =========================
+  // 历史
+  // =========================
+  function exportAppState(){
+    return {
+      datasets: state.datasets,
+      activeKey: state.activeKey,
+      selectedIndexByKey: state.selectedIndexByKey,
+      importFileName: state.importFileName,
+      batchSourceKey: state.batchSourceKey,
+      batches: state.batches,
+      activeBatchIndex: state.activeBatchIndex,
+      mergedRecordObject: state.mergedRecordObject,
+      finalRawText: state.finalRawText,
+      finalRenderedText: state.finalRenderedText,
+      strictValidation: state.strictValidation,
+      controls: {
+        promptTemplate: $('promptTemplate').value,
+        filterText: $('filterText').value,
+        filterStatus: $('filterStatus').value,
+        batchMaxItems: $('batchMaxItems').value,
+        batchMaxChars: $('batchMaxChars').value,
+        fillMissingKeep: $('fillMissingKeep').checked,
+        modelId: $('modelId').value,
+        autoSwitch429: $('autoSwitch429').checked,
+        autoWriteCurrentBatch: $('autoWriteCurrentBatch').checked,
+        use331Render: $('use331Render').checked,
+        fullTextEditor: $('fullTextEditor').value,
+        sourcePaste: $('sourcePaste').value,
+        allResultsPaste: $('allResultsPaste').value
+      }
+    };
+  }
+
+  function importAppState(data){
+    if (!data) return;
+    state.datasets = data.datasets || { working:null, result:null, next:null };
+    state.activeKey = data.activeKey || null;
+    state.selectedIndexByKey = data.selectedIndexByKey || { working:null, result:null, next:null };
+    state.importFileName = data.importFileName || '0.json';
+    state.batchSourceKey = data.batchSourceKey || null;
+    state.batches = data.batches || [];
+    state.activeBatchIndex = data.activeBatchIndex ?? null;
+    state.mergedRecordObject = data.mergedRecordObject || null;
+    state.finalRawText = data.finalRawText || '';
+    state.finalRenderedText = data.finalRenderedText || '';
+    state.strictValidation = data.strictValidation || null;
+
+    const c = data.controls || {};
+    $('promptTemplate').value = c.promptTemplate ?? DEFAULT_PROMPT;
+    $('filterText').value = c.filterText ?? '';
+    $('filterStatus').value = c.filterStatus ?? 'all';
+    $('batchMaxItems').value = c.batchMaxItems ?? '42';
+    $('batchMaxChars').value = c.batchMaxChars ?? '18000';
+    $('fillMissingKeep').checked = c.fillMissingKeep ?? true;
+    $('modelId').value = c.modelId ?? 'gemini-2.5-flash-lite';
+    $('autoSwitch429').checked = c.autoSwitch429 ?? true;
+    $('autoWriteCurrentBatch').checked = c.autoWriteCurrentBatch ?? true;
+    $('use331Render').checked = c.use331Render ?? true;
+    $('fullTextEditor').value = c.fullTextEditor ?? '';
+    $('sourcePaste').value = c.sourcePaste ?? '';
+    $('allResultsPaste').value = c.allResultsPaste ?? '';
+  }
+
+  function saveHistory(){
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.historyList.slice(0, 8))); } catch {}
+  }
+
+  function loadHistory(){
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      state.historyList = raw ? JSON.parse(raw) : [];
+    } catch {
+      state.historyList = [];
+    }
+  }
+
+  function getHistoryMetaSnapshot(label='手动快照'){
+    return {
+      id: 'snap_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      label,
+      time: new Date().toLocaleString(),
+      sourceFileName: state.importFileName || '',
+      batchCount: state.batches.length,
+      itemCount: activeDataset()?.modifications?.length || state.datasets.working?.modifications?.length || 0,
+      state: exportAppState()
+    };
+  }
+
+  function saveSnapshot(label='手动快照'){
+    const snap = getHistoryMetaSnapshot(label);
+    state.historyList.unshift(snap);
+    state.historyList = state.historyList.slice(0, 8);
+    saveHistory();
+    renderHistory();
+  }
+
+  function renderHistory(){
+    const box = $('historyList');
+    if (!state.historyList.length) {
+      box.innerHTML = '<div class="history-item">暂无历史记录。</div>';
+      return;
+    }
+    box.innerHTML = state.historyList.map((h, idx) => `
+      <div class="history-item" data-idx="${idx}" title="点击恢复这条历史记录">
+        <div class="history-head">
+          <div><b>${escapeHtml(h.label || '快照')}</b></div>
+          <div class="badge">${escapeHtml(h.time || '')}</div>
+        </div>
+        <div class="history-meta">来源：${escapeHtml(h.sourceFileName || '-')}</div>
+        <div class="history-meta">批次：${escapeHtml(String(h.batchCount || 0))} ｜ 条数：${escapeHtml(String(h.itemCount || 0))}</div>
+        <div class="toolbar" style="margin-top:6px">
+          <button class="btn secondary hist-restore" data-idx="${idx}" title="恢复这条历史记录">恢复</button>
+          <button class="btn bad hist-delete" data-idx="${idx}" title="删除这条历史记录">删除</button>
+        </div>
+      </div>
+    `).join('');
+
+    [...box.querySelectorAll('.hist-restore')].forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const snap = state.historyList[+btn.dataset.idx];
+        if (!snap?.state) return;
+        importAppState(snap.state);
+        renderAll();
+      });
+    });
+
+    [...box.querySelectorAll('.hist-delete')].forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        state.historyList.splice(+btn.dataset.idx, 1);
+        saveHistory();
+        renderHistory();
+      });
+    });
+  }
+
+  // =========================
+  // 页面状态保存
+  // =========================
+  function saveTextareaLayout(){
+    const layout = {};
+    document.querySelectorAll('textarea').forEach(el => {
+      layout[el.id] = {
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        scrollTop: el.scrollTop || 0,
+        scrollLeft: el.scrollLeft || 0
+      };
+    });
+    try { localStorage.setItem(STORAGE_KEY + '_textarea_layout', JSON.stringify(layout)); } catch {}
+  }
+
+  function loadTextareaLayout(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + '_textarea_layout');
+      if (!raw) return;
+      const layout = JSON.parse(raw);
+      document.querySelectorAll('textarea').forEach(el => {
+        const x = layout[el.id];
+        if (!x) return;
+        if (x.width) el.style.width = x.width + 'px';
+        if (x.height) el.style.height = x.height + 'px';
+        requestAnimationFrame(() => {
+          el.scrollTop = x.scrollTop || 0;
+          el.scrollLeft = x.scrollLeft || 0;
+        });
+      });
+    } catch {}
+  }
+
+  function saveWindowScroll(){
+    try { localStorage.setItem(STORAGE_KEY + '_scroll', JSON.stringify({ x: window.scrollX, y: window.scrollY })); } catch {}
+  }
+
+  function loadWindowScroll(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + '_scroll');
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      requestAnimationFrame(() => window.scrollTo(s.x || 0, s.y || 0));
+    } catch {}
+  }
+
+  function savePageState(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(exportAppState())); } catch {}
+    saveTextareaLayout();
+    saveWindowScroll();
+  }
+
+  const savePageStateDebounced = debounce(savePageState, 200);
+
+  function loadPageState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        $('promptTemplate').value = DEFAULT_PROMPT;
+        return;
+      }
+      importAppState(JSON.parse(raw));
+    } catch {
+      $('promptTemplate').value = DEFAULT_PROMPT;
+    }
+  }
+
+  function bindAutoSaveControls(){
+    document.querySelectorAll('[data-save-key]').forEach(el => {
+      const ev = (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') ? 'input' : 'change';
+      el.addEventListener(ev, () => {
+        if (el.id === 'promptTemplate') rebuildBatchPromptTexts();
+        if (el.id === 'fullTextEditor') {
+          $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+          invalidateStrictValidation('原文已修改，请重新预校验。');
+        }
+        savePageStateDebounced();
+      });
+      if (el.type === 'checkbox' || el.tagName === 'SELECT') {
+        el.addEventListener('change', savePageStateDebounced);
+      }
+    });
+
+    ['batchMaxItems','batchMaxChars'].forEach(id => {
+      $(id).addEventListener('input', () => {
+        scheduleBatchRebuildFromCurrentSelection();
+        savePageStateDebounced();
+      });
+    });
+
+    document.querySelectorAll('textarea').forEach(el => {
+      el.addEventListener('mouseup', savePageStateDebounced);
+      el.addEventListener('keyup', savePageStateDebounced);
+      el.addEventListener('scroll', savePageStateDebounced);
+    });
+
+    window.addEventListener('beforeunload', savePageState);
+    window.addEventListener('scroll', debounce(saveWindowScroll, 150));
+  }
+
+  // =========================
+  // Tooltips
+  // =========================
+  function applyAutoTitles(root = document){
+    const controls = root.querySelectorAll('button,input,textarea,select,.status,.preview-box,.batch-list,.listbox,.history-list,.readme');
+    controls.forEach(el => {
+      if (el.getAttribute('title')) return;
+      const dataTip = el.getAttribute('data-tip');
+      if (dataTip) {
+        el.setAttribute('title', dataTip);
+        return;
+      }
+      let tip = '';
+      const id = el.id;
+      if (id) {
+        const explicit = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+        if (explicit) tip = explicit.textContent.trim();
+      }
+      if (!tip) {
+        const prev = el.previousElementSibling;
+        if (prev && prev.tagName === 'LABEL') tip = prev.textContent.trim();
+      }
+      if (!tip) {
+        const wrapLabel = el.closest('label');
+        if (wrapLabel) tip = wrapLabel.textContent.replace(/\s+/g,' ').trim();
+      }
+      if (!tip && el.getAttribute('placeholder')) tip = el.getAttribute('placeholder');
+      if (!tip) {
+        if (el.classList.contains('status')) tip = '状态/日志显示区域';
+        else if (el.classList.contains('preview-box')) tip = '预览区域';
+        else if (el.classList.contains('batch-list')) tip = '批次列表区域';
+        else if (el.classList.contains('listbox')) tip = '补丁列表区域';
+        else if (el.classList.contains('history-list')) tip = '历史记录区域';
+        else if (el.classList.contains('readme')) tip = '说明文档区域';
+      }
+      if (tip) el.title = tip;
+    });
+  }
+
+  // =========================
+  // 渲染总入口
+  // =========================
+  function refreshButtons(){
+    const ds = activeDataset();
+    const hasDs = !!ds;
+    const hasBatch = !!currentBatch();
+    const hasResult = !!state.datasets.result;
+    const hasOriginal = !!String($('fullTextEditor').value || '').trim();
+    const canImportAllAnytime = !!importBaseDataset();
+
+    $('btnDownloadActiveDataset').disabled = !hasDs;
+    $('btnRebuildBatches').disabled = !hasDs || ds.key === 'result';
+    $('btnCopyPromptPreview').disabled = !hasBatch;
+    $('btnDownloadCurrentBatchJson').disabled = !hasBatch;
+    $('btnDownloadCurrentBatchPrompt').disabled = !hasBatch;
+    $('btnImportCurrentBatch').disabled = !hasBatch;
+    $('btnImportAllSavedBatches').disabled = !state.batches.length;
+    $('btnClearCurrentBatchResponse').disabled = !hasBatch;
+    $('btnCallGeminiCurrentBatch').disabled = !(hasBatch && state.apiKeys.length);
+
+    $('btnImportAllResultsAnytime').disabled = !canImportAllAnytime;
+    $('btnMergeAllBatches').disabled = !state.batches.length;
+    $('btnDownloadMergedRecord').disabled = !state.mergedRecordObject;
+    $('btnCreateNextRound').disabled = !hasResult;
+
+    $('btnValidateStrict').disabled = !(hasResult && hasOriginal);
+    $('btnBuildFinalText').disabled = !(hasResult && hasOriginal && state.strictValidation?.ok);
+    $('btnDownloadFinalRaw').disabled = !state.finalRawText;
+    $('btnDownloadFinalRendered').disabled = !state.finalRenderedText;
+  }
+
+  function renderAll(){
+    renderDatasetTabs();
+    renderDatasetStats();
+    renderBatchArea();
+    focusWorkAreaToCurrentBatch();
+    renderModList();
+    ensureSelectedMod();
+    renderEditor();
+    renderHistory();
+    $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+    $('finalRawPreview').value = (state.finalRawText || '').slice(0, 30000);
+    $('finalRenderedPreview').value = (state.finalRenderedText || '').slice(0, 30000);
+    refreshButtons();
+    applyAutoTitles();
+  }
+
+  // =========================
+  // 事件
+  // =========================
+  async function importSourceFromAny(){
+    let raw = '';
+    const file = $('sourceFile').files[0];
+    if (file) {
+      state.importFileName = file.name || '0.json';
+      raw = normalizeNewlines(await file.text());
+    } else {
+      raw = normalizeNewlines($('sourcePaste').value.trim());
+    }
+    if (!raw) throw new Error('请先选择文件或粘贴一润 JSON。');
+
+    const obj = parseAnyJson(raw);
+    const sourceMods = parseSourceMods(obj);
+
+    state.datasets.working = createWorkingDataset(sourceMods);
+    state.datasets.result = null;
+    state.datasets.next = null;
+    state.batchSourceKey = null;
+    state.batches = [];
+    state.activeBatchIndex = null;
+    state.mergedRecordObject = null;
+    state.finalRawText = '';
+    state.finalRenderedText = '';
+    state.strictValidation = null;
+
+    setActiveDataset('working');
+
+    const lines = [];
+    lines.push(`成功导入：${sourceMods.length} 条`);
+    lines.push(`来源文件：${state.importFileName}`);
+    lines.push(`首条锚点：${sourceMods[0] ? sourceMods[0].absoluteStart + ' - ' + sourceMods[0].absoluteEnd : '-'}`);
+    lines.push(`末条锚点：${sourceMods[sourceMods.length-1] ? sourceMods[sourceMods.length-1].absoluteStart + ' - ' + sourceMods[sourceMods.length-1].absoluteEnd : '-'}`);
+    setText($('importLog'), lines.join('\n'));
+    setText($('mergeLog'), '还没有新的润色记录。');
+    setText($('strictValidateLog'), '尚未预校验。');
+    setText($('finalTextLog'), '尚未生成润色后全文。');
+    $('finalRawPreview').value = '';
+    $('finalRenderedPreview').value = '';
+
+    buildBatchesCore(true);
+    saveSnapshot('自动快照：导入一润 JSON');
+    renderAll();
+  }
+
+  $('sourceFile').addEventListener('change', async () => {
+    try { await importSourceFromAny(); }
+    catch (err) { setText($('importLog'), '导入失败：\n' + (err?.message || String(err))); }
+  });
+
+  $('btnImportSource').addEventListener('click', async () => {
+    try { await importSourceFromAny(); }
+    catch (err) { setText($('importLog'), '导入失败：\n' + (err?.message || String(err))); }
+  });
+
+  $('fullTextFile').addEventListener('change', async () => {
+    const f = $('fullTextFile').files[0];
+    if (!f) return;
+    $('fullTextEditor').value = normalizeNewlines(await f.text());
+    $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+    invalidateStrictValidation('已载入润色前原文，请点击“预校验全文（严格 100%）”。');
+    savePageStateDebounced();
+  });
+
+  $('btnCopyReadme').addEventListener('click', async () => {
+    const ok = await copyText(README_TEXT);
+    alert(ok ? 'README 已复制。' : '复制失败，请手动复制。');
+  });
+
+  $('btnCopyPromptTemplate').addEventListener('click', async () => {
+    const ok = await copyText($('promptTemplate').value.trim());
+    alert(ok ? '提示词模板已复制。' : '复制失败，请手动复制。');
+  });
+
+  $('btnCopyPromptPreview').addEventListener('click', async () => {
+    const b = currentBatch();
+    if (!b || !b.promptText) {
+      alert('当前没有可复制的批次 prompt。');
+      return;
+    }
+    const ok = await autoCopyCurrentBatchPrompt(false);
+    if (!ok) alert('复制失败，请手动复制。');
+  });
+
+  $('filterText').addEventListener('input', () => {
+    renderModList();
+    savePageStateDebounced();
+  });
+  $('filterStatus').addEventListener('change', () => {
+    renderModList();
+    savePageStateDebounced();
+  });
+
+  $('btnSelectVisible').addEventListener('click', () => selectVisible('on'));
+  $('btnClearVisible').addEventListener('click', () => selectVisible('off'));
+  $('btnInvertVisible').addEventListener('click', () => selectVisible('invert'));
+  $('btnSelectPending').addEventListener('click', selectPending);
+  $('btnClearAllSelection').addEventListener('click', clearAllSelection);
+
+  $('btnRebuildBatches').addEventListener('click', () => {
+    if (hasReturnedBatchData()) {
+      const ok = confirm('已经有批次返回结果。重建批次会清空当前批次映射关系。确定继续吗？');
+      if (!ok) return;
+    }
+    buildBatchesCore(true);
+  });
+
+  $('btnDownloadCurrentBatchJson').addEventListener('click', () => {
+    const b = currentBatch();
+    if (!b) return;
+    downloadText(`${getBaseName(state.importFileName)}__batch_${b.index + 1}.json`, b.jsonText, 'application/json;charset=utf-8');
+  });
+
+  $('btnDownloadCurrentBatchPrompt').addEventListener('click', () => {
+    const b = currentBatch();
+    if (!b) return;
+    downloadText(`${getBaseName(state.importFileName)}__batch_${b.index + 1}.prompt.txt`, $('promptPreview').value || b.promptText);
+  });
+
+  $('btnDownloadActiveDataset').addEventListener('click', () => {
+    const ds = activeDataset();
+    if (!ds) return;
+    downloadText(`${getBaseName(state.importFileName)}__${ds.key}.json`, JSON.stringify(datasetToExportObject(ds), null, 2), 'application/json;charset=utf-8');
+  });
+
+  $('batchResponseBox').addEventListener('input', persistCurrentBatchResponse);
+  $('batchResponseBox').addEventListener('click', async () => {
+    const b = currentBatch();
+    if (!b) return;
+    const clip = await readClipboardText();
+    if (!clip) return;
+    $('batchResponseBox').value = clip;
+    b.responseRaw = clip;
+    savePageStateDebounced();
+  });
+
+  $('btnImportCurrentBatch').addEventListener('click', async () => {
+    try { await importCurrentBatchAndAdvance(); }
+    catch (err) {
+      const b = currentBatch();
+      if (b) {
+        b.status = 'error';
+        b.importLog = '导入失败：\n' + (err?.message || String(err));
+        renderBatchArea();
+      }
+    }
+  });
+
+  $('btnImportAllSavedBatches').addEventListener('click', async () => {
+    await importAllSavedBatches();
+  });
+
+  $('btnClearCurrentBatchResponse').addEventListener('click', clearCurrentBatchResponse);
+
+  $('btnImportAllResultsAnytime').addEventListener('click', async () => {
+    try {
+      await importAllResultsAnytime();
+    } catch (err) {
+      setText($('mergeLog'), '导入全部批次结果失败：\n' + (err?.message || String(err)));
+    }
+  });
+
+  $('btnMergeAllBatches').addEventListener('click', () => {
+    try { mergeAllBatches(); }
+    catch (err) { setText($('mergeLog'), '合并失败：\n' + (err?.message || String(err))); }
+  });
+
+  $('btnDownloadMergedRecord').addEventListener('click', () => {
+    if (!state.mergedRecordObject) return;
+    downloadText(
+      `${getBaseName(state.importFileName)}__二润润色记录.json`,
+      JSON.stringify(state.mergedRecordObject, null, 2),
+      'application/json;charset=utf-8'
+    );
+  });
+
+  $('btnCreateNextRound').addEventListener('click', () => {
+    try { createNextRound(); }
+    catch (err) { alert(err?.message || String(err)); }
+  });
+
+  $('btnValidateStrict').addEventListener('click', async () => {
+    try { await validateStrictNow(); }
+    catch (err) { setText($('strictValidateLog'), '预校验失败：\n' + (err?.message || String(err))); }
+  });
+
+  $('btnBuildFinalText').addEventListener('click', async () => {
+    try { await buildFinalTextStrict(); }
+    catch (err) { setText($('finalTextLog'), '生成失败：\n' + (err?.message || String(err))); }
+  });
+
+  $('btnDownloadFinalRaw').addEventListener('click', () => {
+    if (!state.finalRawText) return;
+    downloadText(`${getBaseName(state.importFileName)}__应用后二润全文.txt`, state.finalRawText);
+  });
+
+  $('btnDownloadFinalRendered').addEventListener('click', () => {
+    if (!state.finalRenderedText) return;
+    downloadText(`${getBaseName(state.importFileName)}__331整理版.txt`, state.finalRenderedText);
+  });
+
+  $('btnLoadApiKeys').addEventListener('click', async () => {
+    try {
+      let text = '';
+      const file = $('apiFile').files[0];
+      if (file) text = normalizeNewlines(await file.text());
+      if (!text.trim()) text = $('apiPaste').value.trim();
+      if (!text) throw new Error('请先上传或粘贴 API KEY。');
+      loadApiKeysFromText(text);
+    } catch (err) {
+      setText($('apiLog'), '载入失败：\n' + (err?.message || String(err)));
+    }
+  });
+
+  $('btnCallGeminiCurrentBatch').addEventListener('click', async () => {
+    try { await callGeminiForCurrentBatch(); }
+    catch (err) { setText($('apiLog'), '调用失败：\n' + (err?.message || String(err))); }
+  });
+
+  $('btnSaveMod').addEventListener('click', saveEditor);
+  $('btnMarkKeep').addEventListener('click', markKeep);
+  $('btnMarkSkip').addEventListener('click', markSkip);
+  $('btnUseNewAsOld').addEventListener('click', useNewAsOld);
+
+  $('btnSaveSnapshot').addEventListener('click', () => saveSnapshot('手动快照'));
+  $('btnDeleteAllHistory').addEventListener('click', () => {
+    state.historyList = [];
+    saveHistory();
+    renderHistory();
+  });
+
+  // =========================
+  // 页面状态保存
+  // =========================
+  function saveTextareaLayout(){
+    const layout = {};
+    document.querySelectorAll('textarea').forEach(el => {
+      layout[el.id] = {
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        scrollTop: el.scrollTop || 0,
+        scrollLeft: el.scrollLeft || 0
+      };
+    });
+    try { localStorage.setItem(STORAGE_KEY + '_textarea_layout', JSON.stringify(layout)); } catch {}
+  }
+
+  function loadTextareaLayout(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + '_textarea_layout');
+      if (!raw) return;
+      const layout = JSON.parse(raw);
+      document.querySelectorAll('textarea').forEach(el => {
+        const x = layout[el.id];
+        if (!x) return;
+        if (x.width) el.style.width = x.width + 'px';
+        if (x.height) el.style.height = x.height + 'px';
+        requestAnimationFrame(() => {
+          el.scrollTop = x.scrollTop || 0;
+          el.scrollLeft = x.scrollLeft || 0;
+        });
+      });
+    } catch {}
+  }
+
+  function saveWindowScroll(){
+    try { localStorage.setItem(STORAGE_KEY + '_scroll', JSON.stringify({ x: window.scrollX, y: window.scrollY })); } catch {}
+  }
+
+  function loadWindowScroll(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY + '_scroll');
+      if (!raw) return;
+      const s = JSON.parse(raw);
+      requestAnimationFrame(() => window.scrollTo(s.x || 0, s.y || 0));
+    } catch {}
+  }
+
+  function savePageState(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(exportAppState())); } catch {}
+    saveTextareaLayout();
+    saveWindowScroll();
+  }
+
+  const savePageStateDebounced = debounce(savePageState, 200);
+
+  function loadPageState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        $('promptTemplate').value = DEFAULT_PROMPT;
+        return;
+      }
+      importAppState(JSON.parse(raw));
+    } catch {
+      $('promptTemplate').value = DEFAULT_PROMPT;
+    }
+  }
+
+  function bindAutoSaveControls(){
+    document.querySelectorAll('[data-save-key]').forEach(el => {
+      const ev = (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') ? 'input' : 'change';
+      el.addEventListener(ev, () => {
+        if (el.id === 'promptTemplate') rebuildBatchPromptTexts();
+        if (el.id === 'fullTextEditor') {
+          $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+          invalidateStrictValidation('原文已修改，请重新预校验。');
+        }
+        savePageStateDebounced();
+      });
+      if (el.type === 'checkbox' || el.tagName === 'SELECT') {
+        el.addEventListener('change', savePageStateDebounced);
+      }
+    });
+
+    ['batchMaxItems','batchMaxChars'].forEach(id => {
+      $(id).addEventListener('input', () => {
+        scheduleBatchRebuildFromCurrentSelection();
+        savePageStateDebounced();
+      });
+    });
+
+    document.querySelectorAll('textarea').forEach(el => {
+      el.addEventListener('mouseup', savePageStateDebounced);
+      el.addEventListener('keyup', savePageStateDebounced);
+      el.addEventListener('scroll', savePageStateDebounced);
+    });
+
+    window.addEventListener('beforeunload', savePageState);
+    window.addEventListener('scroll', debounce(saveWindowScroll, 150));
+  }
+
+  function applyAutoTitles(root = document){
+    const controls = root.querySelectorAll('button,input,textarea,select,.status,.preview-box,.batch-list,.listbox,.history-list,.readme');
+    controls.forEach(el => {
+      if (el.getAttribute('title')) return;
+      const dataTip = el.getAttribute('data-tip');
+      if (dataTip) { el.setAttribute('title', dataTip); return; }
+      let tip = '';
+      const id = el.id;
+      if (id) {
+        const explicit = document.querySelector(`label[for="${CSS.escape(id)}"]`);
+        if (explicit) tip = explicit.textContent.trim();
+      }
+      if (!tip) {
+        const prev = el.previousElementSibling;
+        if (prev && prev.tagName === 'LABEL') tip = prev.textContent.trim();
+      }
+      if (!tip) {
+        const wrapLabel = el.closest('label');
+        if (wrapLabel) tip = wrapLabel.textContent.replace(/\s+/g,' ').trim();
+      }
+      if (!tip && el.getAttribute('placeholder')) tip = el.getAttribute('placeholder');
+      if (!tip) {
+        if (el.classList.contains('status')) tip = '状态/日志显示区域';
+        else if (el.classList.contains('preview-box')) tip = '预览区域';
+        else if (el.classList.contains('batch-list')) tip = '批次列表区域';
+        else if (el.classList.contains('listbox')) tip = '补丁列表区域';
+        else if (el.classList.contains('history-list')) tip = '历史记录区域';
+        else if (el.classList.contains('readme')) tip = '说明文档区域';
+      }
+      if (tip) el.title = tip;
+    });
+  }
+
+  function renderAll(){
+    renderDatasetTabs();
+    renderDatasetStats();
+    renderBatchArea();
+    focusWorkAreaToCurrentBatch();
+    renderModList();
+    ensureSelectedMod();
+    renderEditor();
+    renderHistory();
+    $('fullTextPreview').value = $('fullTextEditor').value.slice(0, 30000);
+    $('finalRawPreview').value = (state.finalRawText || '').slice(0, 30000);
+    $('finalRenderedPreview').value = (state.finalRenderedText || '').slice(0, 30000);
+    refreshButtons();
+    applyAutoTitles();
+  }
+
+  // =========================
+  // 初始化
+  // =========================
+  loadHistory();
+  loadPageState();
+  if (!$('promptTemplate').value) $('promptTemplate').value = DEFAULT_PROMPT;
+  bindAutoSaveControls();
+  renderAll();
+  loadTextareaLayout();
+  loadWindowScroll();
+})();
+</script>
+</body>
+</html>
