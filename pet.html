@@ -1,0 +1,2156 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>App.tsx</title>
+<style>
+body{margin:0;padding:24px;background:#fff;color:#111;font:14px/1.5 Consolas,Menlo,monospace}
+pre{white-space:pre-wrap;word-break:break-word}
+.ln{color:#888;display:inline-block;min-width:72px}
+</style>
+</head>
+<body>
+<pre>
+
+<span class="ln">00001:</span> import { type ReactNode, useEffect, useMemo, useRef, useState } from &quot;react&quot;;
+<span class="ln">00002:</span> import { cn } from &quot;@/utils/cn&quot;;
+<span class="ln">00003:</span> 
+<span class="ln">00004:</span> type View = &quot;home&quot; | &quot;result&quot; | &quot;records&quot; | &quot;settings&quot;;
+<span class="ln">00005:</span> type PetType = &quot;cat&quot; | &quot;dog&quot; | &quot;rabbit&quot;;
+<span class="ln">00006:</span> type Emotion = &quot;生气&quot; | &quot;委屈&quot; | &quot;难过&quot; | &quot;不服气&quot; | &quot;担心&quot; | &quot;平静&quot;;
+<span class="ln">00007:</span> type AgeGroup = &quot;3_5&quot; | &quot;6_8&quot; | &quot;9_12&quot; | &quot;13_15&quot;;
+<span class="ln">00008:</span> type Source = &quot;gemini&quot; | &quot;demo&quot; | &quot;safety&quot;;
+<span class="ln">00009:</span> type ChildGender = &quot;boy&quot; | &quot;girl&quot; | &quot;unspecified&quot;;
+<span class="ln">00010:</span> type TtsRole = &quot;sweet&quot; | &quot;playful&quot; | &quot;gentle&quot; | &quot;story&quot;;
+<span class="ln">00011:</span> 
+<span class="ln">00012:</span> type SettingsState = {
+<span class="ln">00013:</span>   petName: string;
+<span class="ln">00014:</span>   petType: PetType;
+<span class="ln">00015:</span>   childName: string;
+<span class="ln">00016:</span>   childBirthday: string;
+<span class="ln">00017:</span>   fallbackAge: number;
+<span class="ln">00018:</span>   ageManualOverride: boolean;
+<span class="ln">00019:</span>   childGender: ChildGender;
+<span class="ln">00020:</span>   caregiverOptions: string[];
+<span class="ln">00021:</span>   commonCaregiverOptions: string[];
+<span class="ln">00022:</span>   apiKey: string;
+<span class="ln">00023:</span>   systemPrompt: string;
+<span class="ln">00024:</span>   ttsRole: TtsRole;
+<span class="ln">00025:</span> };
+<span class="ln">00026:</span> 
+<span class="ln">00027:</span> type DraftState = {
+<span class="ln">00028:</span>   caregiver: string;
+<span class="ln">00029:</span>   childStatement: string;
+<span class="ln">00030:</span>   parentStatement: string;
+<span class="ln">00031:</span> };
+<span class="ln">00032:</span> 
+<span class="ln">00033:</span> type ChildProfile = {
+<span class="ln">00034:</span>   nickname: string;
+<span class="ln">00035:</span>   age: number;
+<span class="ln">00036:</span>   age_group: AgeGroup;
+<span class="ln">00037:</span>   birthday: string;
+<span class="ln">00038:</span>   gender: ChildGender;
+<span class="ln">00039:</span>   source: &quot;birthday&quot; | &quot;fallback&quot;;
+<span class="ln">00040:</span> };
+<span class="ln">00041:</span> 
+<span class="ln">00042:</span> type MediationResult = {
+<span class="ln">00043:</span>   pet: {
+<span class="ln">00044:</span>     name: string;
+<span class="ln">00045:</span>     type: PetType;
+<span class="ln">00046:</span>     title: string;
+<span class="ln">00047:</span>   };
+<span class="ln">00048:</span>   child_profile: {
+<span class="ln">00049:</span>     nickname: string;
+<span class="ln">00050:</span>     age: number;
+<span class="ln">00051:</span>     age_group: AgeGroup;
+<span class="ln">00052:</span>     birthday: string;
+<span class="ln">00053:</span>   };
+<span class="ln">00054:</span>   emotion_summary: {
+<span class="ln">00055:</span>     child: Emotion;
+<span class="ln">00056:</span>     parent: Emotion;
+<span class="ln">00057:</span>   };
+<span class="ln">00058:</span>   child_view: {
+<span class="ln">00059:</span>     opening: string;
+<span class="ln">00060:</span>     observation: string;
+<span class="ln">00061:</span>     judgment_short: string;
+<span class="ln">00062:</span>     action_short: string;
+<span class="ln">00063:</span>     closing: string;
+<span class="ln">00064:</span>   };
+<span class="ln">00065:</span>   action_card: {
+<span class="ln">00066:</span>     title: string;
+<span class="ln">00067:</span>     do_now: string;
+<span class="ln">00068:</span>     child_can_say: string;
+<span class="ln">00069:</span>     parent_can_say: string;
+<span class="ln">00070:</span>     repair_action: string;
+<span class="ln">00071:</span>   };
+<span class="ln">00072:</span>   parent_view: {
+<span class="ln">00073:</span>     issue_summary: string;
+<span class="ln">00074:</span>     fair_judgment: string;
+<span class="ln">00075:</span>     child_learning: string;
+<span class="ln">00076:</span>     parent_guidance: string;
+<span class="ln">00077:</span>   };
+<span class="ln">00078:</span>   reward: {
+<span class="ln">00079:</span>     intimacy_points: number;
+<span class="ln">00080:</span>     badge_text: string;
+<span class="ln">00081:</span>   };
+<span class="ln">00082:</span>   safety: {
+<span class="ln">00083:</span>     mode: &quot;normal&quot; | &quot;alert&quot;;
+<span class="ln">00084:</span>     alert: string;
+<span class="ln">00085:</span>   };
+<span class="ln">00086:</span>   tts_script: string;
+<span class="ln">00087:</span> };
+<span class="ln">00088:</span> 
+<span class="ln">00089:</span> type RecordItem = {
+<span class="ln">00090:</span>   id: string;
+<span class="ln">00091:</span>   createdAt: string;
+<span class="ln">00092:</span>   draft: DraftState;
+<span class="ln">00093:</span>   result: MediationResult;
+<span class="ln">00094:</span>   meta: {
+<span class="ln">00095:</span>     source: Source;
+<span class="ln">00096:</span>     issueTag: string;
+<span class="ln">00097:</span>   };
+<span class="ln">00098:</span>   selectedRepairIndex: number;
+<span class="ln">00099:</span>   completedRepairIndex: number | null;
+<span class="ln">00100:</span> };
+<span class="ln">00101:</span> 
+<span class="ln">00102:</span> type LegacyRecordItem = Omit&lt;RecordItem, &quot;selectedRepairIndex&quot; | &quot;completedRepairIndex&quot;&gt; &amp; {
+<span class="ln">00103:</span>   taskDone?: boolean;
+<span class="ln">00104:</span>   selectedRepairIndex?: number;
+<span class="ln">00105:</span>   completedRepairIndex?: number | null;
+<span class="ln">00106:</span> };
+<span class="ln">00107:</span> 
+<span class="ln">00108:</span> type ToastState = {
+<span class="ln">00109:</span>   message: string;
+<span class="ln">00110:</span>   tone: &quot;dark&quot; | &quot;pink&quot; | &quot;amber&quot;;
+<span class="ln">00111:</span> };
+<span class="ln">00112:</span> 
+<span class="ln">00113:</span> type GeminiResponse = {
+<span class="ln">00114:</span>   candidates?: Array&lt;{
+<span class="ln">00115:</span>     content?: {
+<span class="ln">00116:</span>       parts?: Array&lt;{
+<span class="ln">00117:</span>         text?: string;
+<span class="ln">00118:</span>       }&gt;;
+<span class="ln">00119:</span>     };
+<span class="ln">00120:</span>   }&gt;;
+<span class="ln">00121:</span>   promptFeedback?: {
+<span class="ln">00122:</span>     blockReason?: string;
+<span class="ln">00123:</span>   };
+<span class="ln">00124:</span> };
+<span class="ln">00125:</span> 
+<span class="ln">00126:</span> type AgeMeta = {
+<span class="ln">00127:</span>   label: string;
+<span class="ln">00128:</span>   audienceName: string;
+<span class="ln">00129:</span>   languageStyle: string;
+<span class="ln">00130:</span>   metaphorType: string;
+<span class="ln">00131:</span>   childWordLimit: string;
+<span class="ln">00132:</span> };
+<span class="ln">00133:</span> 
+<span class="ln">00134:</span> const MODEL_NAME = &quot;gemini-3.1-flash-lite-preview&quot;;
+<span class="ln">00135:</span> 
+<span class="ln">00136:</span> const STORAGE_KEYS = {
+<span class="ln">00137:</span>   settings: &quot;pet-judge-settings-v2&quot;,
+<span class="ln">00138:</span>   draft: &quot;pet-judge-draft-v2&quot;,
+<span class="ln">00139:</span>   records: &quot;pet-judge-records-v2&quot;,
+<span class="ln">00140:</span> } as const;
+<span class="ln">00141:</span> 
+<span class="ln">00142:</span> const PETS = {
+<span class="ln">00143:</span>   cat: {
+<span class="ln">00144:</span>     emoji: &quot;🐱&quot;,
+<span class="ln">00145:</span>     firstPerson: &quot;本喵&quot;,
+<span class="ln">00146:</span>     accent: &quot;from-fuchsia-400 via-pink-400 to-rose-400&quot;,
+<span class="ln">00147:</span>     soft: &quot;from-fuchsia-50 via-white to-rose-50&quot;,
+<span class="ln">00148:</span>     chip: &quot;bg-fuchsia-100 text-fuchsia-700&quot;,
+<span class="ln">00149:</span>     writingToolEmoji: &quot;🎣&quot;,
+<span class="ln">00150:</span>     writingToolLabel: &quot;逗猫棒&quot;,
+<span class="ln">00151:</span>     openers: [
+<span class="ln">00152:</span>       &quot;本喵先把小爪垫放轻一点，认真听你们说。&quot;,
+<span class="ln">00153:</span>       &quot;本喵在这儿，谁的心里话都可以慢慢说。&quot;,
+<span class="ln">00154:</span>       &quot;本喵先把空气里的刺刺话拨开一点。&quot;,
+<span class="ln">00155:</span>     ],
+<span class="ln">00156:</span>     closings: [
+<span class="ln">00157:</span>       &quot;本喵宣布：今天这个家还是暖暖的。&quot;,
+<span class="ln">00158:</span>       &quot;本喵的小爪印已经盖好啦，和好继续。&quot;,
+<span class="ln">00159:</span>       &quot;本喵确认过了，你们是在学着更会说话。&quot;,
+<span class="ln">00160:</span>     ],
+<span class="ln">00161:</span>   },
+<span class="ln">00162:</span>   dog: {
+<span class="ln">00163:</span>     emoji: &quot;🐶&quot;,
+<span class="ln">00164:</span>     firstPerson: &quot;本汪&quot;,
+<span class="ln">00165:</span>     accent: &quot;from-amber-400 via-orange-400 to-yellow-400&quot;,
+<span class="ln">00166:</span>     soft: &quot;from-amber-50 via-white to-orange-50&quot;,
+<span class="ln">00167:</span>     chip: &quot;bg-amber-100 text-amber-700&quot;,
+<span class="ln">00168:</span>     writingToolEmoji: &quot;🦴&quot;,
+<span class="ln">00169:</span>     writingToolLabel: &quot;小骨头&quot;,
+<span class="ln">00170:</span>     openers: [
+<span class="ln">00171:</span>       &quot;本汪先坐好，认真听你们把话说完。&quot;,
+<span class="ln">00172:</span>       &quot;本汪会先把着急的话接住，再慢慢理顺。&quot;,
+<span class="ln">00173:</span>       &quot;本汪先把这阵小风波按住，不让它继续乱跑。&quot;,
+<span class="ln">00174:</span>     ],
+<span class="ln">00175:</span>     closings: [
+<span class="ln">00176:</span>       &quot;本汪宣布：今天和解赢啦。&quot;,
+<span class="ln">00177:</span>       &quot;本汪摇尾巴认证：你们已经更靠近了。&quot;,
+<span class="ln">00178:</span>       &quot;本汪的小爪印说：这次不是对抗，是合作。&quot;,
+<span class="ln">00179:</span>     ],
+<span class="ln">00180:</span>   },
+<span class="ln">00181:</span>   rabbit: {
+<span class="ln">00182:</span>     emoji: &quot;🐰&quot;,
+<span class="ln">00183:</span>     firstPerson: &quot;小兔&quot;,
+<span class="ln">00184:</span>     accent: &quot;from-sky-400 via-cyan-400 to-emerald-400&quot;,
+<span class="ln">00185:</span>     soft: &quot;from-sky-50 via-white to-emerald-50&quot;,
+<span class="ln">00186:</span>     chip: &quot;bg-cyan-100 text-cyan-700&quot;,
+<span class="ln">00187:</span>     writingToolEmoji: &quot;🥕&quot;,
+<span class="ln">00188:</span>     writingToolLabel: &quot;小胡萝卜&quot;,
+<span class="ln">00189:</span>     openers: [
+<span class="ln">00190:</span>       &quot;小兔先把耳朵竖起来，安安静静听你们说。&quot;,
+<span class="ln">00191:</span>       &quot;小兔会把每一句话都轻轻接住。&quot;,
+<span class="ln">00192:</span>       &quot;小兔先陪你们把乱乱的心情放平一点。&quot;,
+<span class="ln">00193:</span>     ],
+<span class="ln">00194:</span>     closings: [
+<span class="ln">00195:</span>       &quot;小兔轻轻盖章：今天继续暖暖的。&quot;,
+<span class="ln">00196:</span>       &quot;小兔宣布：现在适合做一个小小和解动作。&quot;,
+<span class="ln">00197:</span>       &quot;小兔确认：你们已经往和好那边走啦。&quot;,
+<span class="ln">00198:</span>     ],
+<span class="ln">00199:</span>   },
+<span class="ln">00200:</span> } satisfies Record&lt;PetType, {
+<span class="ln">00201:</span>   emoji: string;
+<span class="ln">00202:</span>   firstPerson: string;
+<span class="ln">00203:</span>   accent: string;
+<span class="ln">00204:</span>   soft: string;
+<span class="ln">00205:</span>   chip: string;
+<span class="ln">00206:</span>   writingToolEmoji: string;
+<span class="ln">00207:</span>   writingToolLabel: string;
+<span class="ln">00208:</span>   openers: string[];
+<span class="ln">00209:</span>   closings: string[];
+<span class="ln">00210:</span> }&gt;;
+<span class="ln">00211:</span> 
+<span class="ln">00212:</span> const AGE_META: Record&lt;AgeGroup, AgeMeta&gt; = {
+<span class="ln">00213:</span>   &quot;3_5&quot;: {
+<span class="ln">00214:</span>     label: &quot;3-5岁&quot;,
+<span class="ln">00215:</span>     audienceName: &quot;小宝宝&quot;,
+<span class="ln">00216:</span>     languageStyle: &quot;极短、安抚、家长引导为主&quot;,
+<span class="ln">00217:</span>     metaphorType: &quot;动物、玩具、糖果&quot;,
+<span class="ln">00218:</span>     childWordLimit: &quot;40~80字&quot;,
+<span class="ln">00219:</span>   },
+<span class="ln">00220:</span>   &quot;6_8&quot;: {
+<span class="ln">00221:</span>     label: &quot;6-8岁&quot;,
+<span class="ln">00222:</span>     audienceName: &quot;小朋友&quot;,
+<span class="ln">00223:</span>     languageStyle: &quot;短句、具体动作、一次一个成长点&quot;,
+<span class="ln">00224:</span>     metaphorType: &quot;游戏、学校、冒险&quot;,
+<span class="ln">00225:</span>     childWordLimit: &quot;60~120字&quot;,
+<span class="ln">00226:</span>   },
+<span class="ln">00227:</span>   &quot;9_12&quot;: {
+<span class="ln">00228:</span>     label: &quot;9-12岁&quot;,
+<span class="ln">00229:</span>     audienceName: &quot;小主人&quot;,
+<span class="ln">00230:</span>     languageStyle: &quot;能讲简单因果，保留宠物感&quot;,
+<span class="ln">00231:</span>     metaphorType: &quot;运动、探险、成长&quot;,
+<span class="ln">00232:</span>     childWordLimit: &quot;80~160字&quot;,
+<span class="ln">00233:</span>   },
+<span class="ln">00234:</span>   &quot;13_15&quot;: {
+<span class="ln">00235:</span>     label: &quot;13-15岁&quot;,
+<span class="ln">00236:</span>     audienceName: &quot;大朋友&quot;,
+<span class="ln">00237:</span>     languageStyle: &quot;更尊重、更平等、不过度幼化&quot;,
+<span class="ln">00238:</span>     metaphorType: &quot;选择、边界、信任&quot;,
+<span class="ln">00239:</span>     childWordLimit: &quot;100~180字&quot;,
+<span class="ln">00240:</span>   },
+<span class="ln">00241:</span> };
+<span class="ln">00242:</span> 
+<span class="ln">00243:</span> const EMOTION_OPTIONS: Emotion[] = [&quot;生气&quot;, &quot;委屈&quot;, &quot;难过&quot;, &quot;不服气&quot;, &quot;担心&quot;, &quot;平静&quot;];
+<span class="ln">00244:</span> 
+<span class="ln">00245:</span> const TTS_ROLE_META: Record&lt;TtsRole, { label: string; rate: number; pitch: number; preferredNamePattern?: RegExp }&gt; = {
+<span class="ln">00246:</span>   sweet: {
+<span class="ln">00247:</span>     label: &quot;软萌小奶音&quot;,
+<span class="ln">00248:</span>     rate: 1.04,
+<span class="ln">00249:</span>     pitch: 1.22,
+<span class="ln">00250:</span>     preferredNamePattern: /xiaoxiao|xiaoyi|female|girl|女/i,
+<span class="ln">00251:</span>   },
+<span class="ln">00252:</span>   playful: {
+<span class="ln">00253:</span>     label: &quot;元气小可爱&quot;,
+<span class="ln">00254:</span>     rate: 1.1,
+<span class="ln">00255:</span>     pitch: 1.16,
+<span class="ln">00256:</span>     preferredNamePattern: /xiaoxiao|xiaoyi|yunxi|female|girl|女/i,
+<span class="ln">00257:</span>   },
+<span class="ln">00258:</span>   gentle: {
+<span class="ln">00259:</span>     label: &quot;温柔陪伴音&quot;,
+<span class="ln">00260:</span>     rate: 1.02,
+<span class="ln">00261:</span>     pitch: 1.08,
+<span class="ln">00262:</span>     preferredNamePattern: /xiaoyi|xiaoxiao|female|girl|女/i,
+<span class="ln">00263:</span>   },
+<span class="ln">00264:</span>   story: {
+<span class="ln">00265:</span>     label: &quot;童话讲述音&quot;,
+<span class="ln">00266:</span>     rate: 1.03,
+<span class="ln">00267:</span>     pitch: 1.12,
+<span class="ln">00268:</span>     preferredNamePattern: /xiaoxiao|story|female|girl|女/i,
+<span class="ln">00269:</span>   },
+<span class="ln">00270:</span> };
+<span class="ln">00271:</span> 
+<span class="ln">00272:</span> const DEFAULT_PROMPT = `你是一个儿童教育专家，也是帮助家庭把问题说清楚、解决得更顺的沟通能手。
+<span class="ln">00273:</span> 现在你要扮演家庭宠物调解官，名字由外部传入，例如“雪雪”。
+<span class="ln">00274:</span> 你不是冷酷裁判，而是温柔、可爱、值得信任的家庭宠物大法官。
+<span class="ln">00275:</span> 
+<span class="ln">00276:</span> 你的任务是在孩子和家长发生分歧时：
+<span class="ln">00277:</span> 1. 先理解双方情绪，整理双方诉求；
+<span class="ln">00278:</span> 2. 判断孩子和家长各自最接近的情绪；
+<span class="ln">00279:</span> 3. 用宠物第一人称口吻，温柔安抚孩子；
+<span class="ln">00280:</span> 4. 结合孩子年龄、性别和表达方式，给出更容易被接受的解决办法；
+<span class="ln">00281:</span> 5. 同时给家长一个简短、可执行的沟通提醒；
+<span class="ln">00282:</span> 6. 促进关系修复，而不是判定输赢；
+<span class="ln">00283:</span> 7. 给出一个低阻力、可立刻执行的和解动作；
+<span class="ln">00284:</span> 8. 最后输出温馨结尾和亲密度奖励。
+<span class="ln">00285:</span> 
+<span class="ln">00286:</span> 你必须根据 child_profile 中的信息调整表达方式：
+<span class="ln">00287:</span> - 如果 age 有值，则优先使用 age；
+<span class="ln">00288:</span> - 如果 age 为空且提供 birthday，则根据 birthday 推断年龄；
+<span class="ln">00289:</span> - 如果 age 和 birthday 都没有，则按 7 岁理解；
+<span class="ln">00290:</span> - 根据年龄自动适配语言风格；
+<span class="ln">00291:</span> - 可以参考孩子性别来调整语气和举例，但绝不能使用刻板印象或标签化表达。
+<span class="ln">00292:</span> 
+<span class="ln">00293:</span> 年龄表达规则：
+<span class="ln">00294:</span> - 3_5：孩子版文案极短，少说教，主要安抚和行动建议，更偏向家长引导。
+<span class="ln">00295:</span> - 6_8：句子短、具体、温柔，一次只讲一个成长点，避免抽象词。
+<span class="ln">00296:</span> - 9_12：可加入简单因果解释，但仍保持宠物感和温和语气。
+<span class="ln">00297:</span> - 13_15：减少幼态表达，避免过度可爱化，更强调尊重、自主和协商。
+<span class="ln">00298:</span> 
+<span class="ln">00299:</span> 输出原则：
+<span class="ln">00300:</span> - 不羞辱、不标签化、不绝对站队。
+<span class="ln">00301:</span> - 不说“你就是错的”“你太差了”“你总是这样”等否定性表达。
+<span class="ln">00302:</span> - 不把家长塑造成反派，也不让孩子感觉被审判。
+<span class="ln">00303:</span> - 重点不是输赢，而是让孩子被理解、让家长有方法、让关系变温暖。
+<span class="ln">00304:</span> - 优先给出低阻力和解动作，如：说一句话、定一个小计划、击掌、握手。
+<span class="ln">00305:</span> - 不要一上来就要求拥抱，除非上下文显示双方已经明显缓和。
+<span class="ln">00306:</span> - child_view 必须使用宠物第一人称口吻。
+<span class="ln">00307:</span> - parent_view 可以更理性，但仍须温和，不得说教过重。
+<span class="ln">00308:</span> - child_view 总字数应尽量简洁：
+<span class="ln">00309:</span>   - 3_5：40~80字
+<span class="ln">00310:</span>   - 6_8：60~120字
+<span class="ln">00311:</span>   - 9_12：80~160字
+<span class="ln">00312:</span>   - 13_15：100~180字
+<span class="ln">00313:</span> 
+<span class="ln">00314:</span> 情绪选择规则：
+<span class="ln">00315:</span> emotion_summary.child 和 emotion_summary.parent 只能从以下词中选择一个：
+<span class="ln">00316:</span> 生气、委屈、难过、不服气、担心、平静
+<span class="ln">00317:</span> 
+<span class="ln">00318:</span> 安全规则：
+<span class="ln">00319:</span> 如果发现涉及以下内容：
+<span class="ln">00320:</span> - 自残
+<span class="ln">00321:</span> - 虐待
+<span class="ln">00322:</span> - 严重人身伤害
+<span class="ln">00323:</span> - 长期恐吓
+<span class="ln">00324:</span> - 明显家庭暴力
+<span class="ln">00325:</span> 则不要继续使用轻松宠物判案风格，切换到 safety.mode = &quot;alert&quot;，
+<span class="ln">00326:</span> 重点给出安全建议、可信成年人求助建议和停止冲突升级的建议。
+<span class="ln">00327:</span> 
+<span class="ln">00328:</span> 输出必须是 JSON，不得输出 JSON 以外的任何说明文字。`;
+<span class="ln">00329:</span> 
+<span class="ln">00330:</span> const DEFAULT_SETTINGS: SettingsState = {
+<span class="ln">00331:</span>   petName: &quot;雪雪&quot;,
+<span class="ln">00332:</span>   petType: &quot;cat&quot;,
+<span class="ln">00333:</span>   childName: &quot;乐乐&quot;,
+<span class="ln">00334:</span>   childBirthday: &quot;&quot;,
+<span class="ln">00335:</span>   fallbackAge: 7,
+<span class="ln">00336:</span>   ageManualOverride: false,
+<span class="ln">00337:</span>   childGender: &quot;unspecified&quot;,
+<span class="ln">00338:</span>   caregiverOptions: [&quot;妈妈&quot;, &quot;爸爸&quot;, &quot;姥姥&quot;, &quot;姥爷&quot;, &quot;爷爷&quot;, &quot;奶奶&quot;],
+<span class="ln">00339:</span>   commonCaregiverOptions: [&quot;妈妈&quot;, &quot;爸爸&quot;],
+<span class="ln">00340:</span>   apiKey: &quot;&quot;,
+<span class="ln">00341:</span>   systemPrompt: DEFAULT_PROMPT,
+<span class="ln">00342:</span>   ttsRole: &quot;sweet&quot;,
+<span class="ln">00343:</span> };
+<span class="ln">00344:</span> 
+<span class="ln">00345:</span> const DEFAULT_DRAFT: DraftState = {
+<span class="ln">00346:</span>   caregiver: &quot;妈妈&quot;,
+<span class="ln">00347:</span>   childStatement: &quot;先玩再写作业&quot;,
+<span class="ln">00348:</span>   parentStatement: &quot;先写作业再玩&quot;,
+<span class="ln">00349:</span> };
+<span class="ln">00350:</span> 
+<span class="ln">00351:</span> const MEDIATION_SCHEMA = {
+<span class="ln">00352:</span>   type: &quot;object&quot;,
+<span class="ln">00353:</span>   additionalProperties: false,
+<span class="ln">00354:</span>   required: [
+<span class="ln">00355:</span>     &quot;pet&quot;,
+<span class="ln">00356:</span>     &quot;child_profile&quot;,
+<span class="ln">00357:</span>     &quot;emotion_summary&quot;,
+<span class="ln">00358:</span>     &quot;child_view&quot;,
+<span class="ln">00359:</span>     &quot;action_card&quot;,
+<span class="ln">00360:</span>     &quot;parent_view&quot;,
+<span class="ln">00361:</span>     &quot;reward&quot;,
+<span class="ln">00362:</span>     &quot;safety&quot;,
+<span class="ln">00363:</span>     &quot;tts_script&quot;,
+<span class="ln">00364:</span>   ],
+<span class="ln">00365:</span>   properties: {
+<span class="ln">00366:</span>     pet: {
+<span class="ln">00367:</span>       type: &quot;object&quot;,
+<span class="ln">00368:</span>       additionalProperties: false,
+<span class="ln">00369:</span>       required: [&quot;name&quot;, &quot;type&quot;, &quot;title&quot;],
+<span class="ln">00370:</span>       properties: {
+<span class="ln">00371:</span>         name: { type: &quot;string&quot; },
+<span class="ln">00372:</span>         type: { type: &quot;string&quot;, enum: [&quot;cat&quot;, &quot;dog&quot;, &quot;rabbit&quot;] },
+<span class="ln">00373:</span>         title: { type: &quot;string&quot; },
+<span class="ln">00374:</span>       },
+<span class="ln">00375:</span>     },
+<span class="ln">00376:</span>     child_profile: {
+<span class="ln">00377:</span>       type: &quot;object&quot;,
+<span class="ln">00378:</span>       additionalProperties: false,
+<span class="ln">00379:</span>       required: [&quot;nickname&quot;, &quot;age&quot;, &quot;age_group&quot;, &quot;birthday&quot;],
+<span class="ln">00380:</span>       properties: {
+<span class="ln">00381:</span>         nickname: { type: &quot;string&quot; },
+<span class="ln">00382:</span>         age: { type: &quot;integer&quot;, minimum: 3, maximum: 15 },
+<span class="ln">00383:</span>         age_group: { type: &quot;string&quot;, enum: [&quot;3_5&quot;, &quot;6_8&quot;, &quot;9_12&quot;, &quot;13_15&quot;] },
+<span class="ln">00384:</span>         birthday: { type: &quot;string&quot; },
+<span class="ln">00385:</span>       },
+<span class="ln">00386:</span>     },
+<span class="ln">00387:</span>     emotion_summary: {
+<span class="ln">00388:</span>       type: &quot;object&quot;,
+<span class="ln">00389:</span>       additionalProperties: false,
+<span class="ln">00390:</span>       required: [&quot;child&quot;, &quot;parent&quot;],
+<span class="ln">00391:</span>       properties: {
+<span class="ln">00392:</span>         child: { type: &quot;string&quot;, enum: EMOTION_OPTIONS },
+<span class="ln">00393:</span>         parent: { type: &quot;string&quot;, enum: EMOTION_OPTIONS },
+<span class="ln">00394:</span>       },
+<span class="ln">00395:</span>     },
+<span class="ln">00396:</span>     child_view: {
+<span class="ln">00397:</span>       type: &quot;object&quot;,
+<span class="ln">00398:</span>       additionalProperties: false,
+<span class="ln">00399:</span>       required: [&quot;opening&quot;, &quot;observation&quot;, &quot;judgment_short&quot;, &quot;action_short&quot;, &quot;closing&quot;],
+<span class="ln">00400:</span>       properties: {
+<span class="ln">00401:</span>         opening: { type: &quot;string&quot; },
+<span class="ln">00402:</span>         observation: { type: &quot;string&quot; },
+<span class="ln">00403:</span>         judgment_short: { type: &quot;string&quot; },
+<span class="ln">00404:</span>         action_short: { type: &quot;string&quot; },
+<span class="ln">00405:</span>         closing: { type: &quot;string&quot; },
+<span class="ln">00406:</span>       },
+<span class="ln">00407:</span>     },
+<span class="ln">00408:</span>     action_card: {
+<span class="ln">00409:</span>       type: &quot;object&quot;,
+<span class="ln">00410:</span>       additionalProperties: false,
+<span class="ln">00411:</span>       required: [&quot;title&quot;, &quot;do_now&quot;, &quot;child_can_say&quot;, &quot;parent_can_say&quot;, &quot;repair_action&quot;],
+<span class="ln">00412:</span>       properties: {
+<span class="ln">00413:</span>         title: { type: &quot;string&quot; },
+<span class="ln">00414:</span>         do_now: { type: &quot;string&quot; },
+<span class="ln">00415:</span>         child_can_say: { type: &quot;string&quot; },
+<span class="ln">00416:</span>         parent_can_say: { type: &quot;string&quot; },
+<span class="ln">00417:</span>         repair_action: { type: &quot;string&quot; },
+<span class="ln">00418:</span>       },
+<span class="ln">00419:</span>     },
+<span class="ln">00420:</span>     parent_view: {
+<span class="ln">00421:</span>       type: &quot;object&quot;,
+<span class="ln">00422:</span>       additionalProperties: false,
+<span class="ln">00423:</span>       required: [&quot;issue_summary&quot;, &quot;fair_judgment&quot;, &quot;child_learning&quot;, &quot;parent_guidance&quot;],
+<span class="ln">00424:</span>       properties: {
+<span class="ln">00425:</span>         issue_summary: { type: &quot;string&quot; },
+<span class="ln">00426:</span>         fair_judgment: { type: &quot;string&quot; },
+<span class="ln">00427:</span>         child_learning: { type: &quot;string&quot; },
+<span class="ln">00428:</span>         parent_guidance: { type: &quot;string&quot; },
+<span class="ln">00429:</span>       },
+<span class="ln">00430:</span>     },
+<span class="ln">00431:</span>     reward: {
+<span class="ln">00432:</span>       type: &quot;object&quot;,
+<span class="ln">00433:</span>       additionalProperties: false,
+<span class="ln">00434:</span>       required: [&quot;intimacy_points&quot;, &quot;badge_text&quot;],
+<span class="ln">00435:</span>       properties: {
+<span class="ln">00436:</span>         intimacy_points: { type: &quot;integer&quot;, minimum: 0, maximum: 5 },
+<span class="ln">00437:</span>         badge_text: { type: &quot;string&quot; },
+<span class="ln">00438:</span>       },
+<span class="ln">00439:</span>     },
+<span class="ln">00440:</span>     safety: {
+<span class="ln">00441:</span>       type: &quot;object&quot;,
+<span class="ln">00442:</span>       additionalProperties: false,
+<span class="ln">00443:</span>       required: [&quot;mode&quot;, &quot;alert&quot;],
+<span class="ln">00444:</span>       properties: {
+<span class="ln">00445:</span>         mode: { type: &quot;string&quot;, enum: [&quot;normal&quot;, &quot;alert&quot;] },
+<span class="ln">00446:</span>         alert: { type: &quot;string&quot; },
+<span class="ln">00447:</span>       },
+<span class="ln">00448:</span>     },
+<span class="ln">00449:</span>     tts_script: { type: &quot;string&quot; },
+<span class="ln">00450:</span>   },
+<span class="ln">00451:</span> } as const;
+<span class="ln">00452:</span> 
+<span class="ln">00453:</span> function readStorage&lt;T&gt;(key: string, fallback: T): T {
+<span class="ln">00454:</span>   if (typeof window === &quot;undefined&quot;) {
+<span class="ln">00455:</span>     return fallback;
+<span class="ln">00456:</span>   }
+<span class="ln">00457:</span> 
+<span class="ln">00458:</span>   const raw = window.localStorage.getItem(key);
+<span class="ln">00459:</span>   if (!raw) {
+<span class="ln">00460:</span>     return fallback;
+<span class="ln">00461:</span>   }
+<span class="ln">00462:</span> 
+<span class="ln">00463:</span>   try {
+<span class="ln">00464:</span>     return JSON.parse(raw) as T;
+<span class="ln">00465:</span>   } catch {
+<span class="ln">00466:</span>     return fallback;
+<span class="ln">00467:</span>   }
+<span class="ln">00468:</span> }
+<span class="ln">00469:</span> 
+<span class="ln">00470:</span> function saveStorage&lt;T&gt;(key: string, value: T) {
+<span class="ln">00471:</span>   if (typeof window === &quot;undefined&quot;) {
+<span class="ln">00472:</span>     return;
+<span class="ln">00473:</span>   }
+<span class="ln">00474:</span> 
+<span class="ln">00475:</span>   window.localStorage.setItem(key, JSON.stringify(value));
+<span class="ln">00476:</span> }
+<span class="ln">00477:</span> 
+<span class="ln">00478:</span> function collapseText(text: string) {
+<span class="ln">00479:</span>   return text.replace(/\s+/g, &quot; &quot;).trim();
+<span class="ln">00480:</span> }
+<span class="ln">00481:</span> 
+<span class="ln">00482:</span> function shortenText(text: string, maxLength = 26) {
+<span class="ln">00483:</span>   const compact = collapseText(text);
+<span class="ln">00484:</span>   if (!compact) {
+<span class="ln">00485:</span>     return &quot;&quot;;
+<span class="ln">00486:</span>   }
+<span class="ln">00487:</span> 
+<span class="ln">00488:</span>   return compact.length &gt; maxLength ? `${compact.slice(0, maxLength)}…` : compact;
+<span class="ln">00489:</span> }
+<span class="ln">00490:</span> 
+<span class="ln">00491:</span> function createId() {
+<span class="ln">00492:</span>   if (typeof crypto !== &quot;undefined&quot; &amp;&amp; &quot;randomUUID&quot; in crypto) {
+<span class="ln">00493:</span>     return crypto.randomUUID();
+<span class="ln">00494:</span>   }
+<span class="ln">00495:</span> 
+<span class="ln">00496:</span>   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+<span class="ln">00497:</span> }
+<span class="ln">00498:</span> 
+<span class="ln">00499:</span> function formatDateTime(value: string) {
+<span class="ln">00500:</span>   const date = new Date(value);
+<span class="ln">00501:</span>   if (Number.isNaN(date.getTime())) {
+<span class="ln">00502:</span>     return value;
+<span class="ln">00503:</span>   }
+<span class="ln">00504:</span> 
+<span class="ln">00505:</span>   return new Intl.DateTimeFormat(&quot;zh-CN&quot;, {
+<span class="ln">00506:</span>     month: &quot;2-digit&quot;,
+<span class="ln">00507:</span>     day: &quot;2-digit&quot;,
+<span class="ln">00508:</span>     hour: &quot;2-digit&quot;,
+<span class="ln">00509:</span>     minute: &quot;2-digit&quot;,
+<span class="ln">00510:</span>   }).format(date);
+<span class="ln">00511:</span> }
+<span class="ln">00512:</span> 
+<span class="ln">00513:</span> function clampAge(age: number) {
+<span class="ln">00514:</span>   return Math.min(15, Math.max(3, Math.round(age || 7)));
+<span class="ln">00515:</span> }
+<span class="ln">00516:</span> 
+<span class="ln">00517:</span> function normalizeBirthdayInput(value: string) {
+<span class="ln">00518:</span>   const compact = value.replace(/\s+/g, &quot;&quot;).replace(/[年月日.\/]/g, &quot;&quot;);
+<span class="ln">00519:</span> 
+<span class="ln">00520:</span>   if (/^\d{8}$/.test(compact)) {
+<span class="ln">00521:</span>     return `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
+<span class="ln">00522:</span>   }
+<span class="ln">00523:</span> 
+<span class="ln">00524:</span>   if (/^\d{6}$/.test(compact)) {
+<span class="ln">00525:</span>     return `${compact.slice(0, 4)}-${compact.slice(4, 6)}`;
+<span class="ln">00526:</span>   }
+<span class="ln">00527:</span> 
+<span class="ln">00528:</span>   if (/^\d{4}$/.test(compact)) {
+<span class="ln">00529:</span>     return compact;
+<span class="ln">00530:</span>   }
+<span class="ln">00531:</span> 
+<span class="ln">00532:</span>   return value
+<span class="ln">00533:</span>     .replace(/[.\/]/g, &quot;-&quot;)
+<span class="ln">00534:</span>     .replace(/年/g, &quot;-&quot;)
+<span class="ln">00535:</span>     .replace(/月/g, &quot;-&quot;)
+<span class="ln">00536:</span>     .replace(/日/g, &quot;&quot;)
+<span class="ln">00537:</span>     .replace(/\s+/g, &quot;&quot;)
+<span class="ln">00538:</span>     .replace(/-+/g, &quot;-&quot;)
+<span class="ln">00539:</span>     .replace(/^-|-$/g, &quot;&quot;);
+<span class="ln">00540:</span> }
+<span class="ln">00541:</span> 
+<span class="ln">00542:</span> function calculateAgeFromBirthday(birthday: string) {
+<span class="ln">00543:</span>   const normalized = normalizeBirthdayInput(birthday);
+<span class="ln">00544:</span>   if (!normalized) {
+<span class="ln">00545:</span>     return null;
+<span class="ln">00546:</span>   }
+<span class="ln">00547:</span> 
+<span class="ln">00548:</span>   const match = normalized.match(/^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$/);
+<span class="ln">00549:</span>   if (!match) {
+<span class="ln">00550:</span>     return null;
+<span class="ln">00551:</span>   }
+<span class="ln">00552:</span> 
+<span class="ln">00553:</span>   const [, yearText, monthText, dayText] = match;
+<span class="ln">00554:</span>   const year = Number(yearText);
+<span class="ln">00555:</span>   const month = monthText ? Number(monthText) : null;
+<span class="ln">00556:</span>   const day = dayText ? Number(dayText) : null;
+<span class="ln">00557:</span>   const now = new Date();
+<span class="ln">00558:</span> 
+<span class="ln">00559:</span>   if (!Number.isInteger(year) || year &lt; 1900 || year &gt; now.getFullYear()) {
+<span class="ln">00560:</span>     return null;
+<span class="ln">00561:</span>   }
+<span class="ln">00562:</span> 
+<span class="ln">00563:</span>   if (month !== null &amp;&amp; (!Number.isInteger(month) || month &lt; 1 || month &gt; 12)) {
+<span class="ln">00564:</span>     return null;
+<span class="ln">00565:</span>   }
+<span class="ln">00566:</span> 
+<span class="ln">00567:</span>   if (day !== null) {
+<span class="ln">00568:</span>     if (month === null) {
+<span class="ln">00569:</span>       return null;
+<span class="ln">00570:</span>     }
+<span class="ln">00571:</span> 
+<span class="ln">00572:</span>     const daysInMonth = new Date(year, month, 0).getDate();
+<span class="ln">00573:</span>     if (!Number.isInteger(day) || day &lt; 1 || day &gt; daysInMonth) {
+<span class="ln">00574:</span>       return null;
+<span class="ln">00575:</span>     }
+<span class="ln">00576:</span>   }
+<span class="ln">00577:</span> 
+<span class="ln">00578:</span>   let age = now.getFullYear() - year;
+<span class="ln">00579:</span>   const currentMonth = now.getMonth() + 1;
+<span class="ln">00580:</span>   const currentDay = now.getDate();
+<span class="ln">00581:</span> 
+<span class="ln">00582:</span>   if (month !== null) {
+<span class="ln">00583:</span>     if (currentMonth &lt; month) {
+<span class="ln">00584:</span>       age -= 1;
+<span class="ln">00585:</span>     } else if (currentMonth === month &amp;&amp; day !== null &amp;&amp; currentDay &lt; day) {
+<span class="ln">00586:</span>       age -= 1;
+<span class="ln">00587:</span>     }
+<span class="ln">00588:</span>   }
+<span class="ln">00589:</span> 
+<span class="ln">00590:</span>   return age &gt;= 0 ? age : null;
+<span class="ln">00591:</span> }
+<span class="ln">00592:</span> 
+<span class="ln">00593:</span> function getAgeGroup(age: number): AgeGroup {
+<span class="ln">00594:</span>   if (age &lt;= 5) return &quot;3_5&quot;;
+<span class="ln">00595:</span>   if (age &lt;= 8) return &quot;6_8&quot;;
+<span class="ln">00596:</span>   if (age &lt;= 12) return &quot;9_12&quot;;
+<span class="ln">00597:</span>   return &quot;13_15&quot;;
+<span class="ln">00598:</span> }
+<span class="ln">00599:</span> 
+<span class="ln">00600:</span> function resolveChildProfile(settings: SettingsState): ChildProfile {
+<span class="ln">00601:</span>   const birthdayAge = calculateAgeFromBirthday(settings.childBirthday);
+<span class="ln">00602:</span>   const shouldUseManualAge = settings.ageManualOverride || birthdayAge === null;
+<span class="ln">00603:</span>   const age = clampAge(shouldUseManualAge ? settings.fallbackAge : birthdayAge ?? DEFAULT_SETTINGS.fallbackAge);
+<span class="ln">00604:</span> 
+<span class="ln">00605:</span>   return {
+<span class="ln">00606:</span>     nickname: collapseText(settings.childName) || DEFAULT_SETTINGS.childName,
+<span class="ln">00607:</span>     birthday: settings.childBirthday,
+<span class="ln">00608:</span>     age,
+<span class="ln">00609:</span>     age_group: getAgeGroup(age),
+<span class="ln">00610:</span>     gender: settings.childGender,
+<span class="ln">00611:</span>     source: shouldUseManualAge ? &quot;fallback&quot; : &quot;birthday&quot;,
+<span class="ln">00612:</span>   };
+<span class="ln">00613:</span> }
+<span class="ln">00614:</span> 
+<span class="ln">00615:</span> function pickRandom&lt;T&gt;(items: T[]) {
+<span class="ln">00616:</span>   return items[Math.floor(Math.random() * items.length)];
+<span class="ln">00617:</span> }
+<span class="ln">00618:</span> 
+<span class="ln">00619:</span> function normalizeChildGender(value: unknown): ChildGender {
+<span class="ln">00620:</span>   return value === &quot;boy&quot; || value === &quot;girl&quot; ? value : &quot;unspecified&quot;;
+<span class="ln">00621:</span> }
+<span class="ln">00622:</span> 
+<span class="ln">00623:</span> function normalizeTtsRole(value: unknown): TtsRole {
+<span class="ln">00624:</span>   return value === &quot;sweet&quot; || value === &quot;playful&quot; || value === &quot;gentle&quot; || value === &quot;story&quot; ? value : &quot;sweet&quot;;
+<span class="ln">00625:</span> }
+<span class="ln">00626:</span> 
+<span class="ln">00627:</span> function normalizeCommonCaregivers(options: string[], favorites: unknown) {
+<span class="ln">00628:</span>   const favoriteList = Array.isArray(favorites)
+<span class="ln">00629:</span>     ? favorites.filter((item): item is string =&gt; typeof item === &quot;string&quot;).map((item) =&gt; collapseText(item))
+<span class="ln">00630:</span>     : [];
+<span class="ln">00631:</span> 
+<span class="ln">00632:</span>   const cleaned = favoriteList.filter((item, index) =&gt; item &amp;&amp; options.includes(item) &amp;&amp; favoriteList.indexOf(item) === index).slice(0, 2);
+<span class="ln">00633:</span> 
+<span class="ln">00634:</span>   if (cleaned.length === 2) {
+<span class="ln">00635:</span>     return cleaned;
+<span class="ln">00636:</span>   }
+<span class="ln">00637:</span> 
+<span class="ln">00638:</span>   const fallback = options.slice(0, 2);
+<span class="ln">00639:</span>   return cleaned.length &gt; 0 ? Array.from(new Set([...cleaned, ...fallback])).slice(0, 2) : fallback;
+<span class="ln">00640:</span> }
+<span class="ln">00641:</span> 
+<span class="ln">00642:</span> function getCommonCaregivers(settings: SettingsState) {
+<span class="ln">00643:</span>   const normalized = normalizeCommonCaregivers(settings.caregiverOptions, settings.commonCaregiverOptions);
+<span class="ln">00644:</span>   return normalized.length &gt; 0 ? normalized : DEFAULT_SETTINGS.commonCaregiverOptions;
+<span class="ln">00645:</span> }
+<span class="ln">00646:</span> 
+<span class="ln">00647:</span> function inferEmotion(text: string, role: &quot;child&quot; | &quot;parent&quot;): Emotion {
+<span class="ln">00648:</span>   const source = collapseText(text);
+<span class="ln">00649:</span> 
+<span class="ln">00650:</span>   if (!source) {
+<span class="ln">00651:</span>     return role === &quot;parent&quot; ? &quot;担心&quot; : &quot;平静&quot;;
+<span class="ln">00652:</span>   }
+<span class="ln">00653:</span> 
+<span class="ln">00654:</span>   if (/(气死|生气|火大|烦死|讨厌|别管|不要烦|吼|大喊)/.test(source)) {
+<span class="ln">00655:</span>     return &quot;生气&quot;;
+<span class="ln">00656:</span>   }
+<span class="ln">00657:</span> 
+<span class="ln">00658:</span>   if (/(委屈|不理解|冤枉|偏心|根本不懂|都不听我|老说我)/.test(source)) {
+<span class="ln">00659:</span>     return &quot;委屈&quot;;
+<span class="ln">00660:</span>   }
+<span class="ln">00661:</span> 
+<span class="ln">00662:</span>   if (/(难过|伤心|想哭|哭了|失望|心里难受)/.test(source)) {
+<span class="ln">00663:</span>     return &quot;难过&quot;;
+<span class="ln">00664:</span>   }
+<span class="ln">00665:</span> 
+<span class="ln">00666:</span>   if (/(凭什么|不服|才不要|不想听|就是不|不公平)/.test(source)) {
+<span class="ln">00667:</span>     return &quot;不服气&quot;;
+<span class="ln">00668:</span>   }
+<span class="ln">00669:</span> 
+<span class="ln">00670:</span>   if (/(担心|怕|来不及|拖太晚|影响|跟不上|不好|出事|完不成)/.test(source)) {
+<span class="ln">00671:</span>     return &quot;担心&quot;;
+<span class="ln">00672:</span>   }
+<span class="ln">00673:</span> 
+<span class="ln">00674:</span>   if (role === &quot;parent&quot; &amp;&amp; /(先|必须|应该|赶紧|马上|立刻)/.test(source)) {
+<span class="ln">00675:</span>     return &quot;担心&quot;;
+<span class="ln">00676:</span>   }
+<span class="ln">00677:</span> 
+<span class="ln">00678:</span>   if (role === &quot;child&quot; &amp;&amp; /(想|可不可以|能不能|我想先)/.test(source)) {
+<span class="ln">00679:</span>     return &quot;委屈&quot;;
+<span class="ln">00680:</span>   }
+<span class="ln">00681:</span> 
+<span class="ln">00682:</span>   return &quot;平静&quot;;
+<span class="ln">00683:</span> }
+<span class="ln">00684:</span> 
+<span class="ln">00685:</span> function inferIssueTag(childStatement: string, parentStatement: string) {
+<span class="ln">00686:</span>   const fullText = `${childStatement} ${parentStatement}`;
+<span class="ln">00687:</span> 
+<span class="ln">00688:</span>   if (/作业|写作业|练琴|学习|复习|考试/.test(fullText)) return &quot;作业安排&quot;;
+<span class="ln">00689:</span>   if (/手机|平板|电视|动画|游戏|刷视频/.test(fullText)) return &quot;屏幕时间&quot;;
+<span class="ln">00690:</span>   if (/睡觉|起床|晚睡|午睡/.test(fullText)) return &quot;作息安排&quot;;
+<span class="ln">00691:</span>   if (/收拾|整理|房间|玩具|书包|袜子/.test(fullText)) return &quot;收拾整理&quot;;
+<span class="ln">00692:</span>   if (/吃饭|零食|甜|冰淇淋|饭/.test(fullText)) return &quot;吃饭习惯&quot;;
+<span class="ln">00693:</span>   if (/出门|回来|时间|约定|守时/.test(fullText)) return &quot;时间约定&quot;;
+<span class="ln">00694:</span>   if (/弟弟|妹妹|哥哥|姐姐|抢/.test(fullText)) return &quot;手足冲突&quot;;
+<span class="ln">00695:</span>   return &quot;表达方式&quot;;
+<span class="ln">00696:</span> }
+<span class="ln">00697:</span> 
+<span class="ln">00698:</span> function detectSafetyRisk(childStatement: string, parentStatement: string) {
+<span class="ln">00699:</span>   const fullText = `${childStatement} ${parentStatement}`;
+<span class="ln">00700:</span>   const patterns = [
+<span class="ln">00701:</span>     /自残|不想活|想死|割腕|跳楼|轻生/,
+<span class="ln">00702:</span>     /家暴|打我|打他|打她|殴打|虐待|掐|踢|扇巴掌|拿东西砸/,
+<span class="ln">00703:</span>     /威胁|恐吓|拿刀|拿棍|报警抓你|离家出走/,
+<span class="ln">00704:</span>     /长期辱骂|天天骂|滚出去|不要你了|恨你/,
+<span class="ln">00705:</span>   ];
+<span class="ln">00706:</span> 
+<span class="ln">00707:</span>   return patterns.some((pattern) =&gt; pattern.test(fullText));
+<span class="ln">00708:</span> }
+<span class="ln">00709:</span> 
+<span class="ln">00710:</span> function buildHomeOpener(settings: SettingsState, caregiver: string) {
+<span class="ln">00711:</span>   const pet = PETS[settings.petType];
+<span class="ln">00712:</span>   const lines = [
+<span class="ln">00713:</span>     `${pickRandom(pet.openers)}`,
+<span class="ln">00714:</span>     `${settings.petName}想先听清${settings.childName}和${caregiver}心里最在意的那一句。`,
+<span class="ln">00715:</span>     `${settings.petName}会先把话里的小刺轻轻放下，再陪你们想一个更顺的办法。`,
+<span class="ln">00716:</span>   ];
+<span class="ln">00717:</span> 
+<span class="ln">00718:</span>   return pickRandom(lines);
+<span class="ln">00719:</span> }
+<span class="ln">00720:</span> 
+<span class="ln">00721:</span> function buildLoadingLine(settings: SettingsState, draft: DraftState) {
+<span class="ln">00722:</span>   const pet = PETS[settings.petType];
+<span class="ln">00723:</span>   const childEmotion = inferEmotion(draft.childStatement, &quot;child&quot;);
+<span class="ln">00724:</span>   const parentEmotion = inferEmotion(draft.parentStatement, &quot;parent&quot;);
+<span class="ln">00725:</span>   const issueTag = inferIssueTag(draft.childStatement, draft.parentStatement);
+<span class="ln">00726:</span>   const childSnippet = shortenText(draft.childStatement, 10) || &quot;孩子的话&quot;;
+<span class="ln">00727:</span>   const parentSnippet = shortenText(draft.parentStatement, 10) || &quot;家长的话&quot;;
+<span class="ln">00728:</span> 
+<span class="ln">00729:</span>   const lines = [
+<span class="ln">00730:</span>     `${settings.petName}正在把“${childSnippet}”和“${parentSnippet}”轻轻排好，准备写下更合适的办法。`,
+<span class="ln">00731:</span>     `${pet.firstPerson}正在顺着孩子的${childEmotion}和${draft.caregiver}的${parentEmotion}，找一个更容易说出口的办法。`,
+<span class="ln">00732:</span>     `${settings.petName}正在理清这次“${issueTag}”的小风波，准备给出更温和的判词。`,
+<span class="ln">00733:</span>   ];
+<span class="ln">00734:</span> 
+<span class="ln">00735:</span>   return pickRandom(lines);
+<span class="ln">00736:</span> }
+<span class="ln">00737:</span> 
+<span class="ln">00738:</span> function buildSystemInstruction(settings: SettingsState, profile: ChildProfile, caregiver: string) {
+<span class="ln">00739:</span>   const pet = PETS[settings.petType];
+<span class="ln">00740:</span>   const ageMeta = AGE_META[profile.age_group];
+<span class="ln">00741:</span> 
+<span class="ln">00742:</span>   return `${settings.systemPrompt}
+<span class="ln">00743:</span> 
+<span class="ln">00744:</span> 当前家庭设定：
+<span class="ln">00745:</span> - 宠物名字：${settings.petName}
+<span class="ln">00746:</span> - 宠物类型：${settings.petType}
+<span class="ln">00747:</span> - 宠物第一人称：${pet.firstPerson}
+<span class="ln">00748:</span> - 宠物头衔：大法官
+<span class="ln">00749:</span> - 孩子名字：${profile.nickname}
+<span class="ln">00750:</span> - 孩子年龄：${profile.age}
+<span class="ln">00751:</span> - 年龄段：${profile.age_group}
+<span class="ln">00752:</span> - 年龄段标签：${ageMeta.label}
+<span class="ln">00753:</span> - 年龄段称呼：${ageMeta.audienceName}
+<span class="ln">00754:</span> - 语言风格：${ageMeta.languageStyle}
+<span class="ln">00755:</span> - 比喻类型：${ageMeta.metaphorType}
+<span class="ln">00756:</span> - 孩子性别：${profile.gender}
+<span class="ln">00757:</span> - 家长称呼：${caregiver}
+<span class="ln">00758:</span> - 前台常用家长称呼：${getCommonCaregivers(settings).join(&quot;、&quot;)}
+<span class="ln">00759:</span> - 亲密度奖励只奖励愿意表达、愿意倾听、愿意和解，不奖励“赢了对方”。`;
+<span class="ln">00760:</span> }
+<span class="ln">00761:</span> 
+<span class="ln">00762:</span> function buildUserPrompt(settings: SettingsState, draft: DraftState, profile: ChildProfile) {
+<span class="ln">00763:</span>   return JSON.stringify(
+<span class="ln">00764:</span>     {
+<span class="ln">00765:</span>       pet: {
+<span class="ln">00766:</span>         name: settings.petName,
+<span class="ln">00767:</span>         type: settings.petType,
+<span class="ln">00768:</span>         title: &quot;大法官&quot;,
+<span class="ln">00769:</span>       },
+<span class="ln">00770:</span>       child_profile: {
+<span class="ln">00771:</span>         nickname: profile.nickname,
+<span class="ln">00772:</span>         birthday: profile.birthday,
+<span class="ln">00773:</span>         age: profile.age,
+<span class="ln">00774:</span>         age_group: profile.age_group,
+<span class="ln">00775:</span>         gender: profile.gender,
+<span class="ln">00776:</span>       },
+<span class="ln">00777:</span>       scene: {
+<span class="ln">00778:</span>         child_statement: draft.childStatement,
+<span class="ln">00779:</span>         parent_statement: draft.parentStatement,
+<span class="ln">00780:</span>         caregiver: draft.caregiver,
+<span class="ln">00781:</span>       },
+<span class="ln">00782:</span>       output_requirements: {
+<span class="ln">00783:</span>         need_child_view: true,
+<span class="ln">00784:</span>         need_parent_view: true,
+<span class="ln">00785:</span>         need_tts_script: true,
+<span class="ln">00786:</span>         intimacy_points_range: [1, 5],
+<span class="ln">00787:</span>         child_first: true,
+<span class="ln">00788:</span>         infer_emotions_from_statements: true,
+<span class="ln">00789:</span>       },
+<span class="ln">00790:</span>     },
+<span class="ln">00791:</span>     null,
+<span class="ln">00792:</span>     2,
+<span class="ln">00793:</span>   );
+<span class="ln">00794:</span> }
+<span class="ln">00795:</span> 
+<span class="ln">00796:</span> function safeString(value: unknown, fallback: string) {
+<span class="ln">00797:</span>   return typeof value === &quot;string&quot; &amp;&amp; collapseText(value) ? collapseText(value) : fallback;
+<span class="ln">00798:</span> }
+<span class="ln">00799:</span> 
+<span class="ln">00800:</span> function safeEmotion(value: unknown, fallback: Emotion): Emotion {
+<span class="ln">00801:</span>   return typeof value === &quot;string&quot; &amp;&amp; EMOTION_OPTIONS.includes(value as Emotion) ? (value as Emotion) : fallback;
+<span class="ln">00802:</span> }
+<span class="ln">00803:</span> 
+<span class="ln">00804:</span> function safeAgeGroup(value: unknown, fallback: AgeGroup): AgeGroup {
+<span class="ln">00805:</span>   return value === &quot;3_5&quot; || value === &quot;6_8&quot; || value === &quot;9_12&quot; || value === &quot;13_15&quot; ? value : fallback;
+<span class="ln">00806:</span> }
+<span class="ln">00807:</span> 
+<span class="ln">00808:</span> function safePetType(value: unknown, fallback: PetType): PetType {
+<span class="ln">00809:</span>   return value === &quot;cat&quot; || value === &quot;dog&quot; || value === &quot;rabbit&quot; ? value : fallback;
+<span class="ln">00810:</span> }
+<span class="ln">00811:</span> 
+<span class="ln">00812:</span> function buildDemoCopy(settings: SettingsState, draft: DraftState, profile: ChildProfile): MediationResult {
+<span class="ln">00813:</span>   const pet = PETS[settings.petType];
+<span class="ln">00814:</span>   const childEmotion = inferEmotion(draft.childStatement, &quot;child&quot;);
+<span class="ln">00815:</span>   const parentEmotion = inferEmotion(draft.parentStatement, &quot;parent&quot;);
+<span class="ln">00816:</span>   const issueTag = inferIssueTag(draft.childStatement, draft.parentStatement);
+<span class="ln">00817:</span> 
+<span class="ln">00818:</span>   const childLearningMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00819:</span>     &quot;3_5&quot;: &quot;先把心里话短短说出来，比哭闹更容易被听见。&quot;,
+<span class="ln">00820:</span>     &quot;6_8&quot;: &quot;先说感受，再说一个小办法，会更容易被理解。&quot;,
+<span class="ln">00821:</span>     &quot;9_12&quot;: &quot;先表达需求，再提出方案，比直接顶回去更成熟。&quot;,
+<span class="ln">00822:</span>     &quot;13_15&quot;: &quot;把真实需求和愿意承担的部分一起说清楚，更容易被尊重。&quot;,
+<span class="ln">00823:</span>   };
+<span class="ln">00824:</span> 
+<span class="ln">00825:</span>   const parentGuidanceMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00826:</span>     &quot;3_5&quot;: &quot;先安抚，再给很简单的选择，比直接命令更容易合作。&quot;,
+<span class="ln">00827:</span>     &quot;6_8&quot;: &quot;先接住情绪，再讲规则，会更容易被听进去。&quot;,
+<span class="ln">00828:</span>     &quot;9_12&quot;: &quot;先说担心，再给可协商的安排，会比硬压更有效。&quot;,
+<span class="ln">00829:</span>     &quot;13_15&quot;: &quot;尊重孩子的表达权，同时把边界说清楚，更容易形成真正合作。&quot;,
+<span class="ln">00830:</span>   };
+<span class="ln">00831:</span> 
+<span class="ln">00832:</span>   const doNowMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00833:</span>     &quot;3_5&quot;: `先一起定一个“5分钟准备 + 5分钟开始”的小计划。`,
+<span class="ln">00834:</span>     &quot;6_8&quot;: `一起定一个“20分钟任务 + 15分钟放松”的小时间表。`,
+<span class="ln">00835:</span>     &quot;9_12&quot;: `先确认今天必须完成的部分，再一起决定休息和完成顺序。`,
+<span class="ln">00836:</span>     &quot;13_15&quot;: `先把双方最在意的点各说一句，再写下一个都能接受的安排。`,
+<span class="ln">00837:</span>   };
+<span class="ln">00838:</span> 
+<span class="ln">00839:</span>   const childCanSayMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00840:</span>     &quot;3_5&quot;: &quot;我想先休息一下，然后我会开始。&quot;,
+<span class="ln">00841:</span>     &quot;6_8&quot;: &quot;我想先缓一下，但我愿意先做一部分。&quot;,
+<span class="ln">00842:</span>     &quot;9_12&quot;: &quot;我不是不做，我想先说清楚我想怎么安排。&quot;,
+<span class="ln">00843:</span>     &quot;13_15&quot;: &quot;我想先表达我的需求，也愿意一起商量可执行的方案。&quot;,
+<span class="ln">00844:</span>   };
+<span class="ln">00845:</span> 
+<span class="ln">00846:</span>   const parentCanSayMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00847:</span>     &quot;3_5&quot;: `我知道你现在有点难，我陪你一起开始。`,
+<span class="ln">00848:</span>     &quot;6_8&quot;: `我知道你想放松，我们一起定个让我放心的安排。`,
+<span class="ln">00849:</span>     &quot;9_12&quot;: `我听见你想先缓一缓，我们一起把时间说清楚。`,
+<span class="ln">00850:</span>     &quot;13_15&quot;: `我尊重你的想法，我们来商量一个兼顾规则和空间的方案。`,
+<span class="ln">00851:</span>   };
+<span class="ln">00852:</span> 
+<span class="ln">00853:</span>   const repairActionMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00854:</span>     &quot;3_5&quot;: `一起说“我听见你啦”，然后轻轻碰一下手。`,
+<span class="ln">00855:</span>     &quot;6_8&quot;: `互相说一句“我听见你的想法了”，再击掌一次。`,
+<span class="ln">00856:</span>     &quot;9_12&quot;: `轮流复述一次对方最在意的点，再一起确认今天的安排。`,
+<span class="ln">00857:</span>     &quot;13_15&quot;: `先各自说一句“我理解你在意什么”，再把协商结果定下来。`,
+<span class="ln">00858:</span>   };
+<span class="ln">00859:</span> 
+<span class="ln">00860:</span>   const childObservationMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00861:</span>     &quot;3_5&quot;: `${pet.firstPerson}看到啦，你想按自己的节奏来，${draft.caregiver}是在担心事情拖太晚。`,
+<span class="ln">00862:</span>     &quot;6_8&quot;: `${pet.firstPerson}看见你是真的有自己的想法，${draft.caregiver}也是真的在担心后面不好收尾。`,
+<span class="ln">00863:</span>     &quot;9_12&quot;: `${pet.firstPerson}听见的不是谁故意找麻烦，而是你们对先后顺序和说话方式没有商量好。`,
+<span class="ln">00864:</span>     &quot;13_15&quot;: `${pet.firstPerson}听见的是：你想争取自己的空间，${draft.caregiver}想守住今天该完成的安排。`,
+<span class="ln">00865:</span>   };
+<span class="ln">00866:</span> 
+<span class="ln">00867:</span>   const judgmentMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00868:</span>     &quot;3_5&quot;: `这次不是谁坏了，是你们还没找到最顺的小办法。`,
+<span class="ln">00869:</span>     &quot;6_8&quot;: `这次不是谁输谁赢，是“先做什么”还没有商量到一起。`,
+<span class="ln">00870:</span>     &quot;9_12&quot;: `双方目标其实都是想把今天过好，只是顺序和表达方式没有对齐。`,
+<span class="ln">00871:</span>     &quot;13_15&quot;: `核心不是对错，而是规则、需求和表达方式暂时撞在一起了。`,
+<span class="ln">00872:</span>   };
+<span class="ln">00873:</span> 
+<span class="ln">00874:</span>   const actionShortMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00875:</span>     &quot;3_5&quot;: `我们先做一个很小很小的开始，好吗？`,
+<span class="ln">00876:</span>     &quot;6_8&quot;: `我们先定个小时间表，再继续。`,
+<span class="ln">00877:</span>     &quot;9_12&quot;: `我们先把今天能做到的方案定清楚。`,
+<span class="ln">00878:</span>     &quot;13_15&quot;: `我们先把可接受的安排说具体一点。`,
+<span class="ln">00879:</span>   };
+<span class="ln">00880:</span> 
+<span class="ln">00881:</span>   const closingMap: Record&lt;AgeGroup, string&gt; = {
+<span class="ln">00882:</span>     &quot;3_5&quot;: `${pet.firstPerson}陪着你们慢慢来，今天也可以重新变暖。`,
+<span class="ln">00883:</span>     &quot;6_8&quot;: `${pet.firstPerson}相信你们可以把今天变得更顺一点。`,
+<span class="ln">00884:</span>     &quot;9_12&quot;: `${pet.firstPerson}觉得这次可以变成一次更会沟通的小练习。`,
+<span class="ln">00885:</span>     &quot;13_15&quot;: `${pet.firstPerson}相信你们能用更尊重彼此的方式把这件事走完。`,
+<span class="ln">00886:</span>   };
+<span class="ln">00887:</span> 
+<span class="ln">00888:</span>   const childOpening = `${pet.firstPerson}看到啦，你现在有点${childEmotion}，${draft.caregiver}有点${parentEmotion}。`;
+<span class="ln">00889:</span>   const fairJudgment =
+<span class="ln">00890:</span>     issueTag === &quot;作业安排&quot;
+<span class="ln">00891:</span>       ? `${profile.nickname}想先放松一下可以理解，${draft.caregiver}担心任务拖晚了也合理。问题不是谁坏，而是顺序和表达方式没商量好。`
+<span class="ln">00892:</span>       : `${profile.nickname}的感受是真的，${draft.caregiver}的担心也是真的。问题更多出在表达方式和节奏没有先对齐。`;
+<span class="ln">00893:</span> 
+<span class="ln">00894:</span>   return {
+<span class="ln">00895:</span>     pet: {
+<span class="ln">00896:</span>       name: settings.petName,
+<span class="ln">00897:</span>       type: settings.petType,
+<span class="ln">00898:</span>       title: &quot;大法官&quot;,
+<span class="ln">00899:</span>     },
+<span class="ln">00900:</span>     child_profile: {
+<span class="ln">00901:</span>       nickname: profile.nickname,
+<span class="ln">00902:</span>       age: profile.age,
+<span class="ln">00903:</span>       age_group: profile.age_group,
+<span class="ln">00904:</span>       birthday: profile.birthday,
+<span class="ln">00905:</span>     },
+<span class="ln">00906:</span>     emotion_summary: {
+<span class="ln">00907:</span>       child: childEmotion,
+<span class="ln">00908:</span>       parent: parentEmotion,
+<span class="ln">00909:</span>     },
+<span class="ln">00910:</span>     child_view: {
+<span class="ln">00911:</span>       opening: childOpening,
+<span class="ln">00912:</span>       observation: childObservationMap[profile.age_group],
+<span class="ln">00913:</span>       judgment_short: judgmentMap[profile.age_group],
+<span class="ln">00914:</span>       action_short: actionShortMap[profile.age_group],
+<span class="ln">00915:</span>       closing: closingMap[profile.age_group],
+<span class="ln">00916:</span>     },
+<span class="ln">00917:</span>     action_card: {
+<span class="ln">00918:</span>       title: `${settings.petName}现在的小任务`,
+<span class="ln">00919:</span>       do_now: doNowMap[profile.age_group],
+<span class="ln">00920:</span>       child_can_say: childCanSayMap[profile.age_group],
+<span class="ln">00921:</span>       parent_can_say: parentCanSayMap[profile.age_group],
+<span class="ln">00922:</span>       repair_action: repairActionMap[profile.age_group],
+<span class="ln">00923:</span>     },
+<span class="ln">00924:</span>     parent_view: {
+<span class="ln">00925:</span>       issue_summary: `这次主要是在“${issueTag}”上出现分歧：${profile.nickname}希望“${shortenText(draft.childStatement, 20) || &quot;按自己的节奏来&quot;}”，${draft.caregiver}更在意“${shortenText(draft.parentStatement, 20) || &quot;先把安排稳定下来&quot;}”。`,
+<span class="ln">00926:</span>       fair_judgment: fairJudgment,
+<span class="ln">00927:</span>       child_learning: childLearningMap[profile.age_group],
+<span class="ln">00928:</span>       parent_guidance: parentGuidanceMap[profile.age_group],
+<span class="ln">00929:</span>     },
+<span class="ln">00930:</span>     reward: {
+<span class="ln">00931:</span>       intimacy_points: 3,
+<span class="ln">00932:</span>       badge_text: `${settings.petName}的和谐小爪印`,
+<span class="ln">00933:</span>     },
+<span class="ln">00934:</span>     safety: {
+<span class="ln">00935:</span>       mode: &quot;normal&quot;,
+<span class="ln">00936:</span>       alert: &quot;&quot;,
+<span class="ln">00937:</span>     },
+<span class="ln">00938:</span>     tts_script: `${childOpening}${childObservationMap[profile.age_group]}${judgmentMap[profile.age_group]}${actionShortMap[profile.age_group]}${pickRandom(pet.closings)}`,
+<span class="ln">00939:</span>   };
+<span class="ln">00940:</span> }
+<span class="ln">00941:</span> 
+<span class="ln">00942:</span> function buildSafetyResult(settings: SettingsState, draft: DraftState, profile: ChildProfile): MediationResult {
+<span class="ln">00943:</span>   return {
+<span class="ln">00944:</span>     pet: {
+<span class="ln">00945:</span>       name: settings.petName,
+<span class="ln">00946:</span>       type: settings.petType,
+<span class="ln">00947:</span>       title: &quot;安全提醒&quot;,
+<span class="ln">00948:</span>     },
+<span class="ln">00949:</span>     child_profile: {
+<span class="ln">00950:</span>       nickname: profile.nickname,
+<span class="ln">00951:</span>       age: profile.age,
+<span class="ln">00952:</span>       age_group: profile.age_group,
+<span class="ln">00953:</span>       birthday: profile.birthday,
+<span class="ln">00954:</span>     },
+<span class="ln">00955:</span>     emotion_summary: {
+<span class="ln">00956:</span>       child: inferEmotion(draft.childStatement, &quot;child&quot;),
+<span class="ln">00957:</span>       parent: inferEmotion(draft.parentStatement, &quot;parent&quot;),
+<span class="ln">00958:</span>     },
+<span class="ln">00959:</span>     child_view: {
+<span class="ln">00960:</span>       opening: `${settings.petName}这次先不做萌萌的判词。`,
+<span class="ln">00961:</span>       observation: `我听到的内容里，可能已经不只是普通拌嘴，而是涉及安全的事。`,
+<span class="ln">00962:</span>       judgment_short: `现在最重要的不是争论输赢，而是先保证安全。`,
+<span class="ln">00963:</span>       action_short: `请立刻暂停冲突，去找可信的大人或专业支持。`,
+<span class="ln">00964:</span>       closing: `先保护好人，再谈怎么解决问题。`,
+<span class="ln">00965:</span>     },
+<span class="ln">00966:</span>     action_card: {
+<span class="ln">00967:</span>       title: &quot;现在先做安全步骤&quot;,
+<span class="ln">00968:</span>       do_now: &quot;先离开危险环境，暂停争执，确保没有人继续受到伤害。&quot;,
+<span class="ln">00969:</span>       child_can_say: &quot;我现在需要安全和帮助，请你马上找可信的大人来。&quot;,
+<span class="ln">00970:</span>       parent_can_say: &quot;我们先停下来，马上联系可信的大人或专业支持。&quot;,
+<span class="ln">00971:</span>       repair_action: &quot;联系可信亲友、老师、学校心理老师、社区支持或当地紧急求助渠道。&quot;,
+<span class="ln">00972:</span>     },
+<span class="ln">00973:</span>     parent_view: {
+<span class="ln">00974:</span>       issue_summary: &quot;当前内容可能涉及伤害、威胁、自残或长期恐吓，已经超出普通家庭调解范围。&quot;,
+<span class="ln">00975:</span>       fair_judgment: &quot;现在应优先处理安全风险，而不是继续争论谁对谁错。&quot;,
+<span class="ln">00976:</span>       child_learning: &quot;如果你害怕、受伤或不安全，第一步是马上告诉可信的大人。&quot;,
+<span class="ln">00977:</span>       parent_guidance: &quot;请立即停止任何可能造成伤害的行为，并尽快寻求现实支持。&quot;,
+<span class="ln">00978:</span>     },
+<span class="ln">00979:</span>     reward: {
+<span class="ln">00980:</span>       intimacy_points: 0,
+<span class="ln">00981:</span>       badge_text: &quot;先处理安全，再谈和解&quot;,
+<span class="ln">00982:</span>     },
+<span class="ln">00983:</span>     safety: {
+<span class="ln">00984:</span>       mode: &quot;alert&quot;,
+<span class="ln">00985:</span>       alert: &quot;如果存在现实危险、身体伤害、自残或虐待风险，请尽快联系可信成年人、专业机构或当地紧急求助服务。&quot;,
+<span class="ln">00986:</span>     },
+<span class="ln">00987:</span>     tts_script: &quot;现在最重要的不是判词，而是先保证安全。请立刻停止冲突，并联系可信的大人或专业支持。&quot;,
+<span class="ln">00988:</span>   };
+<span class="ln">00989:</span> }
+<span class="ln">00990:</span> 
+<span class="ln">00991:</span> function normalizeResult(input: unknown, settings: SettingsState, draft: DraftState, profile: ChildProfile): MediationResult {
+<span class="ln">00992:</span>   const fallback = buildDemoCopy(settings, draft, profile);
+<span class="ln">00993:</span>   const root = typeof input === &quot;object&quot; &amp;&amp; input !== null ? (input as Record&lt;string, unknown&gt;) : {};
+<span class="ln">00994:</span> 
+<span class="ln">00995:</span>   const petRoot = typeof root.pet === &quot;object&quot; &amp;&amp; root.pet !== null ? (root.pet as Record&lt;string, unknown&gt;) : {};
+<span class="ln">00996:</span>   const childRoot = typeof root.child_profile === &quot;object&quot; &amp;&amp; root.child_profile !== null ? (root.child_profile as Record&lt;string, unknown&gt;) : {};
+<span class="ln">00997:</span>   const emotionRoot = typeof root.emotion_summary === &quot;object&quot; &amp;&amp; root.emotion_summary !== null ? (root.emotion_summary as Record&lt;string, unknown&gt;) : {};
+<span class="ln">00998:</span>   const childViewRoot = typeof root.child_view === &quot;object&quot; &amp;&amp; root.child_view !== null ? (root.child_view as Record&lt;string, unknown&gt;) : {};
+<span class="ln">00999:</span>   const actionRoot = typeof root.action_card === &quot;object&quot; &amp;&amp; root.action_card !== null ? (root.action_card as Record&lt;string, unknown&gt;) : {};
+<span class="ln">01000:</span>   const parentViewRoot = typeof root.parent_view === &quot;object&quot; &amp;&amp; root.parent_view !== null ? (root.parent_view as Record&lt;string, unknown&gt;) : {};
+<span class="ln">01001:</span>   const rewardRoot = typeof root.reward === &quot;object&quot; &amp;&amp; root.reward !== null ? (root.reward as Record&lt;string, unknown&gt;) : {};
+<span class="ln">01002:</span>   const safetyRoot = typeof root.safety === &quot;object&quot; &amp;&amp; root.safety !== null ? (root.safety as Record&lt;string, unknown&gt;) : {};
+<span class="ln">01003:</span> 
+<span class="ln">01004:</span>   const intimacy = typeof rewardRoot.intimacy_points === &quot;number&quot; ? rewardRoot.intimacy_points : fallback.reward.intimacy_points;
+<span class="ln">01005:</span> 
+<span class="ln">01006:</span>   return {
+<span class="ln">01007:</span>     pet: {
+<span class="ln">01008:</span>       name: safeString(petRoot.name, fallback.pet.name),
+<span class="ln">01009:</span>       type: safePetType(petRoot.type, fallback.pet.type),
+<span class="ln">01010:</span>       title: safeString(petRoot.title, fallback.pet.title),
+<span class="ln">01011:</span>     },
+<span class="ln">01012:</span>     child_profile: {
+<span class="ln">01013:</span>       nickname: safeString(childRoot.nickname, fallback.child_profile.nickname),
+<span class="ln">01014:</span>       age: clampAge(typeof childRoot.age === &quot;number&quot; ? childRoot.age : fallback.child_profile.age),
+<span class="ln">01015:</span>       age_group: safeAgeGroup(childRoot.age_group, fallback.child_profile.age_group),
+<span class="ln">01016:</span>       birthday: typeof childRoot.birthday === &quot;string&quot; ? childRoot.birthday : fallback.child_profile.birthday,
+<span class="ln">01017:</span>     },
+<span class="ln">01018:</span>     emotion_summary: {
+<span class="ln">01019:</span>       child: safeEmotion(emotionRoot.child, fallback.emotion_summary.child),
+<span class="ln">01020:</span>       parent: safeEmotion(emotionRoot.parent, fallback.emotion_summary.parent),
+<span class="ln">01021:</span>     },
+<span class="ln">01022:</span>     child_view: {
+<span class="ln">01023:</span>       opening: safeString(childViewRoot.opening, fallback.child_view.opening),
+<span class="ln">01024:</span>       observation: safeString(childViewRoot.observation, fallback.child_view.observation),
+<span class="ln">01025:</span>       judgment_short: safeString(childViewRoot.judgment_short, fallback.child_view.judgment_short),
+<span class="ln">01026:</span>       action_short: safeString(childViewRoot.action_short, fallback.child_view.action_short),
+<span class="ln">01027:</span>       closing: safeString(childViewRoot.closing, fallback.child_view.closing),
+<span class="ln">01028:</span>     },
+<span class="ln">01029:</span>     action_card: {
+<span class="ln">01030:</span>       title: safeString(actionRoot.title, fallback.action_card.title),
+<span class="ln">01031:</span>       do_now: safeString(actionRoot.do_now, fallback.action_card.do_now),
+<span class="ln">01032:</span>       child_can_say: safeString(actionRoot.child_can_say, fallback.action_card.child_can_say),
+<span class="ln">01033:</span>       parent_can_say: safeString(actionRoot.parent_can_say, fallback.action_card.parent_can_say),
+<span class="ln">01034:</span>       repair_action: safeString(actionRoot.repair_action, fallback.action_card.repair_action),
+<span class="ln">01035:</span>     },
+<span class="ln">01036:</span>     parent_view: {
+<span class="ln">01037:</span>       issue_summary: safeString(parentViewRoot.issue_summary, fallback.parent_view.issue_summary),
+<span class="ln">01038:</span>       fair_judgment: safeString(parentViewRoot.fair_judgment, fallback.parent_view.fair_judgment),
+<span class="ln">01039:</span>       child_learning: safeString(parentViewRoot.child_learning, fallback.parent_view.child_learning),
+<span class="ln">01040:</span>       parent_guidance: safeString(parentViewRoot.parent_guidance, fallback.parent_view.parent_guidance),
+<span class="ln">01041:</span>     },
+<span class="ln">01042:</span>     reward: {
+<span class="ln">01043:</span>       intimacy_points: Math.max(0, Math.min(5, Math.round(intimacy))),
+<span class="ln">01044:</span>       badge_text: safeString(rewardRoot.badge_text, fallback.reward.badge_text),
+<span class="ln">01045:</span>     },
+<span class="ln">01046:</span>     safety: {
+<span class="ln">01047:</span>       mode: safetyRoot.mode === &quot;alert&quot; ? &quot;alert&quot; : &quot;normal&quot;,
+<span class="ln">01048:</span>       alert: typeof safetyRoot.alert === &quot;string&quot; ? collapseText(safetyRoot.alert) : fallback.safety.alert,
+<span class="ln">01049:</span>     },
+<span class="ln">01050:</span>     tts_script: safeString(root.tts_script, fallback.tts_script),
+<span class="ln">01051:</span>   };
+<span class="ln">01052:</span> }
+<span class="ln">01053:</span> 
+<span class="ln">01054:</span> async function requestGeminiResult(settings: SettingsState, draft: DraftState, profile: ChildProfile) {
+<span class="ln">01055:</span>   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL_NAME)}:generateContent`;
+<span class="ln">01056:</span> 
+<span class="ln">01057:</span>   const response = await fetch(endpoint, {
+<span class="ln">01058:</span>     method: &quot;POST&quot;,
+<span class="ln">01059:</span>     headers: {
+<span class="ln">01060:</span>       &quot;Content-Type&quot;: &quot;application/json&quot;,
+<span class="ln">01061:</span>       &quot;x-goog-api-key&quot;: settings.apiKey.trim(),
+<span class="ln">01062:</span>     },
+<span class="ln">01063:</span>     body: JSON.stringify({
+<span class="ln">01064:</span>       contents: [
+<span class="ln">01065:</span>         {
+<span class="ln">01066:</span>           role: &quot;user&quot;,
+<span class="ln">01067:</span>           parts: [{ text: buildUserPrompt(settings, draft, profile) }],
+<span class="ln">01068:</span>         },
+<span class="ln">01069:</span>       ],
+<span class="ln">01070:</span>       systemInstruction: {
+<span class="ln">01071:</span>         role: &quot;system&quot;,
+<span class="ln">01072:</span>         parts: [{ text: buildSystemInstruction(settings, profile, draft.caregiver) }],
+<span class="ln">01073:</span>       },
+<span class="ln">01074:</span>       generationConfig: {
+<span class="ln">01075:</span>         temperature: 1,
+<span class="ln">01076:</span>         topP: 0.95,
+<span class="ln">01077:</span>         maxOutputTokens: 1200,
+<span class="ln">01078:</span>         responseMimeType: &quot;application/json&quot;,
+<span class="ln">01079:</span>         responseJsonSchema: MEDIATION_SCHEMA,
+<span class="ln">01080:</span>       },
+<span class="ln">01081:</span>       store: false,
+<span class="ln">01082:</span>     }),
+<span class="ln">01083:</span>   });
+<span class="ln">01084:</span> 
+<span class="ln">01085:</span>   if (!response.ok) {
+<span class="ln">01086:</span>     throw new Error(`Gemini request failed: ${response.status}`);
+<span class="ln">01087:</span>   }
+<span class="ln">01088:</span> 
+<span class="ln">01089:</span>   const data = (await response.json()) as GeminiResponse;
+<span class="ln">01090:</span>   if (data.promptFeedback?.blockReason) {
+<span class="ln">01091:</span>     return buildSafetyResult(settings, draft, profile);
+<span class="ln">01092:</span>   }
+<span class="ln">01093:</span> 
+<span class="ln">01094:</span>   const text =
+<span class="ln">01095:</span>     data.candidates?.[0]?.content?.parts
+<span class="ln">01096:</span>       ?.map((part) =&gt; part.text ?? &quot;&quot;)
+<span class="ln">01097:</span>       .join(&quot;&quot;)
+<span class="ln">01098:</span>       .trim() ?? &quot;&quot;;
+<span class="ln">01099:</span> 
+<span class="ln">01100:</span>   if (!text) {
+<span class="ln">01101:</span>     throw new Error(&quot;Gemini returned an empty response.&quot;);
+<span class="ln">01102:</span>   }
+<span class="ln">01103:</span> 
+<span class="ln">01104:</span>   const parsed = JSON.parse(text) as unknown;
+<span class="ln">01105:</span>   return normalizeResult(parsed, settings, draft, profile);
+<span class="ln">01106:</span> }
+<span class="ln">01107:</span> 
+<span class="ln">01108:</span> function Card({ children, className }: { children: ReactNode; className?: string }) {
+<span class="ln">01109:</span>   return &lt;div className={cn(&quot;rounded-[28px] border border-white/70 bg-white/90 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur&quot;, className)}&gt;{children}&lt;/div&gt;;
+<span class="ln">01110:</span> }
+<span class="ln">01111:</span> 
+<span class="ln">01112:</span> function IconButton({ icon, onClick, label }: { icon: string; onClick: () =&gt; void; label: string }) {
+<span class="ln">01113:</span>   return (
+<span class="ln">01114:</span>     &lt;button
+<span class="ln">01115:</span>       type=&quot;button&quot;
+<span class="ln">01116:</span>       onClick={onClick}
+<span class="ln">01117:</span>       aria-label={label}
+<span class="ln">01118:</span>       className=&quot;flex h-11 w-11 items-center justify-center rounded-2xl bg-white/90 text-lg text-slate-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-white&quot;
+<span class="ln">01119:</span>     &gt;
+<span class="ln">01120:</span>       {icon}
+<span class="ln">01121:</span>     &lt;/button&gt;
+<span class="ln">01122:</span>   );
+<span class="ln">01123:</span> }
+<span class="ln">01124:</span> 
+<span class="ln">01125:</span> function TinyStat({ label, value }: { label: string; value: string | number }) {
+<span class="ln">01126:</span>   return (
+<span class="ln">01127:</span>     &lt;div className=&quot;rounded-2xl bg-slate-50 px-3 py-2 text-center&quot;&gt;
+<span class="ln">01128:</span>       &lt;div className=&quot;text-[11px] text-slate-400&quot;&gt;{label}&lt;/div&gt;
+<span class="ln">01129:</span>       &lt;div className=&quot;mt-1 text-base font-semibold text-slate-900&quot;&gt;{value}&lt;/div&gt;
+<span class="ln">01130:</span>     &lt;/div&gt;
+<span class="ln">01131:</span>   );
+<span class="ln">01132:</span> }
+<span class="ln">01133:</span> 
+<span class="ln">01134:</span> function normalizeStoredRecord(item: LegacyRecordItem): RecordItem {
+<span class="ln">01135:</span>   const selectedRepairIndex = item.selectedRepairIndex === 1 ? 1 : 0;
+<span class="ln">01136:</span>   const completedRepairIndex = item.completedRepairIndex === 0 || item.completedRepairIndex === 1 ? item.completedRepairIndex : item.taskDone ? 0 : null;
+<span class="ln">01137:</span> 
+<span class="ln">01138:</span>   return {
+<span class="ln">01139:</span>     ...item,
+<span class="ln">01140:</span>     selectedRepairIndex,
+<span class="ln">01141:</span>     completedRepairIndex,
+<span class="ln">01142:</span>   };
+<span class="ln">01143:</span> }
+<span class="ln">01144:</span> 
+<span class="ln">01145:</span> function buildRepairPlans(result: MediationResult) {
+<span class="ln">01146:</span>   const titles: Record&lt;PetType, [string, string]&gt; = {
+<span class="ln">01147:</span>     cat: [&quot;轻爪预备计划&quot;, &quot;暖胡须和好计划&quot;],
+<span class="ln">01148:</span>     dog: [&quot;摇尾巴预备计划&quot;, &quot;并肩和好计划&quot;],
+<span class="ln">01149:</span>     rabbit: [&quot;小耳朵预备计划&quot;, &quot;蹦蹦和好计划&quot;],
+<span class="ln">01150:</span>   };
+<span class="ln">01151:</span> 
+<span class="ln">01152:</span>   const [firstTitle, secondTitle] = titles[result.pet.type];
+<span class="ln">01153:</span> 
+<span class="ln">01154:</span>   return [
+<span class="ln">01155:</span>     {
+<span class="ln">01156:</span>       title: `${result.pet.name}的${firstTitle}`,
+<span class="ln">01157:</span>       description: result.action_card.do_now,
+<span class="ln">01158:</span>     },
+<span class="ln">01159:</span>     {
+<span class="ln">01160:</span>       title: `${result.pet.name}的${secondTitle}`,
+<span class="ln">01161:</span>       description: result.action_card.repair_action,
+<span class="ln">01162:</span>     },
+<span class="ln">01163:</span>   ];
+<span class="ln">01164:</span> }
+<span class="ln">01165:</span> 
+<span class="ln">01166:</span> export default function App() {
+<span class="ln">01167:</span>   const [view, setView] = useState&lt;View&gt;(&quot;home&quot;);
+<span class="ln">01168:</span>   const [settings, setSettings] = useState&lt;SettingsState&gt;(() =&gt; {
+<span class="ln">01169:</span>     const stored = readStorage&lt;Partial&lt;SettingsState&gt;&gt;(STORAGE_KEYS.settings, {});
+<span class="ln">01170:</span>     const caregiverOptions =
+<span class="ln">01171:</span>       Array.isArray(stored.caregiverOptions) &amp;&amp; stored.caregiverOptions.length &gt; 0
+<span class="ln">01172:</span>         ? stored.caregiverOptions.filter((item): item is string =&gt; typeof item === &quot;string&quot; &amp;&amp; collapseText(item).length &gt; 0)
+<span class="ln">01173:</span>         : DEFAULT_SETTINGS.caregiverOptions;
+<span class="ln">01174:</span> 
+<span class="ln">01175:</span>     return {
+<span class="ln">01176:</span>       ...DEFAULT_SETTINGS,
+<span class="ln">01177:</span>       ...stored,
+<span class="ln">01178:</span>       childBirthday: typeof stored.childBirthday === &quot;string&quot; ? normalizeBirthdayInput(stored.childBirthday) : DEFAULT_SETTINGS.childBirthday,
+<span class="ln">01179:</span>       fallbackAge: clampAge(Number(stored.fallbackAge) || DEFAULT_SETTINGS.fallbackAge),
+<span class="ln">01180:</span>       ageManualOverride: typeof stored.ageManualOverride === &quot;boolean&quot; ? stored.ageManualOverride : DEFAULT_SETTINGS.ageManualOverride,
+<span class="ln">01181:</span>       childGender: normalizeChildGender(stored.childGender),
+<span class="ln">01182:</span>       ttsRole: normalizeTtsRole(stored.ttsRole),
+<span class="ln">01183:</span>       caregiverOptions,
+<span class="ln">01184:</span>       commonCaregiverOptions: normalizeCommonCaregivers(caregiverOptions, stored.commonCaregiverOptions),
+<span class="ln">01185:</span>     };
+<span class="ln">01186:</span>   });
+<span class="ln">01187:</span>   const [draft, setDraft] = useState&lt;DraftState&gt;(() =&gt; {
+<span class="ln">01188:</span>     const stored = readStorage&lt;Partial&lt;DraftState&gt;&gt;(STORAGE_KEYS.draft, {});
+<span class="ln">01189:</span>     return {
+<span class="ln">01190:</span>       ...DEFAULT_DRAFT,
+<span class="ln">01191:</span>       ...stored,
+<span class="ln">01192:</span>     };
+<span class="ln">01193:</span>   });
+<span class="ln">01194:</span>   const [records, setRecords] = useState&lt;RecordItem[]&gt;(() =&gt; {
+<span class="ln">01195:</span>     const stored = readStorage&lt;LegacyRecordItem[]&gt;(STORAGE_KEYS.records, []);
+<span class="ln">01196:</span>     return Array.isArray(stored) ? stored.map(normalizeStoredRecord) : [];
+<span class="ln">01197:</span>   });
+<span class="ln">01198:</span>   const [activeRecordId, setActiveRecordId] = useState&lt;string | null&gt;(null);
+<span class="ln">01199:</span>   const [openingSeed, setOpeningSeed] = useState(0);
+<span class="ln">01200:</span>   const [isGenerating, setIsGenerating] = useState(false);
+<span class="ln">01201:</span>   const [loadingLine, setLoadingLine] = useState(&quot;&quot;);
+<span class="ln">01202:</span>   const [typedLoadingLine, setTypedLoadingLine] = useState(&quot;&quot;);
+<span class="ln">01203:</span>   const [toast, setToast] = useState&lt;ToastState | null&gt;(null);
+<span class="ln">01204:</span>   const [visibleBubbles, setVisibleBubbles] = useState(0);
+<span class="ln">01205:</span>   const [showParentNotes, setShowParentNotes] = useState(false);
+<span class="ln">01206:</span>   const [ageInput, setAgeInput] = useState(() =&gt; String(clampAge(Number(settings.fallbackAge) || DEFAULT_SETTINGS.fallbackAge)));
+<span class="ln">01207:</span>   const revealTimersRef = useRef&lt;number[]&gt;([]);
+<span class="ln">01208:</span> 
+<span class="ln">01209:</span>   const pet = PETS[settings.petType];
+<span class="ln">01210:</span>   const commonCaregivers = useMemo(() =&gt; getCommonCaregivers(settings), [settings]);
+<span class="ln">01211:</span>   const openingLine = useMemo(() =&gt; buildHomeOpener(settings, draft.caregiver), [openingSeed, settings, draft.caregiver]);
+<span class="ln">01212:</span> 
+<span class="ln">01213:</span>   const activeRecord = useMemo(() =&gt; records.find((item) =&gt; item.id === activeRecordId) ?? null, [activeRecordId, records]);
+<span class="ln">01214:</span>   const activeRepairPlans = useMemo(() =&gt; (activeRecord ? buildRepairPlans(activeRecord.result) : []), [activeRecord]);
+<span class="ln">01215:</span>   const totalIntimacy = useMemo(() =&gt; records.reduce((sum, item) =&gt; sum + item.result.reward.intimacy_points, 0), [records]);
+<span class="ln">01216:</span>   const totalMediations = records.length;
+<span class="ln">01217:</span>   const latestIssue = records[0]?.meta.issueTag ?? &quot;还没有记录&quot;;
+<span class="ln">01218:</span> 
+<span class="ln">01219:</span>   useEffect(() =&gt; {
+<span class="ln">01220:</span>     saveStorage(STORAGE_KEYS.settings, settings);
+<span class="ln">01221:</span>   }, [settings]);
+<span class="ln">01222:</span> 
+<span class="ln">01223:</span>   useEffect(() =&gt; {
+<span class="ln">01224:</span>     setAgeInput(String(clampAge(Number(settings.fallbackAge) || DEFAULT_SETTINGS.fallbackAge)));
+<span class="ln">01225:</span>   }, [settings.fallbackAge]);
+<span class="ln">01226:</span> 
+<span class="ln">01227:</span>   useEffect(() =&gt; {
+<span class="ln">01228:</span>     saveStorage(STORAGE_KEYS.draft, draft);
+<span class="ln">01229:</span>   }, [draft]);
+<span class="ln">01230:</span> 
+<span class="ln">01231:</span>   useEffect(() =&gt; {
+<span class="ln">01232:</span>     saveStorage(STORAGE_KEYS.records, records);
+<span class="ln">01233:</span>   }, [records]);
+<span class="ln">01234:</span> 
+<span class="ln">01235:</span>   useEffect(() =&gt; {
+<span class="ln">01236:</span>     if (!commonCaregivers.includes(draft.caregiver)) {
+<span class="ln">01237:</span>       setDraft((previous) =&gt; ({
+<span class="ln">01238:</span>         ...previous,
+<span class="ln">01239:</span>         caregiver: commonCaregivers[0] ?? DEFAULT_DRAFT.caregiver,
+<span class="ln">01240:</span>       }));
+<span class="ln">01241:</span>     }
+<span class="ln">01242:</span>   }, [commonCaregivers, draft.caregiver]);
+<span class="ln">01243:</span> 
+<span class="ln">01244:</span>   useEffect(() =&gt; {
+<span class="ln">01245:</span>     if (!toast) {
+<span class="ln">01246:</span>       return undefined;
+<span class="ln">01247:</span>     }
+<span class="ln">01248:</span> 
+<span class="ln">01249:</span>     const timer = window.setTimeout(() =&gt; setToast(null), 2200);
+<span class="ln">01250:</span>     return () =&gt; window.clearTimeout(timer);
+<span class="ln">01251:</span>   }, [toast]);
+<span class="ln">01252:</span> 
+<span class="ln">01253:</span>   useEffect(() =&gt; {
+<span class="ln">01254:</span>     if (view !== &quot;result&quot; || !activeRecord) {
+<span class="ln">01255:</span>       return undefined;
+<span class="ln">01256:</span>     }
+<span class="ln">01257:</span> 
+<span class="ln">01258:</span>     revealTimersRef.current.forEach((timer) =&gt; window.clearTimeout(timer));
+<span class="ln">01259:</span>     setVisibleBubbles(0);
+<span class="ln">01260:</span>     revealTimersRef.current = Array.from({ length: 5 }, (_, index) =&gt;
+<span class="ln">01261:</span>       window.setTimeout(() =&gt; {
+<span class="ln">01262:</span>         setVisibleBubbles(index + 1);
+<span class="ln">01263:</span>       }, 120 + index * 180),
+<span class="ln">01264:</span>     );
+<span class="ln">01265:</span> 
+<span class="ln">01266:</span>     return () =&gt; {
+<span class="ln">01267:</span>       revealTimersRef.current.forEach((timer) =&gt; window.clearTimeout(timer));
+<span class="ln">01268:</span>     };
+<span class="ln">01269:</span>   }, [activeRecord, view]);
+<span class="ln">01270:</span> 
+<span class="ln">01271:</span>   useEffect(() =&gt; {
+<span class="ln">01272:</span>     return () =&gt; {
+<span class="ln">01273:</span>       if (typeof window !== &quot;undefined&quot; &amp;&amp; &quot;speechSynthesis&quot; in window) {
+<span class="ln">01274:</span>         window.speechSynthesis.cancel();
+<span class="ln">01275:</span>       }
+<span class="ln">01276:</span>     };
+<span class="ln">01277:</span>   }, []);
+<span class="ln">01278:</span> 
+<span class="ln">01279:</span>   useEffect(() =&gt; {
+<span class="ln">01280:</span>     if (!isGenerating || !loadingLine) {
+<span class="ln">01281:</span>       setTypedLoadingLine(&quot;&quot;);
+<span class="ln">01282:</span>       return undefined;
+<span class="ln">01283:</span>     }
+<span class="ln">01284:</span> 
+<span class="ln">01285:</span>     setTypedLoadingLine(&quot;&quot;);
+<span class="ln">01286:</span>     let index = 0;
+<span class="ln">01287:</span>     const timer = window.setInterval(() =&gt; {
+<span class="ln">01288:</span>       index += 1;
+<span class="ln">01289:</span>       setTypedLoadingLine(loadingLine.slice(0, index));
+<span class="ln">01290:</span>       if (index &gt;= loadingLine.length) {
+<span class="ln">01291:</span>         window.clearInterval(timer);
+<span class="ln">01292:</span>       }
+<span class="ln">01293:</span>     }, 42);
+<span class="ln">01294:</span> 
+<span class="ln">01295:</span>     return () =&gt; window.clearInterval(timer);
+<span class="ln">01296:</span>   }, [isGenerating, loadingLine]);
+<span class="ln">01297:</span> 
+<span class="ln">01298:</span>   const updateSetting = &lt;K extends keyof SettingsState&gt;(key: K, value: SettingsState[K]) =&gt; {
+<span class="ln">01299:</span>     setSettings((previous) =&gt; ({
+<span class="ln">01300:</span>       ...previous,
+<span class="ln">01301:</span>       [key]: value,
+<span class="ln">01302:</span>     }));
+<span class="ln">01303:</span>   };
+<span class="ln">01304:</span> 
+<span class="ln">01305:</span>   const updateDraft = &lt;K extends keyof DraftState&gt;(key: K, value: DraftState[K]) =&gt; {
+<span class="ln">01306:</span>     setDraft((previous) =&gt; ({
+<span class="ln">01307:</span>       ...previous,
+<span class="ln">01308:</span>       [key]: value,
+<span class="ln">01309:</span>     }));
+<span class="ln">01310:</span> 
+<span class="ln">01311:</span>     if (key === &quot;childStatement&quot; || key === &quot;parentStatement&quot;) {
+<span class="ln">01312:</span>       setActiveRecordId(null);
+<span class="ln">01313:</span>       setShowParentNotes(false);
+<span class="ln">01314:</span>       if (view === &quot;result&quot;) {
+<span class="ln">01315:</span>         setView(&quot;home&quot;);
+<span class="ln">01316:</span>       }
+<span class="ln">01317:</span>     }
+<span class="ln">01318:</span>   };
+<span class="ln">01319:</span> 
+<span class="ln">01320:</span>   const toggleCommonCaregiver = (name: string) =&gt; {
+<span class="ln">01321:</span>     setSettings((previous) =&gt; {
+<span class="ln">01322:</span>       if (previous.commonCaregiverOptions.includes(name)) {
+<span class="ln">01323:</span>         return previous;
+<span class="ln">01324:</span>       }
+<span class="ln">01325:</span> 
+<span class="ln">01326:</span>       const next = [...previous.commonCaregiverOptions, name].slice(-2);
+<span class="ln">01327:</span>       return {
+<span class="ln">01328:</span>         ...previous,
+<span class="ln">01329:</span>         commonCaregiverOptions: normalizeCommonCaregivers(previous.caregiverOptions, next),
+<span class="ln">01330:</span>       };
+<span class="ln">01331:</span>     });
+<span class="ln">01332:</span>   };
+<span class="ln">01333:</span> 
+<span class="ln">01334:</span>   const cycleCaregiver = () =&gt; {
+<span class="ln">01335:</span>     if (commonCaregivers.length === 0) {
+<span class="ln">01336:</span>       return;
+<span class="ln">01337:</span>     }
+<span class="ln">01338:</span> 
+<span class="ln">01339:</span>     if (commonCaregivers.length === 1) {
+<span class="ln">01340:</span>       updateDraft(&quot;caregiver&quot;, commonCaregivers[0] ?? DEFAULT_DRAFT.caregiver);
+<span class="ln">01341:</span>       return;
+<span class="ln">01342:</span>     }
+<span class="ln">01343:</span> 
+<span class="ln">01344:</span>     updateDraft(&quot;caregiver&quot;, draft.caregiver === commonCaregivers[0] ? commonCaregivers[1] : commonCaregivers[0]);
+<span class="ln">01345:</span>   };
+<span class="ln">01346:</span> 
+<span class="ln">01347:</span>   const selectRepairPlan = (recordId: string, index: number) =&gt; {
+<span class="ln">01348:</span>     setRecords((previous) =&gt; previous.map((item) =&gt; (item.id === recordId ? { ...item, selectedRepairIndex: index } : item)));
+<span class="ln">01349:</span>   };
+<span class="ln">01350:</span> 
+<span class="ln">01351:</span>   const completeRepairPlan = (recordId: string, index: number) =&gt; {
+<span class="ln">01352:</span>     setRecords((previous) =&gt;
+<span class="ln">01353:</span>       previous.map((item) =&gt;
+<span class="ln">01354:</span>         item.id === recordId
+<span class="ln">01355:</span>           ? {
+<span class="ln">01356:</span>               ...item,
+<span class="ln">01357:</span>               selectedRepairIndex: index,
+<span class="ln">01358:</span>               completedRepairIndex: item.completedRepairIndex === index ? null : index,
+<span class="ln">01359:</span>             }
+<span class="ln">01360:</span>           : item,
+<span class="ln">01361:</span>       ),
+<span class="ln">01362:</span>     );
+<span class="ln">01363:</span>   };
+<span class="ln">01364:</span> 
+<span class="ln">01365:</span>   const openRecord = (record: RecordItem) =&gt; {
+<span class="ln">01366:</span>     setActiveRecordId(record.id);
+<span class="ln">01367:</span>     setShowParentNotes(false);
+<span class="ln">01368:</span>     setView(&quot;result&quot;);
+<span class="ln">01369:</span>   };
+<span class="ln">01370:</span> 
+<span class="ln">01371:</span>   const handleSaveToast = (message: string) =&gt; {
+<span class="ln">01372:</span>     setToast({ message, tone: &quot;pink&quot; });
+<span class="ln">01373:</span>   };
+<span class="ln">01374:</span> 
+<span class="ln">01375:</span>   const handleGenerate = async () =&gt; {
+<span class="ln">01376:</span>     if (!collapseText(draft.childStatement) || !collapseText(draft.parentStatement)) {
+<span class="ln">01377:</span>       setToast({ message: &quot;先把双方的话写上，再请大法官出庭哦。&quot;, tone: &quot;amber&quot; });
+<span class="ln">01378:</span>       return;
+<span class="ln">01379:</span>     }
+<span class="ln">01380:</span> 
+<span class="ln">01381:</span>     const currentProfile = resolveChildProfile(settings);
+<span class="ln">01382:</span>     const issueTag = inferIssueTag(draft.childStatement, draft.parentStatement);
+<span class="ln">01383:</span> 
+<span class="ln">01384:</span>     setIsGenerating(true);
+<span class="ln">01385:</span>     setLoadingLine(buildLoadingLine(settings, draft));
+<span class="ln">01386:</span> 
+<span class="ln">01387:</span>     try {
+<span class="ln">01388:</span>       let source: Source = &quot;demo&quot;;
+<span class="ln">01389:</span>       let result: MediationResult;
+<span class="ln">01390:</span> 
+<span class="ln">01391:</span>       if (detectSafetyRisk(draft.childStatement, draft.parentStatement)) {
+<span class="ln">01392:</span>         result = buildSafetyResult(settings, draft, currentProfile);
+<span class="ln">01393:</span>         source = &quot;safety&quot;;
+<span class="ln">01394:</span>       } else if (settings.apiKey.trim()) {
+<span class="ln">01395:</span>         try {
+<span class="ln">01396:</span>           result = await requestGeminiResult(settings, draft, currentProfile);
+<span class="ln">01397:</span>           source = result.safety.mode === &quot;alert&quot; ? &quot;safety&quot; : &quot;gemini&quot;;
+<span class="ln">01398:</span>         } catch {
+<span class="ln">01399:</span>           result = buildDemoCopy(settings, draft, currentProfile);
+<span class="ln">01400:</span>           source = &quot;demo&quot;;
+<span class="ln">01401:</span>           setToast({ message: &quot;Gemini 调用失败，已切换为本地演示判词。&quot;, tone: &quot;amber&quot; });
+<span class="ln">01402:</span>         }
+<span class="ln">01403:</span>       } else {
+<span class="ln">01404:</span>         result = buildDemoCopy(settings, draft, currentProfile);
+<span class="ln">01405:</span>         source = &quot;demo&quot;;
+<span class="ln">01406:</span>       }
+<span class="ln">01407:</span> 
+<span class="ln">01408:</span>       const record: RecordItem = {
+<span class="ln">01409:</span>         id: createId(),
+<span class="ln">01410:</span>         createdAt: new Date().toISOString(),
+<span class="ln">01411:</span>         draft: { ...draft },
+<span class="ln">01412:</span>         result,
+<span class="ln">01413:</span>         meta: {
+<span class="ln">01414:</span>           source,
+<span class="ln">01415:</span>           issueTag,
+<span class="ln">01416:</span>         },
+<span class="ln">01417:</span>         selectedRepairIndex: 0,
+<span class="ln">01418:</span>         completedRepairIndex: null,
+<span class="ln">01419:</span>       };
+<span class="ln">01420:</span> 
+<span class="ln">01421:</span>       setRecords((previous) =&gt; [record, ...previous].slice(0, 120));
+<span class="ln">01422:</span>       setActiveRecordId(record.id);
+<span class="ln">01423:</span>       setShowParentNotes(false);
+<span class="ln">01424:</span>       setView(&quot;result&quot;);
+<span class="ln">01425:</span>       setToast({ message: source === &quot;gemini&quot; ? &quot;新的判词已经出来了。&quot; : &quot;已经整理好一份可继续体验的判词。&quot;, tone: &quot;dark&quot; });
+<span class="ln">01426:</span>     } finally {
+<span class="ln">01427:</span>       setIsGenerating(false);
+<span class="ln">01428:</span>     }
+<span class="ln">01429:</span>   };
+<span class="ln">01430:</span> 
+<span class="ln">01431:</span>   const speakWithRole = (text: string, role: TtsRole) =&gt; {
+<span class="ln">01432:</span>     if (typeof window === &quot;undefined&quot; || !(&quot;speechSynthesis&quot; in window) || !collapseText(text)) {
+<span class="ln">01433:</span>       return false;
+<span class="ln">01434:</span>     }
+<span class="ln">01435:</span> 
+<span class="ln">01436:</span>     window.speechSynthesis.cancel();
+<span class="ln">01437:</span>     const utterance = new SpeechSynthesisUtterance(text);
+<span class="ln">01438:</span>     const roleMeta = TTS_ROLE_META[role];
+<span class="ln">01439:</span>     utterance.lang = &quot;zh-CN&quot;;
+<span class="ln">01440:</span>     utterance.rate = roleMeta.rate;
+<span class="ln">01441:</span>     utterance.pitch = roleMeta.pitch;
+<span class="ln">01442:</span> 
+<span class="ln">01443:</span>     const voices = window.speechSynthesis.getVoices();
+<span class="ln">01444:</span>     const preferredVoice =
+<span class="ln">01445:</span>       voices.find((voice) =&gt; roleMeta.preferredNamePattern?.test(`${voice.lang} ${voice.name}`)) ??
+<span class="ln">01446:</span>       voices.find((voice) =&gt; /zh|Chinese|中文/i.test(`${voice.lang} ${voice.name}`));
+<span class="ln">01447:</span>     if (preferredVoice) {
+<span class="ln">01448:</span>       utterance.voice = preferredVoice;
+<span class="ln">01449:</span>     }
+<span class="ln">01450:</span> 
+<span class="ln">01451:</span>     window.speechSynthesis.speak(utterance);
+<span class="ln">01452:</span>     return true;
+<span class="ln">01453:</span>   };
+<span class="ln">01454:</span> 
+<span class="ln">01455:</span>   const handlePreviewTtsRole = (role: TtsRole) =&gt; {
+<span class="ln">01456:</span>     const previewText = `${settings.petName}大法官来试一小句啦。今天我们把话慢慢说柔一点，好吗？`;
+<span class="ln">01457:</span>     const didSpeak = speakWithRole(previewText, role);
+<span class="ln">01458:</span>     if (!didSpeak) {
+<span class="ln">01459:</span>       setToast({ message: &quot;当前设备暂时不支持语音试听。&quot;, tone: &quot;amber&quot; });
+<span class="ln">01460:</span>     }
+<span class="ln">01461:</span>   };
+<span class="ln">01462:</span> 
+<span class="ln">01463:</span>   const handlePlayTts = () =&gt; {
+<span class="ln">01464:</span>     if (!activeRecord) {
+<span class="ln">01465:</span>       return;
+<span class="ln">01466:</span>     }
+<span class="ln">01467:</span> 
+<span class="ln">01468:</span>     const didSpeak = speakWithRole(activeRecord.result.tts_script, settings.ttsRole);
+<span class="ln">01469:</span>     if (!didSpeak) {
+<span class="ln">01470:</span>       setToast({ message: &quot;当前设备暂时不支持语音播放。&quot;, tone: &quot;amber&quot; });
+<span class="ln">01471:</span>     }
+<span class="ln">01472:</span>   };
+<span class="ln">01473:</span> 
+<span class="ln">01474:</span>   return (
+<span class="ln">01475:</span>     &lt;div className=&quot;min-h-screen bg-[radial-gradient(circle_at_top,_rgba(244,114,182,0.16),_transparent_25%),radial-gradient(circle_at_bottom,_rgba(56,189,248,0.16),_transparent_25%),linear-gradient(180deg,_#fffafc_0%,_#f8fafc_52%,_#eef2ff_100%)] px-3 py-4 text-slate-900 sm:px-6 sm:py-8&quot;&gt;
+<span class="ln">01476:</span>       &lt;div className=&quot;mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[430px] flex-col overflow-hidden rounded-[34px] border border-white/70 bg-white/60 shadow-[0_30px_100px_rgba(15,23,42,0.16)] backdrop-blur-xl sm:min-h-[840px]&quot;&gt;
+<span class="ln">01477:</span>         &lt;div className=&quot;relative border-b border-white/70 bg-white/70 px-4 pb-4 pt-5 backdrop-blur&quot;&gt;
+<span class="ln">01478:</span>           &lt;div className=&quot;absolute -right-8 -top-8 h-28 w-28 rounded-full bg-pink-200/40 blur-3xl&quot; /&gt;
+<span class="ln">01479:</span>           &lt;div className=&quot;absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-sky-200/35 blur-3xl&quot; /&gt;
+<span class="ln">01480:</span>           &lt;div className=&quot;relative flex items-start justify-between gap-3&quot;&gt;
+<span class="ln">01481:</span>             &lt;div className=&quot;flex items-center gap-3&quot;&gt;
+<span class="ln">01482:</span>               &lt;div className={cn(&quot;float-soft flex h-14 w-14 items-center justify-center rounded-[22px] bg-gradient-to-br text-3xl text-white shadow-lg&quot;, pet.accent)}&gt;
+<span class="ln">01483:</span>                 {pet.emoji}
+<span class="ln">01484:</span>               &lt;/div&gt;
+<span class="ln">01485:</span>               &lt;div&gt;
+<span class="ln">01486:</span>                 &lt;h1 className=&quot;text-xl font-semibold tracking-tight&quot;&gt;{settings.petName}大法官&lt;/h1&gt;
+<span class="ln">01487:</span>                 &lt;p className=&quot;mt-1 text-sm text-slate-500&quot;&gt;
+<span class="ln">01488:</span>                   {view === &quot;result&quot; ? &quot;这次我先把双方的话轻轻摆整齐了&quot; : &quot;今天也来帮你们把话说柔一点&quot;}
+<span class="ln">01489:</span>                 &lt;/p&gt;
+<span class="ln">01490:</span>               &lt;/div&gt;
+<span class="ln">01491:</span>             &lt;/div&gt;
+<span class="ln">01492:</span>             &lt;div className=&quot;flex items-center gap-2&quot;&gt;
+<span class="ln">01493:</span>               {view !== &quot;records&quot; ? &lt;IconButton icon=&quot;📚&quot; label=&quot;成长记录&quot; onClick={() =&gt; setView(&quot;records&quot;)} /&gt; : null}
+<span class="ln">01494:</span>               {view !== &quot;settings&quot; ? &lt;IconButton icon=&quot;⚙️&quot; label=&quot;设置&quot; onClick={() =&gt; setView(&quot;settings&quot;)} /&gt; : null}
+<span class="ln">01495:</span>             &lt;/div&gt;
+<span class="ln">01496:</span>           &lt;/div&gt;
+<span class="ln">01497:</span>         &lt;/div&gt;
+<span class="ln">01498:</span> 
+<span class="ln">01499:</span>         &lt;div className=&quot;flex-1 overflow-y-auto px-4 py-4&quot;&gt;
+<span class="ln">01500:</span>           {view === &quot;home&quot; ? (
+<span class="ln">01501:</span>             &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01502:</span>               &lt;Card className={cn(&quot;bg-gradient-to-br&quot;, pet.soft)}&gt;
+<span class="ln">01503:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01504:</span>                   &lt;div className=&quot;flex items-start justify-between gap-3&quot;&gt;
+<span class="ln">01505:</span>                     &lt;div className=&quot;space-y-2&quot;&gt;
+<span class="ln">01506:</span>                       &lt;div className=&quot;inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm&quot;&gt;
+<span class="ln">01507:</span>                         &lt;span&gt;✨&lt;/span&gt;
+<span class="ln">01508:</span>                         &lt;span&gt;开场语&lt;/span&gt;
+<span class="ln">01509:</span>                       &lt;/div&gt;
+<span class="ln">01510:</span>                       &lt;p className=&quot;text-sm leading-7 text-slate-700&quot;&gt;{openingLine}&lt;/p&gt;
+<span class="ln">01511:</span>                     &lt;/div&gt;
+<span class="ln">01512:</span>                     &lt;button
+<span class="ln">01513:</span>                       type=&quot;button&quot;
+<span class="ln">01514:</span>                       onClick={() =&gt; setOpeningSeed((previous) =&gt; previous + 1)}
+<span class="ln">01515:</span>                       className=&quot;shrink-0 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm&quot;
+<span class="ln">01516:</span>                     &gt;
+<span class="ln">01517:</span>                       换一句
+<span class="ln">01518:</span>                     &lt;/button&gt;
+<span class="ln">01519:</span>                   &lt;/div&gt;
+<span class="ln">01520:</span> 
+<span class="ln">01521:</span>                   &lt;div className=&quot;grid grid-cols-3 gap-2&quot;&gt;
+<span class="ln">01522:</span>                     &lt;TinyStat label=&quot;孩子&quot; value={settings.childName} /&gt;
+<span class="ln">01523:</span>                     &lt;TinyStat label=&quot;已调解&quot; value={totalMediations} /&gt;
+<span class="ln">01524:</span>                     &lt;TinyStat label=&quot;亲密度&quot; value={`+${totalIntimacy}`} /&gt;
+<span class="ln">01525:</span>                   &lt;/div&gt;
+<span class="ln">01526:</span>                 &lt;/div&gt;
+<span class="ln">01527:</span>               &lt;/Card&gt;
+<span class="ln">01528:</span> 
+<span class="ln">01529:</span>               &lt;Card&gt;
+<span class="ln">01530:</span>                 &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">01531:</span>                   &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;{settings.childName}怎么说&lt;/label&gt;
+<span class="ln">01532:</span>                   &lt;textarea
+<span class="ln">01533:</span>                     value={draft.childStatement}
+<span class="ln">01534:</span>                     onChange={(event) =&gt; updateDraft(&quot;childStatement&quot;, event.target.value)}
+<span class="ln">01535:</span>                     rows={4}
+<span class="ln">01536:</span>                     className=&quot;min-h-[112px] w-full resize-none rounded-3xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-300&quot;
+<span class="ln">01537:</span>                     placeholder={`${settings.childName}想说什么？`}
+<span class="ln">01538:</span>                   /&gt;
+<span class="ln">01539:</span>                 &lt;/div&gt;
+<span class="ln">01540:</span>               &lt;/Card&gt;
+<span class="ln">01541:</span> 
+<span class="ln">01542:</span>               &lt;Card&gt;
+<span class="ln">01543:</span>                 &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">01544:</span>                   &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;
+<span class="ln">01545:</span>                     &lt;button type=&quot;button&quot; onClick={cycleCaregiver} className=&quot;rounded-full bg-sky-50 px-2.5 py-1 text-sm font-semibold text-sky-700&quot;&gt;
+<span class="ln">01546:</span>                       {draft.caregiver}
+<span class="ln">01547:</span>                     &lt;/button&gt;
+<span class="ln">01548:</span>                     &lt;span className=&quot;ml-2&quot;&gt;怎么说&lt;/span&gt;
+<span class="ln">01549:</span>                   &lt;/label&gt;
+<span class="ln">01550:</span>                   &lt;textarea
+<span class="ln">01551:</span>                     value={draft.parentStatement}
+<span class="ln">01552:</span>                     onChange={(event) =&gt; updateDraft(&quot;parentStatement&quot;, event.target.value)}
+<span class="ln">01553:</span>                     rows={4}
+<span class="ln">01554:</span>                     className=&quot;min-h-[112px] w-full resize-none rounded-3xl bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-700 outline-none placeholder:text-slate-300&quot;
+<span class="ln">01555:</span>                     placeholder={`${draft.caregiver}想表达什么？`}
+<span class="ln">01556:</span>                   /&gt;
+<span class="ln">01557:</span>                 &lt;/div&gt;
+<span class="ln">01558:</span>               &lt;/Card&gt;
+<span class="ln">01559:</span> 
+<span class="ln">01560:</span>               &lt;div className=&quot;grid grid-cols-2 gap-3&quot;&gt;
+<span class="ln">01561:</span>                 &lt;button
+<span class="ln">01562:</span>                   type=&quot;button&quot;
+<span class="ln">01563:</span>                   onClick={handleGenerate}
+<span class="ln">01564:</span>                   disabled={isGenerating}
+<span class="ln">01565:</span>                   className={cn(
+<span class="ln">01566:</span>                     &quot;rounded-[24px] bg-slate-900 px-4 py-4 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(15,23,42,0.18)] transition&quot;,
+<span class="ln">01567:</span>                     isGenerating &amp;&amp; &quot;cursor-wait opacity-80&quot;,
+<span class="ln">01568:</span>                   )}
+<span class="ln">01569:</span>                 &gt;
+<span class="ln">01570:</span>                   {isGenerating ? `${settings.petName}正在整理…` : &quot;请大法官出庭&quot;}
+<span class="ln">01571:</span>                 &lt;/button&gt;
+<span class="ln">01572:</span>                 &lt;button
+<span class="ln">01573:</span>                   type=&quot;button&quot;
+<span class="ln">01574:</span>                   onClick={() =&gt; setView(&quot;records&quot;)}
+<span class="ln">01575:</span>                   className=&quot;rounded-[24px] bg-white px-4 py-4 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200&quot;
+<span class="ln">01576:</span>                 &gt;
+<span class="ln">01577:</span>                   查看成长记录
+<span class="ln">01578:</span>                 &lt;/button&gt;
+<span class="ln">01579:</span>               &lt;/div&gt;
+<span class="ln">01580:</span>             &lt;/div&gt;
+<span class="ln">01581:</span>           ) : null}
+<span class="ln">01582:</span> 
+<span class="ln">01583:</span>           {view === &quot;result&quot; ? (
+<span class="ln">01584:</span>             activeRecord ? (
+<span class="ln">01585:</span>               &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01586:</span>                 &lt;div className=&quot;flex items-center justify-between gap-3&quot;&gt;
+<span class="ln">01587:</span>                   &lt;button
+<span class="ln">01588:</span>                     type=&quot;button&quot;
+<span class="ln">01589:</span>                     onClick={() =&gt; setView(&quot;home&quot;)}
+<span class="ln">01590:</span>                     className=&quot;rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200&quot;
+<span class="ln">01591:</span>                   &gt;
+<span class="ln">01592:</span>                     返回
+<span class="ln">01593:</span>                   &lt;/button&gt;
+<span class="ln">01594:</span>                   &lt;button
+<span class="ln">01595:</span>                     type=&quot;button&quot;
+<span class="ln">01596:</span>                     onClick={() =&gt; setView(&quot;records&quot;)}
+<span class="ln">01597:</span>                     className=&quot;rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200&quot;
+<span class="ln">01598:</span>                   &gt;
+<span class="ln">01599:</span>                     查看记录
+<span class="ln">01600:</span>                   &lt;/button&gt;
+<span class="ln">01601:</span>                 &lt;/div&gt;
+<span class="ln">01602:</span> 
+<span class="ln">01603:</span>                 &lt;Card className={cn(&quot;bg-gradient-to-br&quot;, PETS[activeRecord.result.pet.type].soft)}&gt;
+<span class="ln">01604:</span>                   &lt;div className=&quot;flex items-start justify-between gap-3&quot;&gt;
+<span class="ln">01605:</span>                     &lt;div className=&quot;space-y-2&quot;&gt;
+<span class="ln">01606:</span>                       &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;这次的心情线索&lt;/div&gt;
+<span class="ln">01607:</span>                       &lt;div className=&quot;flex flex-wrap gap-2&quot;&gt;
+<span class="ln">01608:</span>                         &lt;span className={cn(&quot;rounded-full px-3 py-1 text-xs font-semibold&quot;, PETS[activeRecord.result.pet.type].chip)}&gt;
+<span class="ln">01609:</span>                           孩子：{activeRecord.result.emotion_summary.child}
+<span class="ln">01610:</span>                         &lt;/span&gt;
+<span class="ln">01611:</span>                         &lt;span className=&quot;rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700&quot;&gt;
+<span class="ln">01612:</span>                           家长：{activeRecord.result.emotion_summary.parent}
+<span class="ln">01613:</span>                         &lt;/span&gt;
+<span class="ln">01614:</span>                       &lt;/div&gt;
+<span class="ln">01615:</span>                     &lt;/div&gt;
+<span class="ln">01616:</span>                     &lt;div className=&quot;stamp-pop rounded-2xl border border-white/70 bg-white/85 px-3 py-2 text-center shadow-sm&quot;&gt;
+<span class="ln">01617:</span>                       &lt;div className=&quot;text-[11px] font-medium text-slate-400&quot;&gt;亲密度&lt;/div&gt;
+<span class="ln">01618:</span>                       &lt;div className=&quot;text-2xl font-bold text-slate-900&quot;&gt;+{activeRecord.result.reward.intimacy_points}&lt;/div&gt;
+<span class="ln">01619:</span>                     &lt;/div&gt;
+<span class="ln">01620:</span>                   &lt;/div&gt;
+<span class="ln">01621:</span>                 &lt;/Card&gt;
+<span class="ln">01622:</span> 
+<span class="ln">01623:</span>                 {activeRecord.result.safety.mode === &quot;alert&quot; ? (
+<span class="ln">01624:</span>                   &lt;Card className=&quot;border-rose-100 bg-rose-50/90&quot;&gt;
+<span class="ln">01625:</span>                     &lt;div className=&quot;space-y-3 text-sm leading-7 text-rose-900&quot;&gt;
+<span class="ln">01626:</span>                       &lt;div className=&quot;text-base font-semibold&quot;&gt;先处理安全&lt;/div&gt;
+<span class="ln">01627:</span>                       &lt;p&gt;{activeRecord.result.child_view.opening}&lt;/p&gt;
+<span class="ln">01628:</span>                       &lt;p&gt;{activeRecord.result.child_view.observation}&lt;/p&gt;
+<span class="ln">01629:</span>                       &lt;p&gt;{activeRecord.result.safety.alert}&lt;/p&gt;
+<span class="ln">01630:</span>                     &lt;/div&gt;
+<span class="ln">01631:</span>                   &lt;/Card&gt;
+<span class="ln">01632:</span>                 ) : null}
+<span class="ln">01633:</span> 
+<span class="ln">01634:</span>                 &lt;Card&gt;
+<span class="ln">01635:</span>                   &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">01636:</span>                     &lt;div className=&quot;flex items-center justify-between gap-3&quot;&gt;
+<span class="ln">01637:</span>                       &lt;h3 className=&quot;text-sm font-semibold text-slate-900&quot;&gt;{activeRecord.result.pet.name}大法官说&lt;/h3&gt;
+<span class="ln">01638:</span>                       &lt;button
+<span class="ln">01639:</span>                         type=&quot;button&quot;
+<span class="ln">01640:</span>                         onClick={handlePlayTts}
+<span class="ln">01641:</span>                         className=&quot;rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white&quot;
+<span class="ln">01642:</span>                       &gt;
+<span class="ln">01643:</span>                         播放语音
+<span class="ln">01644:</span>                       &lt;/button&gt;
+<span class="ln">01645:</span>                     &lt;/div&gt;
+<span class="ln">01646:</span>                     {[activeRecord.result.child_view.opening, activeRecord.result.child_view.observation, activeRecord.result.child_view.judgment_short, activeRecord.result.child_view.action_short, activeRecord.result.child_view.closing].map(
+<span class="ln">01647:</span>                       (line, index) =&gt; (
+<span class="ln">01648:</span>                         &lt;div
+<span class="ln">01649:</span>                           key={`${line}-${index}`}
+<span class="ln">01650:</span>                           className={cn(
+<span class="ln">01651:</span>                             &quot;rounded-[24px] bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-700 transition&quot;,
+<span class="ln">01652:</span>                             visibleBubbles &gt; index ? &quot;fade-up-in&quot; : &quot;opacity-0&quot;,
+<span class="ln">01653:</span>                             index === 2 &amp;&amp; &quot;bg-pink-50 text-pink-800&quot;,
+<span class="ln">01654:</span>                           )}
+<span class="ln">01655:</span>                         &gt;
+<span class="ln">01656:</span>                           {line}
+<span class="ln">01657:</span>                         &lt;/div&gt;
+<span class="ln">01658:</span>                       ),
+<span class="ln">01659:</span>                     )}
+<span class="ln">01660:</span>                   &lt;/div&gt;
+<span class="ln">01661:</span>                 &lt;/Card&gt;
+<span class="ln">01662:</span> 
+<span class="ln">01663:</span>                 &lt;Card className=&quot;border-emerald-100 bg-emerald-50/80&quot;&gt;
+<span class="ln">01664:</span>                   &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">01665:</span>                     &lt;h3 className=&quot;text-sm font-semibold text-emerald-900&quot;&gt;{activeRecord.result.action_card.title}&lt;/h3&gt;
+<span class="ln">01666:</span>                     &lt;TaskRow label=&quot;孩子可以说&quot; value={activeRecord.result.action_card.child_can_say} /&gt;
+<span class="ln">01667:</span>                     &lt;TaskRow label={`${activeRecord.draft.caregiver}可以说`} value={activeRecord.result.action_card.parent_can_say} /&gt;
+<span class="ln">01668:</span>                     &lt;div className=&quot;rounded-[24px] bg-white/80 p-3&quot;&gt;
+<span class="ln">01669:</span>                       &lt;div className=&quot;mb-3 flex items-center justify-between gap-3&quot;&gt;
+<span class="ln">01670:</span>                         &lt;div&gt;
+<span class="ln">01671:</span>                           &lt;div className=&quot;text-sm font-semibold text-emerald-900&quot;&gt;二选一和解计划&lt;/div&gt;
+<span class="ln">01672:</span>                           &lt;div className=&quot;mt-1 text-xs text-emerald-700&quot;&gt;选一个更顺手的方案，完成后打勾就好。&lt;/div&gt;
+<span class="ln">01673:</span>                         &lt;/div&gt;
+<span class="ln">01674:</span>                         &lt;div className=&quot;rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold text-emerald-700&quot;&gt;可切换&lt;/div&gt;
+<span class="ln">01675:</span>                       &lt;/div&gt;
+<span class="ln">01676:</span>                       &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">01677:</span>                         {activeRepairPlans.map((plan, index) =&gt; {
+<span class="ln">01678:</span>                           const isSelected = activeRecord.selectedRepairIndex === index;
+<span class="ln">01679:</span>                           const isDone = activeRecord.completedRepairIndex === index;
+<span class="ln">01680:</span> 
+<span class="ln">01681:</span>                           return (
+<span class="ln">01682:</span>                             &lt;div
+<span class="ln">01683:</span>                               key={`${plan.title}-${index}`}
+<span class="ln">01684:</span>                               className={cn(
+<span class="ln">01685:</span>                                 &quot;rounded-[22px] border p-3 transition&quot;,
+<span class="ln">01686:</span>                                 isSelected ? &quot;border-emerald-400 bg-emerald-50&quot; : &quot;border-white bg-white&quot;,
+<span class="ln">01687:</span>                                 isDone &amp;&amp; &quot;border-emerald-500 ring-2 ring-emerald-200&quot;,
+<span class="ln">01688:</span>                               )}
+<span class="ln">01689:</span>                             &gt;
+<span class="ln">01690:</span>                               &lt;button type=&quot;button&quot; onClick={() =&gt; selectRepairPlan(activeRecord.id, index)} className=&quot;w-full text-left&quot;&gt;
+<span class="ln">01691:</span>                                 &lt;div className=&quot;flex items-start justify-between gap-3&quot;&gt;
+<span class="ln">01692:</span>                                   &lt;div&gt;
+<span class="ln">01693:</span>                                     &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;{plan.title}&lt;/div&gt;
+<span class="ln">01694:</span>                                     &lt;div className=&quot;mt-1 text-sm leading-6 text-slate-700&quot;&gt;{plan.description}&lt;/div&gt;
+<span class="ln">01695:</span>                                   &lt;/div&gt;
+<span class="ln">01696:</span>                                   &lt;span className={cn(&quot;rounded-full px-2.5 py-1 text-[11px] font-semibold&quot;, isSelected ? &quot;bg-emerald-600 text-white&quot; : &quot;bg-slate-100 text-slate-500&quot;)}&gt;
+<span class="ln">01697:</span>                                     {isSelected ? &quot;当前选择&quot; : &quot;点我切换&quot;}
+<span class="ln">01698:</span>                                   &lt;/span&gt;
+<span class="ln">01699:</span>                                 &lt;/div&gt;
+<span class="ln">01700:</span>                               &lt;/button&gt;
+<span class="ln">01701:</span>                               &lt;button
+<span class="ln">01702:</span>                                 type=&quot;button&quot;
+<span class="ln">01703:</span>                                 onClick={() =&gt; completeRepairPlan(activeRecord.id, index)}
+<span class="ln">01704:</span>                                 className={cn(
+<span class="ln">01705:</span>                                   &quot;mt-3 w-full rounded-2xl px-4 py-2.5 text-sm font-semibold transition&quot;,
+<span class="ln">01706:</span>                                   isDone ? &quot;bg-emerald-600 text-white&quot; : &quot;bg-slate-100 text-emerald-700&quot;,
+<span class="ln">01707:</span>                                 )}
+<span class="ln">01708:</span>                               &gt;
+<span class="ln">01709:</span>                                 {isDone ? &quot;✓ 已完成这个和解计划&quot; : &quot;完成后点这里打勾&quot;}
+<span class="ln">01710:</span>                               &lt;/button&gt;
+<span class="ln">01711:</span>                             &lt;/div&gt;
+<span class="ln">01712:</span>                           );
+<span class="ln">01713:</span>                         })}
+<span class="ln">01714:</span>                       &lt;/div&gt;
+<span class="ln">01715:</span>                     &lt;/div&gt;
+<span class="ln">01716:</span>                   &lt;/div&gt;
+<span class="ln">01717:</span>                 &lt;/Card&gt;
+<span class="ln">01718:</span> 
+<span class="ln">01719:</span>                 &lt;Card className=&quot;bg-slate-900 text-white&quot;&gt;
+<span class="ln">01720:</span>                   &lt;div className=&quot;flex items-center justify-between gap-4&quot;&gt;
+<span class="ln">01721:</span>                     &lt;div&gt;
+<span class="ln">01722:</span>                       &lt;div className=&quot;text-sm font-semibold&quot;&gt;{activeRecord.result.reward.badge_text}&lt;/div&gt;
+<span class="ln">01723:</span>                       &lt;div className=&quot;mt-1 text-xs text-slate-300&quot;&gt;愿意表达、愿意听、愿意和解，就值得被鼓励。&lt;/div&gt;
+<span class="ln">01724:</span>                     &lt;/div&gt;
+<span class="ln">01725:</span>                     &lt;div className=&quot;stamp-pop rounded-2xl border border-white/15 px-4 py-2 text-center&quot;&gt;
+<span class="ln">01726:</span>                       &lt;div className=&quot;text-[11px] tracking-[0.2em] text-slate-400&quot;&gt;奖励&lt;/div&gt;
+<span class="ln">01727:</span>                       &lt;div className=&quot;text-2xl font-bold&quot;&gt;+{activeRecord.result.reward.intimacy_points}&lt;/div&gt;
+<span class="ln">01728:</span>                     &lt;/div&gt;
+<span class="ln">01729:</span>                   &lt;/div&gt;
+<span class="ln">01730:</span>                 &lt;/Card&gt;
+<span class="ln">01731:</span> 
+<span class="ln">01732:</span>                 &lt;Card&gt;
+<span class="ln">01733:</span>                   &lt;button
+<span class="ln">01734:</span>                     type=&quot;button&quot;
+<span class="ln">01735:</span>                     onClick={() =&gt; setShowParentNotes((previous) =&gt; !previous)}
+<span class="ln">01736:</span>                     className=&quot;flex w-full items-center justify-between gap-3 text-left&quot;
+<span class="ln">01737:</span>                   &gt;
+<span class="ln">01738:</span>                     &lt;div&gt;
+<span class="ln">01739:</span>                       &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;给家长的小参考&lt;/div&gt;
+<span class="ln">01740:</span>                       &lt;div className=&quot;mt-1 text-xs text-slate-500&quot;&gt;点开看看这次为什么会吵起来&lt;/div&gt;
+<span class="ln">01741:</span>                     &lt;/div&gt;
+<span class="ln">01742:</span>                     &lt;span className=&quot;text-lg text-slate-400&quot;&gt;{showParentNotes ? &quot;▾&quot; : &quot;▸&quot;}&lt;/span&gt;
+<span class="ln">01743:</span>                   &lt;/button&gt;
+<span class="ln">01744:</span> 
+<span class="ln">01745:</span>                   {showParentNotes ? (
+<span class="ln">01746:</span>                     &lt;div className=&quot;mt-4 space-y-3 text-sm leading-7 text-slate-700&quot;&gt;
+<span class="ln">01747:</span>                       &lt;DetailItem title=&quot;事情摘要&quot; value={activeRecord.result.parent_view.issue_summary} /&gt;
+<span class="ln">01748:</span>                       &lt;DetailItem title=&quot;公平判断&quot; value={activeRecord.result.parent_view.fair_judgment} /&gt;
+<span class="ln">01749:</span>                       &lt;DetailItem title=&quot;孩子成长点&quot; value={activeRecord.result.parent_view.child_learning} /&gt;
+<span class="ln">01750:</span>                       &lt;DetailItem title=&quot;家长提醒&quot; value={activeRecord.result.parent_view.parent_guidance} /&gt;
+<span class="ln">01751:</span>                     &lt;/div&gt;
+<span class="ln">01752:</span>                   ) : null}
+<span class="ln">01753:</span>                 &lt;/Card&gt;
+<span class="ln">01754:</span>               &lt;/div&gt;
+<span class="ln">01755:</span>             ) : (
+<span class="ln">01756:</span>               &lt;Card&gt;
+<span class="ln">01757:</span>                 &lt;div className=&quot;space-y-3 py-6 text-center&quot;&gt;
+<span class="ln">01758:</span>                   &lt;div className=&quot;text-4xl&quot;&gt;📭&lt;/div&gt;
+<span class="ln">01759:</span>                   &lt;div className=&quot;text-lg font-semibold&quot;&gt;还没有判词&lt;/div&gt;
+<span class="ln">01760:</span>                   &lt;p className=&quot;text-sm text-slate-500&quot;&gt;先回去写下双方的话，再请大法官出庭。&lt;/p&gt;
+<span class="ln">01761:</span>                 &lt;/div&gt;
+<span class="ln">01762:</span>               &lt;/Card&gt;
+<span class="ln">01763:</span>             )
+<span class="ln">01764:</span>           ) : null}
+<span class="ln">01765:</span> 
+<span class="ln">01766:</span>           {view === &quot;records&quot; ? (
+<span class="ln">01767:</span>             &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01768:</span>               &lt;div className=&quot;flex items-center justify-between gap-3&quot;&gt;
+<span class="ln">01769:</span>                 &lt;button
+<span class="ln">01770:</span>                   type=&quot;button&quot;
+<span class="ln">01771:</span>                   onClick={() =&gt; setView(&quot;home&quot;)}
+<span class="ln">01772:</span>                   className=&quot;rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200&quot;
+<span class="ln">01773:</span>                 &gt;
+<span class="ln">01774:</span>                   返回首页
+<span class="ln">01775:</span>                 &lt;/button&gt;
+<span class="ln">01776:</span>                 &lt;button
+<span class="ln">01777:</span>                   type=&quot;button&quot;
+<span class="ln">01778:</span>                   onClick={() =&gt; setView(&quot;settings&quot;)}
+<span class="ln">01779:</span>                   className=&quot;rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200&quot;
+<span class="ln">01780:</span>                 &gt;
+<span class="ln">01781:</span>                   打开设置
+<span class="ln">01782:</span>                 &lt;/button&gt;
+<span class="ln">01783:</span>               &lt;/div&gt;
+<span class="ln">01784:</span> 
+<span class="ln">01785:</span>               &lt;Card&gt;
+<span class="ln">01786:</span>                 &lt;div className=&quot;grid grid-cols-3 gap-3&quot;&gt;
+<span class="ln">01787:</span>                   &lt;TinyStat label=&quot;总次数&quot; value={totalMediations} /&gt;
+<span class="ln">01788:</span>                   &lt;TinyStat label=&quot;亲密度&quot; value={`+${totalIntimacy}`} /&gt;
+<span class="ln">01789:</span>                   &lt;TinyStat label=&quot;最近主题&quot; value={latestIssue} /&gt;
+<span class="ln">01790:</span>                 &lt;/div&gt;
+<span class="ln">01791:</span>               &lt;/Card&gt;
+<span class="ln">01792:</span> 
+<span class="ln">01793:</span>               &lt;Card&gt;
+<span class="ln">01794:</span>                 &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">01795:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;查看成长记录&lt;/div&gt;
+<span class="ln">01796:</span>                   {records.length === 0 ? (
+<span class="ln">01797:</span>                     &lt;div className=&quot;rounded-3xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500&quot;&gt;
+<span class="ln">01798:</span>                       还没有记录，先完成一次调解吧。
+<span class="ln">01799:</span>                     &lt;/div&gt;
+<span class="ln">01800:</span>                   ) : (
+<span class="ln">01801:</span>                     records.map((record) =&gt; (
+<span class="ln">01802:</span>                       &lt;button
+<span class="ln">01803:</span>                         key={record.id}
+<span class="ln">01804:</span>                         type=&quot;button&quot;
+<span class="ln">01805:</span>                         onClick={() =&gt; openRecord(record)}
+<span class="ln">01806:</span>                         className=&quot;w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:border-slate-300&quot;
+<span class="ln">01807:</span>                       &gt;
+<span class="ln">01808:</span>                         &lt;div className=&quot;flex items-start justify-between gap-3&quot;&gt;
+<span class="ln">01809:</span>                           &lt;div className=&quot;space-y-2&quot;&gt;
+<span class="ln">01810:</span>                             &lt;div className=&quot;flex flex-wrap items-center gap-2&quot;&gt;
+<span class="ln">01811:</span>                               &lt;span className=&quot;text-sm font-semibold text-slate-900&quot;&gt;{formatDateTime(record.createdAt)}&lt;/span&gt;
+<span class="ln">01812:</span>                               &lt;span className=&quot;rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600&quot;&gt;{record.meta.issueTag}&lt;/span&gt;
+<span class="ln">01813:</span>                               &lt;span className=&quot;rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700&quot;&gt;+{record.result.reward.intimacy_points}&lt;/span&gt;
+<span class="ln">01814:</span>                             &lt;/div&gt;
+<span class="ln">01815:</span>                             &lt;p className=&quot;text-sm leading-6 text-slate-600&quot;&gt;
+<span class="ln">01816:</span>                               {settings.childName}：{shortenText(record.draft.childStatement, 18) || &quot;已记录&quot;} / {record.draft.caregiver}：
+<span class="ln">01817:</span>                               {shortenText(record.draft.parentStatement, 18) || &quot;已记录&quot;}
+<span class="ln">01818:</span>                             &lt;/p&gt;
+<span class="ln">01819:</span>                           &lt;/div&gt;
+<span class="ln">01820:</span>                           &lt;div className=&quot;text-xl text-slate-300&quot;&gt;›&lt;/div&gt;
+<span class="ln">01821:</span>                         &lt;/div&gt;
+<span class="ln">01822:</span>                       &lt;/button&gt;
+<span class="ln">01823:</span>                     ))
+<span class="ln">01824:</span>                   )}
+<span class="ln">01825:</span>                 &lt;/div&gt;
+<span class="ln">01826:</span>               &lt;/Card&gt;
+<span class="ln">01827:</span>             &lt;/div&gt;
+<span class="ln">01828:</span>           ) : null}
+<span class="ln">01829:</span> 
+<span class="ln">01830:</span>           {view === &quot;settings&quot; ? (
+<span class="ln">01831:</span>             &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01832:</span>               &lt;div className=&quot;flex items-center justify-between gap-3&quot;&gt;
+<span class="ln">01833:</span>                 &lt;button
+<span class="ln">01834:</span>                   type=&quot;button&quot;
+<span class="ln">01835:</span>                   onClick={() =&gt; setView(&quot;home&quot;)}
+<span class="ln">01836:</span>                   className=&quot;rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200&quot;
+<span class="ln">01837:</span>                 &gt;
+<span class="ln">01838:</span>                   返回首页
+<span class="ln">01839:</span>                 &lt;/button&gt;
+<span class="ln">01840:</span>                 &lt;span className=&quot;text-sm font-semibold text-slate-500&quot;&gt;修改后会自动保存&lt;/span&gt;
+<span class="ln">01841:</span>               &lt;/div&gt;
+<span class="ln">01842:</span> 
+<span class="ln">01843:</span>               &lt;Card&gt;
+<span class="ln">01844:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01845:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;宠物设置&lt;/div&gt;
+<span class="ln">01846:</span>                   &lt;div className=&quot;grid grid-cols-3 gap-3&quot;&gt;
+<span class="ln">01847:</span>                     {([&quot;cat&quot;, &quot;dog&quot;, &quot;rabbit&quot;] as PetType[]).map((type) =&gt; (
+<span class="ln">01848:</span>                       &lt;button
+<span class="ln">01849:</span>                         key={type}
+<span class="ln">01850:</span>                         type=&quot;button&quot;
+<span class="ln">01851:</span>                         onClick={() =&gt; updateSetting(&quot;petType&quot;, type)}
+<span class="ln">01852:</span>                         className={cn(
+<span class="ln">01853:</span>                           &quot;rounded-3xl border px-3 py-4 text-center transition&quot;,
+<span class="ln">01854:</span>                           settings.petType === type ? &quot;border-slate-900 bg-slate-900 text-white&quot; : &quot;border-slate-200 bg-white text-slate-700&quot;,
+<span class="ln">01855:</span>                         )}
+<span class="ln">01856:</span>                       &gt;
+<span class="ln">01857:</span>                         &lt;div className=&quot;text-3xl&quot;&gt;{PETS[type].emoji}&lt;/div&gt;
+<span class="ln">01858:</span>                       &lt;/button&gt;
+<span class="ln">01859:</span>                     ))}
+<span class="ln">01860:</span>                   &lt;/div&gt;
+<span class="ln">01861:</span>                   &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">01862:</span>                     &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;宠物名字&lt;/label&gt;
+<span class="ln">01863:</span>                     &lt;input
+<span class="ln">01864:</span>                       value={settings.petName}
+<span class="ln">01865:</span>                       onChange={(event) =&gt; updateSetting(&quot;petName&quot;, event.target.value)}
+<span class="ln">01866:</span>                       onBlur={() =&gt; handleSaveToast(&quot;宠物名字已自动保存。&quot;)}
+<span class="ln">01867:</span>                       className=&quot;mt-2 w-full border-0 bg-transparent text-sm text-slate-700 outline-none&quot;
+<span class="ln">01868:</span>                       placeholder=&quot;例如：雪雪&quot;
+<span class="ln">01869:</span>                     /&gt;
+<span class="ln">01870:</span>                   &lt;/div&gt;
+<span class="ln">01871:</span>                 &lt;/div&gt;
+<span class="ln">01872:</span>               &lt;/Card&gt;
+<span class="ln">01873:</span> 
+<span class="ln">01874:</span>               &lt;Card&gt;
+<span class="ln">01875:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01876:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;孩子信息设置&lt;/div&gt;
+<span class="ln">01877:</span>                   &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">01878:</span>                     &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;孩子昵称&lt;/label&gt;
+<span class="ln">01879:</span>                     &lt;input
+<span class="ln">01880:</span>                       value={settings.childName}
+<span class="ln">01881:</span>                       onChange={(event) =&gt; updateSetting(&quot;childName&quot;, event.target.value)}
+<span class="ln">01882:</span>                       onBlur={() =&gt; handleSaveToast(&quot;孩子昵称已自动保存。&quot;)}
+<span class="ln">01883:</span>                       className=&quot;mt-2 w-full border-0 bg-transparent text-sm text-slate-700 outline-none&quot;
+<span class="ln">01884:</span>                       placeholder=&quot;例如：乐乐&quot;
+<span class="ln">01885:</span>                     /&gt;
+<span class="ln">01886:</span>                   &lt;/div&gt;
+<span class="ln">01887:</span>                   &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">01888:</span>                     &lt;div className=&quot;text-sm font-semibold text-slate-800&quot;&gt;孩子性别&lt;/div&gt;
+<span class="ln">01889:</span>                     &lt;div className=&quot;mt-3 grid grid-cols-3 gap-2&quot;&gt;
+<span class="ln">01890:</span>                       {[
+<span class="ln">01891:</span>                         { value: &quot;boy&quot;, label: &quot;男孩&quot; },
+<span class="ln">01892:</span>                         { value: &quot;girl&quot;, label: &quot;女孩&quot; },
+<span class="ln">01893:</span>                         { value: &quot;unspecified&quot;, label: &quot;不设置&quot; },
+<span class="ln">01894:</span>                       ].map((item) =&gt; (
+<span class="ln">01895:</span>                         &lt;button
+<span class="ln">01896:</span>                           key={item.value}
+<span class="ln">01897:</span>                           type=&quot;button&quot;
+<span class="ln">01898:</span>                           onClick={() =&gt; {
+<span class="ln">01899:</span>                             updateSetting(&quot;childGender&quot;, item.value as ChildGender);
+<span class="ln">01900:</span>                             handleSaveToast(&quot;孩子性别已自动保存。&quot;);
+<span class="ln">01901:</span>                           }}
+<span class="ln">01902:</span>                           className={cn(
+<span class="ln">01903:</span>                             &quot;rounded-2xl px-3 py-3 text-sm font-semibold transition&quot;,
+<span class="ln">01904:</span>                             settings.childGender === item.value ? &quot;bg-slate-900 text-white&quot; : &quot;bg-white text-slate-700 ring-1 ring-slate-200&quot;,
+<span class="ln">01905:</span>                           )}
+<span class="ln">01906:</span>                         &gt;
+<span class="ln">01907:</span>                           {item.label}
+<span class="ln">01908:</span>                         &lt;/button&gt;
+<span class="ln">01909:</span>                       ))}
+<span class="ln">01910:</span>                     &lt;/div&gt;
+<span class="ln">01911:</span>                   &lt;/div&gt;
+<span class="ln">01912:</span>                   &lt;div className=&quot;grid grid-cols-1 gap-3 sm:grid-cols-2&quot;&gt;
+<span class="ln">01913:</span>                     &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">01914:</span>                       &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;生日(20160125)&lt;/label&gt;
+<span class="ln">01915:</span>                       &lt;input
+<span class="ln">01916:</span>                         type=&quot;text&quot;
+<span class="ln">01917:</span>                         inputMode=&quot;numeric&quot;
+<span class="ln">01918:</span>                         value={settings.childBirthday}
+<span class="ln">01919:</span>                         onChange={(event) =&gt; updateSetting(&quot;childBirthday&quot;, event.target.value)}
+<span class="ln">01920:</span>                         onBlur={(event) =&gt; {
+<span class="ln">01921:</span>                           const normalized = normalizeBirthdayInput(event.target.value);
+<span class="ln">01922:</span>                           const birthdayAge = calculateAgeFromBirthday(normalized);
+<span class="ln">01923:</span> 
+<span class="ln">01924:</span>                           setSettings((previous) =&gt; ({
+<span class="ln">01925:</span>                             ...previous,
+<span class="ln">01926:</span>                             childBirthday: normalized,
+<span class="ln">01927:</span>                             fallbackAge: birthdayAge !== null &amp;&amp; !previous.ageManualOverride ? clampAge(birthdayAge) : previous.fallbackAge,
+<span class="ln">01928:</span>                           }));
+<span class="ln">01929:</span> 
+<span class="ln">01930:</span>                           if (birthdayAge !== null &amp;&amp; !settings.ageManualOverride) {
+<span class="ln">01931:</span>                             setAgeInput(String(clampAge(birthdayAge)));
+<span class="ln">01932:</span>                           } else if (!normalized &amp;&amp; !settings.ageManualOverride) {
+<span class="ln">01933:</span>                             setAgeInput(String(DEFAULT_SETTINGS.fallbackAge));
+<span class="ln">01934:</span>                           }
+<span class="ln">01935:</span> 
+<span class="ln">01936:</span>                           handleSaveToast(&quot;生日已自动保存。&quot;);
+<span class="ln">01937:</span>                         }}
+<span class="ln">01938:</span>                         className=&quot;mt-2 w-full border-0 bg-transparent text-sm text-slate-700 outline-none&quot;
+<span class="ln">01939:</span>                         placeholder=&quot;可填 2016、201601 或 20160125&quot;
+<span class="ln">01940:</span>                       /&gt;
+<span class="ln">01941:</span>                     &lt;/div&gt;
+<span class="ln">01942:</span>                     &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">01943:</span>                       &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;年龄&lt;/label&gt;
+<span class="ln">01944:</span>                       &lt;input
+<span class="ln">01945:</span>                         type=&quot;text&quot;
+<span class="ln">01946:</span>                         inputMode=&quot;numeric&quot;
+<span class="ln">01947:</span>                         value={ageInput}
+<span class="ln">01948:</span>                         onChange={(event) =&gt; setAgeInput(event.target.value.replace(/[^\d]/g, &quot;&quot;).slice(0, 2))}
+<span class="ln">01949:</span>                         onBlur={() =&gt; {
+<span class="ln">01950:</span>                           const digits = ageInput.replace(/[^\d]/g, &quot;&quot;);
+<span class="ln">01951:</span> 
+<span class="ln">01952:</span>                           if (!digits) {
+<span class="ln">01953:</span>                             const birthdayAge = calculateAgeFromBirthday(settings.childBirthday);
+<span class="ln">01954:</span>                             const nextAge = clampAge(birthdayAge ?? DEFAULT_SETTINGS.fallbackAge);
+<span class="ln">01955:</span>                             setSettings((previous) =&gt; ({
+<span class="ln">01956:</span>                               ...previous,
+<span class="ln">01957:</span>                               fallbackAge: nextAge,
+<span class="ln">01958:</span>                               ageManualOverride: false,
+<span class="ln">01959:</span>                             }));
+<span class="ln">01960:</span>                             setAgeInput(String(nextAge));
+<span class="ln">01961:</span>                             handleSaveToast(&quot;年龄已自动保存。&quot;);
+<span class="ln">01962:</span>                             return;
+<span class="ln">01963:</span>                           }
+<span class="ln">01964:</span> 
+<span class="ln">01965:</span>                           const parsedAge = clampAge(Number(digits));
+<span class="ln">01966:</span>                           setSettings((previous) =&gt; ({
+<span class="ln">01967:</span>                             ...previous,
+<span class="ln">01968:</span>                             fallbackAge: parsedAge,
+<span class="ln">01969:</span>                             ageManualOverride: true,
+<span class="ln">01970:</span>                           }));
+<span class="ln">01971:</span>                           setAgeInput(String(parsedAge));
+<span class="ln">01972:</span>                           handleSaveToast(&quot;年龄已自动保存。&quot;);
+<span class="ln">01973:</span>                         }}
+<span class="ln">01974:</span>                         className=&quot;mt-2 w-full border-0 bg-transparent text-sm text-slate-700 outline-none&quot;
+<span class="ln">01975:</span>                         placeholder=&quot;例如：7&quot;
+<span class="ln">01976:</span>                       /&gt;
+<span class="ln">01977:</span>                     &lt;/div&gt;
+<span class="ln">01978:</span>                   &lt;/div&gt;
+<span class="ln">01979:</span>                   &lt;div className=&quot;rounded-3xl bg-emerald-50 px-4 py-3 text-sm leading-7 text-emerald-900&quot;&gt;
+<span class="ln">01980:</span>                     两个都不填时默认按 7 岁；填了生日会自动回填年龄；生日和年龄都存在时，以年龄为准。
+<span class="ln">01981:</span>                   &lt;/div&gt;
+<span class="ln">01982:</span>                 &lt;/div&gt;
+<span class="ln">01983:</span>               &lt;/Card&gt;
+<span class="ln">01984:</span> 
+<span class="ln">01985:</span>               &lt;Card&gt;
+<span class="ln">01986:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">01987:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;家长称呼&lt;/div&gt;
+<span class="ln">01988:</span>                   &lt;div className=&quot;rounded-3xl bg-white px-4 py-4 ring-1 ring-slate-100&quot;&gt;
+<span class="ln">01989:</span>                     &lt;div className=&quot;text-sm font-semibold text-slate-800&quot;&gt;两个常用称呼&lt;/div&gt;
+<span class="ln">01990:</span>                     &lt;p className=&quot;mt-1 text-xs leading-6 text-slate-500&quot;&gt;前台点“{draft.caregiver}怎么说”时，会在下面选中的两个称呼之间切换。&lt;/p&gt;
+<span class="ln">01991:</span>                     &lt;div className=&quot;mt-3 flex flex-wrap gap-2&quot;&gt;
+<span class="ln">01992:</span>                       {settings.caregiverOptions.map((name) =&gt; {
+<span class="ln">01993:</span>                         const selected = commonCaregivers.includes(name);
+<span class="ln">01994:</span>                         return (
+<span class="ln">01995:</span>                           &lt;button
+<span class="ln">01996:</span>                             key={name}
+<span class="ln">01997:</span>                             type=&quot;button&quot;
+<span class="ln">01998:</span>                             onClick={() =&gt; {
+<span class="ln">01999:</span>                               toggleCommonCaregiver(name);
+<span class="ln">02000:</span>                               handleSaveToast(&quot;常用称呼已自动保存。&quot;);
+<span class="ln">02001:</span>                             }}
+<span class="ln">02002:</span>                             className={cn(
+<span class="ln">02003:</span>                               &quot;rounded-full px-3 py-2 text-sm font-semibold transition&quot;,
+<span class="ln">02004:</span>                               selected ? &quot;bg-slate-900 text-white&quot; : &quot;bg-slate-100 text-slate-700&quot;,
+<span class="ln">02005:</span>                             )}
+<span class="ln">02006:</span>                           &gt;
+<span class="ln">02007:</span>                             {selected ? `✓ ${name}` : name}
+<span class="ln">02008:</span>                           &lt;/button&gt;
+<span class="ln">02009:</span>                         );
+<span class="ln">02010:</span>                       })}
+<span class="ln">02011:</span>                     &lt;/div&gt;
+<span class="ln">02012:</span>                   &lt;/div&gt;
+<span class="ln">02013:</span>                 &lt;/div&gt;
+<span class="ln">02014:</span>               &lt;/Card&gt;
+<span class="ln">02015:</span> 
+<span class="ln">02016:</span>               &lt;Card&gt;
+<span class="ln">02017:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">02018:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;播放语音&lt;/div&gt;
+<span class="ln">02019:</span>                   &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">02020:</span>                     &lt;div className=&quot;text-sm font-semibold text-slate-800&quot;&gt;语音角色&lt;/div&gt;
+<span class="ln">02021:</span>                     &lt;div className=&quot;mt-3 grid grid-cols-2 gap-2&quot;&gt;
+<span class="ln">02022:</span>                       {(Object.entries(TTS_ROLE_META) as Array&lt;[TtsRole, (typeof TTS_ROLE_META)[TtsRole]]&gt;).map(([role, meta]) =&gt; (
+<span class="ln">02023:</span>                         &lt;button
+<span class="ln">02024:</span>                           key={role}
+<span class="ln">02025:</span>                           type=&quot;button&quot;
+<span class="ln">02026:</span>                           onClick={() =&gt; {
+<span class="ln">02027:</span>                             updateSetting(&quot;ttsRole&quot;, role);
+<span class="ln">02028:</span>                             handlePreviewTtsRole(role);
+<span class="ln">02029:</span>                             handleSaveToast(&quot;语音角色已自动保存，并已试听一小句。&quot;);
+<span class="ln">02030:</span>                           }}
+<span class="ln">02031:</span>                           className={cn(
+<span class="ln">02032:</span>                             &quot;rounded-2xl px-3 py-3 text-sm font-semibold transition&quot;,
+<span class="ln">02033:</span>                             settings.ttsRole === role ? &quot;bg-slate-900 text-white&quot; : &quot;bg-white text-slate-700 ring-1 ring-slate-200&quot;,
+<span class="ln">02034:</span>                           )}
+<span class="ln">02035:</span>                         &gt;
+<span class="ln">02036:</span>                           &lt;span className=&quot;block&quot;&gt;{meta.label}&lt;/span&gt;
+<span class="ln">02037:</span>                           &lt;span className=&quot;mt-1 block text-[11px] font-medium opacity-75&quot;&gt;点一下试听&lt;/span&gt;
+<span class="ln">02038:</span>                         &lt;/button&gt;
+<span class="ln">02039:</span>                       ))}
+<span class="ln">02040:</span>                     &lt;/div&gt;
+<span class="ln">02041:</span>                     &lt;p className=&quot;mt-3 text-xs leading-6 text-slate-500&quot;&gt;点选时会自动试听；不同手机和浏览器能用的中文语音不完全一样，所以听起来会有一点差别。&lt;/p&gt;
+<span class="ln">02042:</span>                   &lt;/div&gt;
+<span class="ln">02043:</span>                 &lt;/div&gt;
+<span class="ln">02044:</span>               &lt;/Card&gt;
+<span class="ln">02045:</span> 
+<span class="ln">02046:</span>               &lt;Card&gt;
+<span class="ln">02047:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">02048:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;Gemini 测试&lt;/div&gt;
+<span class="ln">02049:</span>                   &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">02050:</span>                     &lt;label className=&quot;text-sm font-semibold text-slate-800&quot;&gt;API Key（隐藏）&lt;/label&gt;
+<span class="ln">02051:</span>                     &lt;input
+<span class="ln">02052:</span>                       type=&quot;password&quot;
+<span class="ln">02053:</span>                       autoComplete=&quot;off&quot;
+<span class="ln">02054:</span>                       value={settings.apiKey}
+<span class="ln">02055:</span>                       onChange={(event) =&gt; updateSetting(&quot;apiKey&quot;, event.target.value)}
+<span class="ln">02056:</span>                       onBlur={() =&gt; handleSaveToast(&quot;测试 Key 已隐藏并自动保存。&quot;)}
+<span class="ln">02057:</span>                       className=&quot;mt-2 w-full border-0 bg-transparent text-sm text-slate-700 outline-none&quot;
+<span class="ln">02058:</span>                       placeholder=&quot;粘贴测试 Key，离开输入框自动保存&quot;
+<span class="ln">02059:</span>                     /&gt;
+<span class="ln">02060:</span>                     &lt;p className=&quot;mt-2 text-xs leading-5 text-slate-500&quot;&gt;前台只用于测试调用。正式上线建议改成你自己的后端转发，不把 Key 放到客户端。&lt;/p&gt;
+<span class="ln">02061:</span>                   &lt;/div&gt;
+<span class="ln">02062:</span>                 &lt;/div&gt;
+<span class="ln">02063:</span>               &lt;/Card&gt;
+<span class="ln">02064:</span> 
+<span class="ln">02065:</span>               &lt;Card&gt;
+<span class="ln">02066:</span>                 &lt;div className=&quot;space-y-4&quot;&gt;
+<span class="ln">02067:</span>                   &lt;div className=&quot;text-sm font-semibold text-slate-900&quot;&gt;提示词&lt;/div&gt;
+<span class="ln">02068:</span>                   &lt;div className=&quot;rounded-3xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">02069:</span>                     &lt;textarea
+<span class="ln">02070:</span>                       value={settings.systemPrompt}
+<span class="ln">02071:</span>                       onChange={(event) =&gt; updateSetting(&quot;systemPrompt&quot;, event.target.value)}
+<span class="ln">02072:</span>                       onBlur={() =&gt; handleSaveToast(&quot;提示词已自动保存。&quot;)}
+<span class="ln">02073:</span>                       rows={16}
+<span class="ln">02074:</span>                       className=&quot;w-full resize-none border-0 bg-transparent text-sm leading-7 text-slate-700 outline-none&quot;
+<span class="ln">02075:</span>                     /&gt;
+<span class="ln">02076:</span>                   &lt;/div&gt;
+<span class="ln">02077:</span>                 &lt;/div&gt;
+<span class="ln">02078:</span>               &lt;/Card&gt;
+<span class="ln">02079:</span>             &lt;/div&gt;
+<span class="ln">02080:</span>           ) : null}
+<span class="ln">02081:</span>         &lt;/div&gt;
+<span class="ln">02082:</span>       &lt;/div&gt;
+<span class="ln">02083:</span> 
+<span class="ln">02084:</span>       {isGenerating ? (
+<span class="ln">02085:</span>         &lt;div className=&quot;fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 px-6 backdrop-blur-sm&quot;&gt;
+<span class="ln">02086:</span>           &lt;div className=&quot;w-full max-w-sm rounded-[32px] border border-white/60 bg-white/92 p-6 text-center shadow-[0_24px_80px_rgba(15,23,42,0.22)]&quot;&gt;
+<span class="ln">02087:</span>             &lt;div className={cn(&quot;mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-gradient-to-br text-3xl text-white shadow-lg&quot;, pet.accent)}&gt;
+<span class="ln">02088:</span>               &lt;span className=&quot;spin-soft&quot;&gt;{pet.writingToolEmoji}&lt;/span&gt;
+<span class="ln">02089:</span>             &lt;/div&gt;
+<span class="ln">02090:</span>               &lt;div className=&quot;space-y-3&quot;&gt;
+<span class="ln">02091:</span>               &lt;h2 className=&quot;text-lg font-semibold text-slate-900&quot;&gt;{settings.petName}大法官正在整理判词&lt;/h2&gt;
+<span class="ln">02092:</span>               &lt;div className=&quot;rounded-[24px] bg-slate-50 px-4 py-4 text-left&quot;&gt;
+<span class="ln">02093:</span>                 &lt;div className=&quot;mb-2 text-xs font-semibold tracking-[0.18em] text-slate-400&quot;&gt;{settings.petName}用{pet.writingToolLabel}在慢慢写字&lt;/div&gt;
+<span class="ln">02094:</span>                 &lt;p className=&quot;scratch-write min-h-[84px] text-sm leading-7 text-slate-700&quot;&gt;
+<span class="ln">02095:</span>                   {typedLoadingLine}
+<span class="ln">02096:</span>                   &lt;span className=&quot;paw-cursor&quot;&gt;{pet.writingToolEmoji}&lt;/span&gt;
+<span class="ln">02097:</span>                 &lt;/p&gt;
+<span class="ln">02098:</span>               &lt;/div&gt;
+<span class="ln">02099:</span>             &lt;/div&gt;
+<span class="ln">02100:</span>           &lt;/div&gt;
+<span class="ln">02101:</span>         &lt;/div&gt;
+<span class="ln">02102:</span>       ) : null}
+<span class="ln">02103:</span> 
+<span class="ln">02104:</span>       {toast ? (
+<span class="ln">02105:</span>         &lt;div className=&quot;fixed inset-x-0 bottom-6 z-50 mx-auto w-fit max-w-[calc(100vw-2rem)] px-4&quot;&gt;
+<span class="ln">02106:</span>           &lt;div
+<span class="ln">02107:</span>             className={cn(
+<span class="ln">02108:</span>               &quot;rounded-full px-4 py-3 text-sm font-semibold shadow-lg backdrop-blur&quot;,
+<span class="ln">02109:</span>               toast.tone === &quot;dark&quot; &amp;&amp; &quot;bg-slate-900 text-white&quot;,
+<span class="ln">02110:</span>               toast.tone === &quot;pink&quot; &amp;&amp; &quot;bg-pink-500 text-white&quot;,
+<span class="ln">02111:</span>               toast.tone === &quot;amber&quot; &amp;&amp; &quot;bg-amber-400 text-slate-900&quot;,
+<span class="ln">02112:</span>             )}
+<span class="ln">02113:</span>           &gt;
+<span class="ln">02114:</span>             {toast.message}
+<span class="ln">02115:</span>           &lt;/div&gt;
+<span class="ln">02116:</span>         &lt;/div&gt;
+<span class="ln">02117:</span>       ) : null}
+<span class="ln">02118:</span>     &lt;/div&gt;
+<span class="ln">02119:</span>   );
+<span class="ln">02120:</span> }
+<span class="ln">02121:</span> 
+<span class="ln">02122:</span> function TaskRow({ label, value }: { label: string; value: string }) {
+<span class="ln">02123:</span>   return (
+<span class="ln">02124:</span>     &lt;div className=&quot;rounded-2xl bg-white/80 px-4 py-3 text-sm leading-7 text-slate-700&quot;&gt;
+<span class="ln">02125:</span>       &lt;div className=&quot;mb-1 text-xs font-semibold text-slate-500&quot;&gt;{label}&lt;/div&gt;
+<span class="ln">02126:</span>       &lt;div&gt;{value}&lt;/div&gt;
+<span class="ln">02127:</span>     &lt;/div&gt;
+<span class="ln">02128:</span>   );
+<span class="ln">02129:</span> }
+<span class="ln">02130:</span> 
+<span class="ln">02131:</span> function DetailItem({ title, value }: { title: string; value: string }) {
+<span class="ln">02132:</span>   return (
+<span class="ln">02133:</span>     &lt;div className=&quot;rounded-2xl bg-slate-50 px-4 py-3&quot;&gt;
+<span class="ln">02134:</span>       &lt;div className=&quot;mb-1 text-xs font-semibold text-slate-500&quot;&gt;{title}&lt;/div&gt;
+<span class="ln">02135:</span>       &lt;div&gt;{value}&lt;/div&gt;
+<span class="ln">02136:</span>     &lt;/div&gt;
+<span class="ln">02137:</span>   );
+<span class="ln">02138:</span> }
+
+</pre>
+</body>
+</html>
