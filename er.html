@@ -1,177 +1,370 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>缝合助手_超增强版（直通二润版）</title>
+<title>缝合助手_超增强版（人工润色记录版）</title>
 <style>
   :root{
-    --bg:#0a1122;
-    --panel:#111a33;
-    --line:#2b3e73;
-    --text:#edf2ff;
-    --muted:#a8b6da;
-    --blue:#4f7cff;
-    --blue2:#375fd6;
-    --green:#1fa56f;
-    --green2:#167d54;
-    --orange:#b87911;
-    --orange2:#8d5d0d;
-    --red:#b34343;
-    --red2:#8e3131;
-    --chip:#0d1530;
-    --shadow:0 10px 30px rgba(0,0,0,.28);
-    --ins:#7df2c1;
-    --del:#ffb1b1;
-    --hl:#ffd869;
+    --bg:#0b1220;
+    --panel:#121b2d;
+    --panel3:#0f1727;
+    --text:#eaf1ff;
+    --muted:#9eb1cf;
+    --line:#29415f;
+    --line2:#1f3048;
+    --blue:#5aa9ff;
+    --shadow:0 8px 24px rgba(0,0,0,.22);
+    --radius:12px;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
-  body{padding:18px}
-  .wrap{max-width:1600px;margin:0 auto}
-  h1{margin:0 0 12px;font-size:28px}
-  h2{margin:0 0 12px;font-size:18px}
-  .desc{color:var(--muted);margin-bottom:16px}
-  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
-  .panel.full{grid-column:1/-1}
-  .row{display:flex;gap:12px;flex-wrap:wrap}
-  .row > div{flex:1;min-width:220px}
-  .row.tight{gap:10px;align-items:center}
-  .twoWide{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .split2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .split3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-  .workspace{display:grid;grid-template-columns:320px 1fr;gap:12px}
-  .compact-grid{display:grid;grid-template-columns:110px 130px 110px 110px 110px 1fr;gap:10px;align-items:end}
-  .compact-grid .full{grid-column:1/-1}
-  .editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .editor-grid .full{grid-column:1/-1}
-  label{display:block;margin:8px 0 6px;font-weight:700}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Microsoft YaHei,sans-serif}
+  body{padding:10px}
+  .wrap{max-width:1520px;margin:0 auto}
+  h1{margin:0 0 8px;font-size:24px;line-height:1.2}
+  h2{margin:0 0 8px;font-size:16px;line-height:1.25}
+  .desc{color:var(--muted);margin-bottom:10px}
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--panel3));
+    border:1px solid var(--line2);
+    border-radius:var(--radius);
+    padding:10px;
+    box-shadow:var(--shadow);
+    margin-bottom:10px;
+  }
+  .grid{display:grid;gap:10px}
+  .grid-2{grid-template-columns:1.15fr .85fr}
+  .grid-3{grid-template-columns:1fr 1fr 1fr}
+  .grid-main{grid-template-columns:340px 1fr}
+  .grid-batch{grid-template-columns:340px 1fr}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .split-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .editor-grid{
+    display:grid;
+    grid-template-columns:90px 120px 90px 90px 90px 1fr;
+    gap:8px;
+    align-items:end;
+  }
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  label{display:block;color:#cfe0ff;margin:6px 0 4px;font-size:13px}
   input[type="text"],input[type="number"],select,textarea{
-    width:100%;border:1px solid var(--line);border-radius:12px;padding:10px 12px;
-    background:#0a1230;color:var(--text);outline:none
+    width:100%;
+    background:#0c1525;
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:7px 9px;
+    outline:none;
   }
-  textarea{min-height:120px;resize:vertical}
-  textarea.mono,input.mono,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  textarea{min-height:72px;resize:vertical}
+  textarea.small-ta{min-height:58px}
+  textarea.big-ta{min-height:160px}
   input[type="file"]{
-    width:100%;border:1px dashed var(--line);border-radius:12px;padding:10px;background:#0a1230;color:var(--text)
+    width:100%;
+    background:#0c1525;
+    color:var(--text);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:7px;
   }
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
   .btn{
-    appearance:none;border:none;border-radius:999px;padding:9px 14px;cursor:pointer;
-    color:#fff;font-weight:800;letter-spacing:.2px
+    border:none;
+    background:#223554;
+    color:#fff;
+    padding:7px 12px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:700;
+    font-size:13px;
   }
+  .btn:hover{filter:brightness(1.08)}
   .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn.ok{background:var(--green)}
-  .btn.ok:hover:not(:disabled){background:var(--green2)}
-  .btn.secondary{background:var(--blue)}
-  .btn.secondary:hover:not(:disabled){background:var(--blue2)}
-  .btn.warn{background:var(--orange)}
-  .btn.warn:hover:not(:disabled){background:var(--orange2)}
-  .btn.bad{background:var(--red)}
-  .btn.bad:hover:not(:disabled){background:var(--red2)}
-  .status,.small,.readme,.preview-box,.listbox,.batch-list,.history-list{
-    border:1px solid var(--line);border-radius:12px;background:#0a1230
+  .btn.ok{background:#0f8b61}
+  .btn.warn{background:#9a5d00}
+  .btn.danger{background:#992f2f}
+  .btn.secondary{background:#2b4166}
+  .btn.ghost{background:#182538}
+  .status,.small,.preview-box,.listbox,.history-list,.batch-list{
+    background:#0c1525;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px;
   }
-  .status,.small,.readme,.preview-box{padding:10px}
-  .status{white-space:pre-wrap;word-break:break-word}
+  .status,.small{white-space:pre-wrap}
   .small{color:var(--muted)}
-  .readme{white-space:pre-wrap;max-height:380px;overflow:auto}
-  .listbox,.batch-list,.history-list{height:420px;overflow:auto;padding:8px}
-  .chip{
-    display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;
-    border:1px solid var(--line);background:var(--chip);font-size:12px
-  }
-  .tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .tab{
-    padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:#0d1531;color:var(--muted);cursor:pointer;font-weight:700
-  }
-  .tab.active{background:#1a2a5e;color:#fff;border-color:#5b83ff}
+  .tiny{font-size:12px;color:var(--muted)}
+  .compact-note{font-size:12px;color:#d5e3ff;opacity:.86;margin-top:4px}
+  .listbox,.history-list,.batch-list{height:240px;overflow:auto}
+  .preview-box{min-height:56px;overflow:auto}
   .item{
-    border:1px solid var(--line);border-radius:12px;background:#0d1531;padding:8px;margin-bottom:8px;cursor:pointer
+    border:1px solid var(--line2);
+    background:#121d31;
+    border-radius:10px;
+    padding:7px;
+    margin-bottom:6px;
   }
-  .item.active{border-color:#7aa2ff;box-shadow:0 0 0 1px rgba(122,162,255,.35) inset}
-  .item .title{font-weight:800}
-  .item .meta{color:var(--muted);font-size:12px;margin-top:4px}
-  .item .ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .preview-box{min-height:96px;overflow:auto;word-break:break-word}
-  .preview-box del{background:rgba(255,177,177,.22);color:#ffd9d9;text-decoration:none;padding:1px 2px;border-radius:3px}
-  .preview-box ins{background:rgba(125,242,193,.22);color:#caffea;text-decoration:none;padding:1px 2px;border-radius:3px}
+  .item:last-child{margin-bottom:0}
+  .item.active{border-color:var(--blue);box-shadow:0 0 0 1px rgba(90,169,255,.35) inset}
+  .item .title{font-weight:700}
+  .item .meta{font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px}
+  .chip{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:56px;height:22px;padding:0 8px;border-radius:999px;
+    font-size:12px;font-weight:700;color:#fff;
+  }
+  .st-pending{background:#46556b}
+  .st-ok{background:#126e53}
+  .st-keep{background:#5e6b2a}
+  .st-skip{background:#6a3640}
+  .st-ambiguous{background:#6b4d13}
+  .st-conflict{background:#5a2a7e}
+  .readme{
+    background:#0b1322;
+    border:1px dashed var(--line);
+    border-radius:10px;
+    padding:8px;
+  }
+  details summary{cursor:pointer;font-weight:700}
+  mark.diff-old{background:rgba(255,123,123,.22);color:#ffd6d6;padding:0 .1em}
+  mark.diff-new{background:rgba(79,209,165,.22);color:#d7fff1;padding:0 .1em}
   .muted{color:var(--muted)}
-  details{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#0d1531}
-  summary{cursor:pointer;font-weight:800}
-  .inline-help{font-size:12px;color:var(--muted);margin-top:4px}
-  .right{margin-left:auto}
-  .hidden{display:none !important}
+  .hr{height:1px;background:var(--line2);margin:8px 0}
+  .radio,.checkbox{display:flex;align-items:center;gap:6px}
+  .radio input,.checkbox input{width:auto}
+  .footer-note{color:var(--muted);font-size:12px;margin-top:6px}
+  #promptTemplate{min-height:132px}
+  #promptPreview{min-height:168px}
+  #promptJsonPreview{min-height:132px}
+  #sourcePaste,#allResultsPaste,#secondPassJsonPaste,#batchResponseBox{min-height:88px}
+  #fullTextEditor,#finalRawPreview,#finalRenderedPreview,#fullTextPreview,#humanRecordPreview{min-height:160px}
+  #oldPreview,#newPreview{min-height:72px}
+  #diffSummary{min-height:58px}
   @media (max-width:1200px){
-    .grid,.split2,.split3,.twoWide,.workspace,.editor-grid,.compact-grid{grid-template-columns:1fr}
-    .listbox,.batch-list,.history-list{height:320px}
+    body{padding:8px}
+    .grid-2,.grid-3,.grid-main,.grid-batch,.two-col,.three-col,.split-2{grid-template-columns:1fr}
+    .editor-grid{grid-template-columns:1fr 1fr}
+    .listbox,.history-list,.batch-list{height:220px}
+    #fullTextEditor,#finalRawPreview,#finalRenderedPreview,#fullTextPreview,#humanRecordPreview{min-height:132px}
   }
+
+/* ===== 模块更紧凑 + 全部框体可拖拽 ===== */
+.wrap{max-width:1680px}
+.panel{padding:8px}
+label{margin:4px 0 4px}
+.toolbar{gap:6px}
+
+.module-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  align-items:start;
+}
+.module-span-2{grid-column:1 / -1}
+
+textarea,
+.preview-box,
+.listbox,
+.history-list,
+.batch-list{
+  resize:both;
+  overflow:auto;
+  max-width:100%;
+}
+
+/* 把短输入框升级后的单行 textarea 做紧凑 */
+.single-line-resizable{
+  min-height:38px !important;
+  height:38px;
+  width:260px;
+  max-width:100%;
+  white-space:nowrap;
+  overflow:auto;
+  line-height:1.35;
+  resize:both;
+}
+
+/* 常用短框宽度 */
+#searchText{width:420px}
+#maxPerBatch{width:140px}
+#maxChars{width:180px}
+#editId{width:90px}
+#editChunk{width:120px}
+#editSrcStart{width:110px}
+#editSrcEnd{width:110px}
+#editAbsStart{width:110px}
+#editAbsEnd{width:110px}
+
+/* 结果预览更长 */
+#fullTextPreview,
+#finalRawPreview,
+#finalRenderedPreview{
+  min-height:320px;
+}
+
+/* ===== ⑩ 补丁工作区重排 ===== */
+.patch-workspace{
+  display:grid;
+  grid-template-columns:250px 1fr;
+  gap:10px;
+  align-items:start;
+}
+.patch-left .listbox{
+  min-height:320px;
+}
+.patch-right{
+  display:grid;
+  gap:8px;
+}
+.patch-mini-grid{
+  display:grid;
+  grid-template-columns:90px 120px 100px 110px 110px 110px 110px;
+  gap:8px;
+  align-items:end;
+}
+.patch-core{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.patch-core textarea{
+  min-height:150px;
+}
+.patch-reasons{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.patch-reasons textarea{
+  min-height:95px;
+}
+.patch-contexts{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.patch-contexts textarea{
+  min-height:110px;
+}
+.patch-advanced{
+  margin-top:4px;
+}
+.patch-advanced textarea{
+  min-height:70px;
+}
+
+/* 半屏模块里，小布局默认竖排，避免几个字的框占半屏 */
+.grid-2 > .panel .two-col,
+.grid-2 > .panel .three-col,
+.grid-2 > .panel .split-2{
+  grid-template-columns:1fr;
+}
+
+/* ⑧ 全宽 */
+.panel.apply-panel{
+  grid-column:1 / -1;
+}
+
+@media (max-width:1280px){
+  .module-grid{grid-template-columns:1fr}
+  .module-span-2{grid-column:auto}
+  .patch-workspace{grid-template-columns:1fr}
+  .patch-mini-grid{grid-template-columns:1fr 1fr}
+  .patch-core,
+  .patch-reasons,
+  .patch-contexts,
+  .grid-2,
+  .grid-3,
+  .grid-main,
+  .grid-batch,
+  .two-col,
+  .three-col,
+  .split-2{
+    grid-template-columns:1fr;
+  }
+}
+
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>缝合助手_超增强版（直通二润版）</h1>
+  <h1>缝合助手_超增强版（人工润色记录版）</h1>
   <div class="desc">
-    这版是<strong>完整替换版</strong>：已移除 Gemini；⑧ 改成“一润后全文 / 合并文本”直通模式；
-    可直接导入二润 JSON 生成二润润色记录与二润全文。keep 且无二润 reason 时，会自动回退使用一润 first_reason。
+    保留原来的“一润 JSON → 自动分批 → 当前批次返回 → 合并润色记录 → 严格应用到全文”的主流程；
+    新增“无提示词当前批次续传包”和“给人看的人工润色记录”，并把默认文件名改成纯中文。
   </div>
 
-  <section class="panel full">
-    <details>
-      <summary title="展开查看使用说明">README_缝合助手（点开查看）</summary>
-      <div class="readme mono" id="readmeBox"></div>
+  <details class="panel">
+    <summary>README_缝合助手（点开查看）</summary>
+    <div class="readme">
+      <div id="readmeText" class="small"></div>
       <div class="toolbar">
         <button class="btn secondary" id="btnCopyReadme">复制 README</button>
       </div>
-    </details>
+    </div>
+  </details>
+
+  <section class="panel">
+    <h2>① 一润 JSON</h2>
+    <div class="two-col">
+      <div>
+        <label>选择一润 JSON / .json.html（选择后自动导入）</label>
+        <input type="file" id="sourceFile" accept=".json,.html,.txt,.json.html" />
+      </div>
+      <div>
+        <label>操作</label>
+        <div class="toolbar">
+          <button class="btn ok" id="btnImportSource">导入一润 JSON</button>
+          <button class="btn secondary" id="btnDownloadDataset" disabled>下载当前激活数据集</button>
+        </div>
+      </div>
+    </div>
+
+    <label>或者粘贴 JSON / HTML 后手动导入</label>
+    <textarea id="sourcePaste" class="mono" placeholder="把一润 JSON 或 .json.html 内容粘贴到这里"></textarea>
+
+    <div class="two-col" style="margin-top:8px">
+      <div id="sourceLog" class="status">等待导入。</div>
+      <div id="datasetSummary" class="small">暂无数据集。</div>
+    </div>
+
+    <label>当前数据集条目列表（可搜索 / 勾选 / 分批）</label>
+    <div id="sourceList" class="listbox"></div>
   </section>
 
-  <div class="grid">
-    <section class="panel">
-      <h2>① 一润 JSON</h2>
-      <label>选择一润 JSON / .json.html（选择后自动导入）</label>
-      <input type="file" id="sourceFile" accept=".json,.html,.txt,.json.html">
+  <section class="panel">
+    <h2>② 提示词模板 / 当前批次完整 prompt 包</h2>
 
-      <label>或者粘贴 JSON / HTML 后手动导入</label>
-      <textarea id="sourcePaste" class="mono" placeholder="支持 JSON、代码块、或 body 中直接是 JSON 的 html"></textarea>
+    <label>提示词模板</label>
+    <textarea id="promptTemplate" class="mono"></textarea>
 
-      <div class="toolbar">
-        <button class="btn ok" id="btnImportSource">导入一润 JSON</button>
-        <button class="btn secondary" id="btnDownloadDataset" disabled>下载当前激活数据集</button>
-      </div>
+    <div class="toolbar">
+      <button class="btn ok" id="btnCopyPromptPreview" disabled>复制当前批次完整 prompt 包</button>
+      <button class="btn secondary" id="btnCopyPromptJsonPreview" disabled>复制不带提示词的当前批次包</button>
+      <button class="btn secondary" id="btnCopyPromptTemplate">复制提示词模板（仅模板）</button>
+    </div>
 
-      <div class="status" id="sourceLog">等待导入。</div>
-      <div class="small" id="datasetSummary">暂无数据集。</div>
-    </section>
+    <label>当前批次完整 prompt 包</label>
+    <textarea id="promptPreview" class="mono" readonly></textarea>
 
-    <section class="panel">
-      <h2>② 提示词模板 / 当前批次完整 prompt 包</h2>
-      <label>提示词模板</label>
-      <textarea id="promptTemplate" class="mono" data-save-key="promptTemplate"></textarea>
+    <label>当前批次 JSON 包（不带提示词，仅适合同一会话续传）</label>
+    <textarea id="promptJsonPreview" class="mono" readonly></textarea>
+    <div class="compact-note">仅建议用于同一聊天线程中的后续批次续传；如果换会话、换模型、输出格式漂移，请重新发送“完整 prompt 包”。</div>
+  </section>
 
-      <div class="toolbar">
-        <button class="btn ok" id="btnCopyPromptPreview" disabled>复制当前批次完整 prompt 包</button>
-        <button class="btn secondary" id="btnCopyPromptTemplate">复制提示词模板（仅模板）</button>
-      </div>
-
-      <label>当前批次完整 prompt 包</label>
-      <textarea id="promptPreview" class="mono" readonly></textarea>
-    </section>
-
+  <div class="grid grid-2">
     <section class="panel">
       <h2>③ 自动分批设置</h2>
-
-      <div class="tabs" id="datasetTabs"></div>
-
-      <div class="row" style="margin-top:10px">
+      <div class="two-col">
         <div>
           <label>搜索</label>
-          <input type="text" id="filterText" data-save-key="filterText" placeholder="按 id / old_text / new_text / reason 搜索">
+          <input type="text" id="searchText" placeholder="搜 id / old_text / new_text / reason / context" />
         </div>
         <div>
           <label>状态筛选</label>
-          <select id="filterStatus" data-save-key="filterStatus">
+          <select id="statusFilter">
             <option value="all">全部</option>
             <option value="pending">pending</option>
             <option value="ok">ok</option>
@@ -184,363 +377,335 @@
       </div>
 
       <div class="toolbar">
-        <button class="btn secondary" id="btnSelectVisible">勾选当前筛选结果</button>
-        <button class="btn secondary" id="btnClearVisible">取消当前筛选结果</button>
-        <button class="btn secondary" id="btnInvertVisible">反选当前筛选结果</button>
-        <button class="btn secondary" id="btnSelectPending">勾选 pending</button>
-        <button class="btn secondary" id="btnClearAllSelection">清空全部勾选</button>
+        <button class="btn ghost" id="btnCheckFiltered">勾选当前筛选结果</button>
+        <button class="btn ghost" id="btnUncheckFiltered">取消当前筛选结果</button>
+        <button class="btn ghost" id="btnInvertFiltered">反选当前筛选结果</button>
+        <button class="btn ghost" id="btnCheckPending">勾选 pending</button>
+        <button class="btn danger" id="btnClearChecks">清空全部勾选</button>
       </div>
 
-      <div class="row">
+      <div class="two-col" style="margin-top:8px">
         <div>
           <label>每批最多条数</label>
-          <input type="number" id="batchMaxItems" min="1" value="20" data-save-key="batchMaxItems">
+          <input type="number" id="maxPerBatch" min="1" step="1" />
         </div>
         <div>
           <label>每批最大字符预算</label>
-          <input type="number" id="batchMaxChars" min="100" step="100" value="12000" data-save-key="batchMaxChars">
+          <input type="number" id="maxChars" min="100" step="100" />
         </div>
       </div>
 
       <div class="toolbar">
-        <button class="btn ok" id="btnBuildBatches" disabled>手动重建批次</button>
+        <button class="btn ok" id="btnRebuildBatches">手动重建批次</button>
         <button class="btn secondary" id="btnDownloadCurrentBatchJson" disabled>下载当前批次 JSON</button>
-        <button class="btn secondary" id="btnDownloadCurrentBatchPrompt" disabled>下载当前批次 prompt.txt</button>
+        <button class="btn secondary" id="btnDownloadCurrentBatchPrompt" disabled>下载当前批次提示词包</button>
       </div>
 
-      <div class="status" id="batchStats">尚未生成批次。</div>
+      <div id="batchStats" class="status" style="margin-top:8px">尚未生成批次。</div>
     </section>
 
     <section class="panel">
       <h2>历史记录</h2>
       <div class="toolbar">
-        <button class="btn secondary" id="btnSaveSnapshot">保存当前状态到历史</button>
-        <button class="btn bad" id="btnDeleteAllHistory">清空全部历史</button>
+        <button class="btn ok" id="btnSaveHistory">保存当前状态到历史</button>
+        <button class="btn danger" id="btnClearHistory">清空全部历史</button>
       </div>
-      <div class="history-list" id="historyList"></div>
-    </section>
-
-    <section class="panel full">
-      <h2>④ 批次列表 + ⑤ 当前批次返回框（强绑定）</h2>
-      <div class="twoWide">
-        <div>
-          <div class="batch-list" id="batchList"></div>
-        </div>
-        <div>
-          <div class="status" id="currentBatchInfo">请先导入一润 JSON。</div>
-
-          <label>当前批次 AI 返回 JSON</label>
-          <textarea id="batchResponseBox" class="mono" placeholder="点击这里会尝试读取剪贴板；也可以手工粘贴"></textarea>
-
-          <div class="row tight">
-            <label style="margin:0;font-weight:600">
-              <input type="checkbox" id="fillMissingKeep" data-save-key="fillMissingKeep" checked>
-              当前批次缺失 id 自动补 keep
-            </label>
-          </div>
-
-          <div class="toolbar">
-            <button class="btn ok" id="btnImportCurrentBatch" disabled>导入当前批次结果</button>
-            <button class="btn secondary" id="btnImportAllSavedBatches" disabled>导入全部已保存批次结果</button>
-            <button class="btn secondary" id="btnClearCurrentBatchResponse" disabled>清空当前批次返回框</button>
-          </div>
-
-          <div class="status" id="currentBatchLog">等待当前批次返回。</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel full">
-      <h2>⑩ 补丁工作区（自动跟随当前批次）</h2>
-      <div class="workspace">
-        <div>
-          <div class="small" id="listSummary">暂无条目</div>
-          <div class="listbox" id="modList"></div>
-        </div>
-
-        <div>
-          <div class="compact-grid">
-            <div>
-              <label>ID</label>
-              <input id="edId" readonly>
-            </div>
-            <div>
-              <label>status</label>
-              <select id="edStatus">
-                <option value="pending">pending</option>
-                <option value="ok">ok</option>
-                <option value="keep">keep</option>
-                <option value="skip">skip</option>
-                <option value="ambiguous">ambiguous</option>
-                <option value="conflict">conflict</option>
-              </select>
-            </div>
-            <div>
-              <label>chunk</label>
-              <input id="edChunkIndex" type="number">
-            </div>
-            <div>
-              <label>srcStart</label>
-              <input id="edAnchorStart" type="number">
-            </div>
-            <div>
-              <label>srcEnd</label>
-              <input id="edAnchorEnd" type="number">
-            </div>
-            <div class="row" style="gap:8px;align-items:end">
-              <div style="flex:1">
-                <label>absStart</label>
-                <input id="edCurrentStart" type="number">
-              </div>
-              <div style="flex:1">
-                <label>absEnd</label>
-                <input id="edCurrentEnd" type="number">
-              </div>
-            </div>
-          </div>
-
-          <div class="editor-grid" style="margin-top:10px">
-            <div>
-              <label>previous_old_text</label>
-              <textarea id="edPrevOld" class="mono" style="min-height:72px"></textarea>
-            </div>
-            <div>
-              <label>old_text（当前基准文本）</label>
-              <textarea id="edOld" class="mono" style="min-height:72px"></textarea>
-            </div>
-            <div class="full">
-              <label>new_text（本轮候选文本）</label>
-              <textarea id="edNew" class="mono" style="min-height:92px"></textarea>
-            </div>
-            <div class="full">
-              <label>reason</label>
-              <textarea id="edReason" class="mono" style="min-height:84px"></textarea>
-            </div>
-            <div>
-              <label>contextBefore</label>
-              <textarea id="edCtxBefore" class="mono" style="min-height:84px"></textarea>
-            </div>
-            <div>
-              <label>contextAfter</label>
-              <textarea id="edCtxAfter" class="mono" style="min-height:84px"></textarea>
-            </div>
-
-            <div class="full">
-              <div class="toolbar">
-                <button class="btn ok" id="btnSaveMod">保存当前条目</button>
-                <button class="btn secondary" id="btnMarkKeep">标记 keep</button>
-                <button class="btn bad" id="btnMarkSkip">标记 skip</button>
-                <button class="btn secondary" id="btnUseNewAsOld">把 new_text 提升为 old_text</button>
-              </div>
-            </div>
-
-            <div>
-              <label>old_text 差异预览</label>
-              <div class="preview-box" id="oldPreview"></div>
-            </div>
-            <div>
-              <label>new_text 差异预览</label>
-              <div class="preview-box" id="newPreview"></div>
-            </div>
-            <div class="full">
-              <label>差异摘要</label>
-              <div class="preview-box" id="diffSummary"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>⑦ 导入全部批次结果 / 生成新的润色记录</h2>
-
-      <label>上传“全部批次结果”文件</label>
-      <input type="file" id="allResultsFile" accept=".json,.txt,.html">
-
-      <label>或者粘贴“全部批次结果”</label>
-      <textarea id="allResultsPaste" class="mono" data-save-key="allResultsPaste" placeholder='支持 {"modifications":[...]} 或 {"batches":[{"batchIndex":1,"modifications":[...]}]}'></textarea>
-
-      <div class="toolbar">
-        <button class="btn ok" id="btnImportAllResultsAnytime">导入全部批次结果</button>
-        <button class="btn ok" id="btnMergeAllBatches" disabled>合并已导回批次，生成新的润色记录</button>
-        <button class="btn secondary" id="btnDownloadMergedRecord" disabled>下载新的润色记录 JSON</button>
-        <button class="btn secondary" id="btnCreateNextRound" disabled>用结果集生成下一轮工作集</button>
-      </div>
-
-      <div class="status" id="mergeLog">还没有新的润色记录。</div>
-    </section>
-
-    <section class="panel full">
-      <h2>⑧ 一润后全文 / 合并文本（严格命中）</h2>
-
-      <div class="row">
-        <div>
-          <label>选择一润后全文 / 合并文本（选择后自动载入）</label>
-          <input type="file" id="fullTextFile" accept=".txt,.md">
-        </div>
-        <div>
-          <label>输出文件名（默认取一润后全文文件名）</label>
-          <input type="text" id="applyOutputBaseName" class="mono" data-save-key="applyOutputBaseName" placeholder="默认自动取文件名；如果是粘贴内容可手动填写">
-        </div>
-      </div>
-
-      <div class="row">
-        <div style="flex:1">
-          <label>二润 JSON / .json.html（选择后自动导入）</label>
-          <input type="file" id="secondPassJsonFile" accept=".json,.txt,.html,.json.html">
-        </div>
-        <div style="flex:1">
-          <label>全文应用记录来源</label>
-          <div class="row tight" style="padding-top:10px">
-            <label style="margin:0;font-weight:600">
-              <input type="radio" name="applyRecordSource" id="applySourceMergedRecord" checked>
-              使用 ⑦ 合并后的新润色记录
-            </label>
-            <label style="margin:0;font-weight:600">
-              <input type="radio" name="applyRecordSource" id="applySourceSecondPassRecord">
-              使用 ⑧ 直通生成的二润润色记录
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <label>或者粘贴二润 JSON / HTML 后手动导入</label>
-      <textarea id="secondPassJsonPaste" class="mono" placeholder='支持 {"modifications":[...]}、纯数组、代码块、或 json.html 文本'></textarea>
-
-      <div class="toolbar">
-        <button class="btn secondary" id="btnImportSecondPassJson">导入二润 JSON</button>
-        <button class="btn secondary" id="btnClearSecondPassJson">清空二润 JSON</button>
-        <button class="btn ok" id="btnBuildSecondPassRecord">生成二润润色记录</button>
-        <button class="btn secondary" id="btnDownloadSecondPassRecord" disabled>下载二润润色记录 JSON</button>
-      </div>
-
-      <div class="split2">
-        <div class="status" id="secondPassJsonLog">尚未导入二润 JSON。</div>
-        <div class="status" id="secondPassRecordLog">尚未生成二润润色记录。</div>
-      </div>
-
-      <div>
-        <label>选项</label>
-        <div class="row tight" style="padding-top:10px">
-          <label style="margin:0;font-weight:600">
-            <input type="checkbox" id="strictMode" checked disabled> 严格命中模式（固定开启）
-          </label>
-          <label style="margin:0;font-weight:600">
-            <input type="checkbox" id="use331Render" data-save-key="use331Render" checked> 使用 331 风格章节整理
-          </label>
-        </div>
-      </div>
-
-      <label>一润后全文 / 合并文本（可修改；生成时以这里的当前内容为准）</label>
-      <textarea id="fullTextEditor" class="mono" style="min-height:220px" data-save-key="fullTextEditor"></textarea>
-
-      <div class="toolbar">
-        <button class="btn warn" id="btnValidateStrict" disabled>预校验全文（严格 100%）</button>
-        <button class="btn ok" id="btnBuildFinalText" disabled>生成并预览应用后全文</button>
-        <button class="btn secondary" id="btnDownloadFinalRaw" disabled>下载应用后全文.txt</button>
-        <button class="btn secondary" id="btnDownloadFinalRendered" disabled>下载 331整理版.txt</button>
-      </div>
-
-      <div class="split2">
-        <div class="status" id="strictValidateLog">尚未预校验。</div>
-        <div class="status" id="finalTextLog">尚未生成应用后全文。</div>
-      </div>
-    </section>
-
-    <section class="panel full">
-      <h2>⑨ 结果预览</h2>
-      <div class="split3">
-        <div>
-          <label>一润后全文当前内容预览</label>
-          <textarea id="fullTextPreview" class="mono" readonly></textarea>
-        </div>
-        <div>
-          <label>应用后全文预览</label>
-          <textarea id="finalRawPreview" class="mono" readonly></textarea>
-        </div>
-        <div>
-          <label>331 整理版预览</label>
-          <textarea id="finalRenderedPreview" class="mono" readonly></textarea>
-        </div>
-      </div>
+      <div id="historyList" class="history-list" style="margin-top:8px"></div>
     </section>
   </div>
+
+  <div class="grid grid-batch">
+    <section class="panel">
+      <h2>④ 批次列表 + ⑤ 当前批次返回框（强绑定）</h2>
+      <div id="batchList" class="batch-list"></div>
+
+      <div class="hr"></div>
+
+      <div id="currentBatchInfo" class="status">请先导入一润 JSON。</div>
+
+      <label>当前批次 AI 返回 JSON</label>
+      <textarea id="batchResponseBox" class="mono" placeholder="把当前批次 AI 返回 JSON 粘贴到这里"></textarea>
+
+      <label class="checkbox">
+        <input type="checkbox" id="fillMissingAsKeep" checked />
+        当前批次缺失 id 自动补 keep
+      </label>
+
+      <div class="toolbar">
+        <button class="btn ok" id="btnImportCurrentBatch" disabled>导入当前批次结果</button>
+        <button class="btn secondary" id="btnImportAllSavedBatches" disabled>导入全部已保存批次结果（自动生成二润数据并进入下一轮）</button>
+        <button class="btn danger" id="btnClearCurrentBatchResponse" disabled>清空当前批次返回框</button>
+      </div>
+
+      <div id="currentBatchLog" class="status" style="margin-top:8px">等待当前批次返回。</div>
+    </section>
+
+  <section class="panel">
+    <h2>⑩ 补丁工作区（自动跟随当前批次）</h2>
+
+    <div class="patch-workspace">
+      <div class="patch-left">
+        <div id="patchItemList" class="listbox">暂无条目</div>
+      </div>
+
+      <div class="patch-right">
+        <div class="patch-mini-grid">
+          <div>
+            <label>ID</label>
+            <input type="text" id="editId" readonly />
+          </div>
+          <div>
+            <label>status</label>
+            <select id="editStatus">
+              <option value="pending">pending</option>
+              <option value="ok">ok</option>
+              <option value="keep">keep</option>
+              <option value="skip">skip</option>
+              <option value="ambiguous">ambiguous</option>
+              <option value="conflict">conflict</option>
+            </select>
+          </div>
+          <div>
+            <label>分段</label>
+            <input type="text" id="editChunk" />
+          </div>
+          <div>
+            <label>srcStart</label>
+            <input type="text" id="editSrcStart" />
+          </div>
+          <div>
+            <label>srcEnd</label>
+            <input type="text" id="editSrcEnd" />
+          </div>
+          <div>
+            <label>absStart</label>
+            <input type="text" id="editAbsStart" />
+          </div>
+          <div>
+            <label>absEnd</label>
+            <input type="text" id="editAbsEnd" />
+          </div>
+        </div>
+
+        <div class="patch-core">
+          <div>
+            <label>old_text（当前基准文本）</label>
+            <textarea id="editOldText" class="mono"></textarea>
+          </div>
+          <div>
+            <label>new_text（本轮候选文本）</label>
+            <textarea id="editNewText" class="mono"></textarea>
+          </div>
+        </div>
+
+        <div class="patch-reasons">
+          <div>
+            <label>first_reason（第一轮理由，自动保留）</label>
+            <textarea id="editFirstReason" class="mono"></textarea>
+          </div>
+          <div>
+            <label>reason（本轮理由）</label>
+            <textarea id="editReason" class="mono"></textarea>
+          </div>
+        </div>
+
+        <div class="patch-contexts">
+          <div>
+            <label>contextBefore</label>
+            <textarea id="editContextBefore" class="mono"></textarea>
+          </div>
+          <div>
+            <label>contextAfter</label>
+            <textarea id="editContextAfter" class="mono"></textarea>
+          </div>
+        </div>
+
+        <details class="patch-advanced">
+          <summary>高级字段（一般不用动）</summary>
+          <label>previous_old_text（上一轮旧文本，仅用于追溯）</label>
+          <textarea id="editPreviousOldText" class="mono"></textarea>
+        </details>
+
+        <div class="toolbar">
+          <button class="btn ok" id="btnSavePatch">保存当前条目</button>
+          <button class="btn secondary" id="btnMarkKeep">标记 keep</button>
+          <button class="btn secondary" id="btnMarkSkip">标记 skip</button>
+          <button class="btn warn" id="btnPromoteNewToOld">把 new_text 提升为 old_text</button>
+        </div>
+
+        <div class="split-2" style="margin-top:8px">
+          <div>
+            <label>old_text 差异预览</label>
+            <div id="oldPreview" class="preview-box mono"></div>
+          </div>
+          <div>
+            <label>new_text 差异预览</label>
+            <div id="newPreview" class="preview-box mono"></div>
+          </div>
+        </div>
+
+        <label>差异摘要</label>
+        <div id="diffSummary" class="status"></div>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+  <section class="panel">
+    <h2>⑦ 二润数据（自动生成 / 也可外部导入）</h2>
+
+    <div class="two-col">
+      <div>
+        <label>上传外部二润数据文件（可选）</label>
+        <input type="file" id="allResultsFile" accept=".json,.html,.txt,.json.html" />
+      </div>
+      <div>
+        <label>操作</label>
+        <div class="toolbar">
+          <button class="btn secondary" id="btnImportAllResultsPaste">导入外部二润数据</button>
+          <button class="btn secondary" id="btnDownloadMergedJson" disabled>下载二润数据 JSON</button>
+        </div>
+      </div>
+    </div>
+
+    <label>或者粘贴外部二润数据</label>
+    <textarea id="allResultsPaste" class="mono" placeholder="这里只是外部导入兜底。正常情况下，点“导入全部已保存批次结果”后会自动生成二润数据。"></textarea>
+
+    <div id="mergeLog" class="status" style="margin-top:8px">尚未生成二润数据。</div>
+    <div class="small">说明：正常流程下，当你在 ④/⑤ 区点击“导入全部已保存批次结果”后，系统会自动生成这里的二润数据，并自动进入下一轮工作集；这里主要用于外部导入兜底。</div>
+
+    <!-- 兼容旧脚本：隐藏占位，不参与界面流程 -->
+    <div style="display:none">
+      <button id="btnMergeImportedBatches" type="button"></button>
+      <button id="btnCreateNextRound" type="button"></button>
+    </div>
+  </section>
+
+
+  <section class="panel apply-panel">
+    <h2>⑧ 一润后全文（严格命中应用）</h2>
+
+    <div class="two-col">
+      <div>
+        <label>选择一润后全文（选择后自动载入）</label>
+        <input type="file" id="fullTextFile" accept=".txt,.md,.html" />
+      </div>
+      <div>
+        <label>当前应用数据</label>
+        <div id="applySourceInfo" class="status">尚无可用二润数据。</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <label class="checkbox"><input type="checkbox" id="strictMode" checked disabled /> 严格命中模式（固定开启）</label>
+      <label class="checkbox"><input type="checkbox" id="use331" checked /> 使用 331 风格章节整理</label>
+    </div>
+
+    <label>一润后全文（这里必须上传“一润后的完整正文”；程序会用当前二润数据中的 old_text 在全文里严格定位）</label>
+    <textarea id="fullTextEditor" class="mono big-ta" placeholder="这里放一润后的完整全文"></textarea>
+
+    <div class="toolbar">
+      <button class="btn secondary" id="btnValidateFullText">预校验全文（严格 100%）</button>
+      <button class="btn ok" id="btnGenerateFinalText">生成并预览二润全文</button>
+      <button class="btn secondary" id="btnDownloadFinalText" disabled>下载二润全文（会同时下载人工润色记录）</button>
+      <button class="btn secondary" id="btnDownload331Text" disabled>下载 331整理版</button>
+    </div>
+
+    <div class="two-col" style="margin-top:8px">
+      <div id="strictValidateLog" class="status">尚未预校验。</div>
+      <div id="finalTextLog" class="status">尚未生成应用后全文。</div>
+    </div>
+
+    <!-- 兼容旧脚本：隐藏占位，不参与界面流程 -->
+    <div style="display:none">
+      <input type="text" id="outputFileName" />
+      <input type="file" id="secondPassFile" />
+      <button id="btnImportSecondPass" type="button"></button>
+      <button id="btnClearSecondPass" type="button"></button>
+      <button id="btnGenerateSecondPassRecords" type="button"></button>
+      <button id="btnDownloadSecondPassRecords" type="button"></button>
+      <textarea id="secondPassJsonPaste"></textarea>
+      <div id="secondPassJsonLog"></div>
+      <div id="secondPassRecordLog"></div>
+      <label><input type="radio" name="applySource" value="merged" checked></label>
+      <label><input type="radio" name="applySource" value="direct"></label>
+    </div>
+  </section>
+
+
+  <section class="panel">
+    <h2>⑨ 人工润色记录（给人看）</h2>
+
+    <div class="row">
+      <label class="checkbox"><input type="checkbox" id="humanIncludeKeep" /> 包含 keep 条目</label>
+      <label class="checkbox"><input type="checkbox" id="humanIncludeContext" checked /> 包含上下文</label>
+      <div class="tiny">记录来源自动跟随 ⑧ 里的“全文应用记录来源”。</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn ok" id="btnGenerateHumanRecord">生成人工润色记录</button>
+      <button class="btn secondary" id="btnCopyHumanRecord" disabled>复制人工润色记录</button>
+      <button class="btn secondary" id="btnDownloadHumanRecord" disabled>下载人工润色记录</button>
+    </div>
+
+    <label>人工润色记录预览</label>
+    <textarea id="humanRecordPreview" class="mono" readonly></textarea>
+    <div id="humanRecordLog" class="status" style="margin-top:8px">尚未生成人工润色记录。</div>
+  </section>
+
+  <section class="panel">
+    <h2>⑨B 结果预览</h2>
+    <div class="grid grid-3">
+      <div>
+        <label>一润后全文当前内容预览</label>
+        <textarea id="fullTextPreview" class="mono" readonly></textarea>
+      </div>
+      <div>
+        <label>应用后全文预览</label>
+        <textarea id="finalRawPreview" class="mono" readonly></textarea>
+      </div>
+      <div>
+        <label>331 整理版预览</label>
+        <textarea id="finalRenderedPreview" class="mono" readonly></textarea>
+      </div>
+    </div>
+    <div class="footer-note">
+      第一次发给 AI：复制“当前批次完整 prompt 包”；同一聊天线程里的后续批次：复制“当前批次 JSON 包（不带提示词）”；换会话、换模型、输出格式漂移时，再重新复制“完整 prompt 包”。
+    </div>
+  </section>
 </div>
 
 <script>
 (() => {
-  'use strict';
-
-  const $ = id => document.getElementById(id);
-
-  const STORAGE_KEY = 'stitch_helper_strict_v3_state';
-  const HISTORY_KEY = 'stitch_helper_strict_v3_history';
-
-  const README_TEXT = `README_缝合助手（直通二润版）
-
-一、这版公开改了什么
-1. 这是完整替换版，不是小补丁。
-2. 已移除 Gemini 区。
-3. ⑧ 现在以“一润后全文 / 合并文本”为基底，不再要求必须从润色前原文重建。
-4. 新增“二润 JSON 直通”：
-   - 可上传二润 JSON / .json.html
-   - 可粘贴二润 JSON / HTML
-   - 可生成二润润色记录
-   - 可直接生成二润全文
-5. keep 时，如果二润 reason 为空，则导出记录时 reason 自动回退到 first_reason。
-
-二、推荐流程
-1. 导入一润 JSON。
-2. 自动分批，逐批处理并导回结果；或者直接在⑦导入全部批次结果。
-3. 生成新的润色记录。
-4. 如需二润：
-   - 用结果集生成下一轮工作集；
-   - 切到“下一轮工作集”；
-   - 导入二润 JSON；
-   - 生成二润润色记录。
-5. 在⑧导入一润后全文 / 合并文本。
-6. 预校验全文（严格 100%）。
-7. 生成并下载应用后全文 / 331整理版。
-
-三、严格命中说明
-1. 这版严格校验优先使用 absoluteStart / absoluteEnd + old_text。
-2. 如果条目没有 absoluteStart / absoluteEnd，但 old_text 在全文中唯一精确出现，也允许通过；不会做模糊搜索。
-3. 不做模糊匹配、不做猜测替换。
-
-四、二润 reason 规则
-1. 每条记录保留 first_reason。
-2. 如果二润 status = keep 且 reason 为空：
-   - 导出记录时 reason = first_reason
-3. 如果二润给了新的 reason：
-   - 优先用二润 reason
-4. 这样可以避免 keep 时原因和一润原因对不上。
-
-五、说明
-1. 下载“应用后全文.txt”和“331整理版.txt”不是重复：
-   - 一个是原始应用结果
-   - 一个是整理版
-2. 为避免旧缓存结构报错，localStorage key 已升级为 v3。`;
+  const STORAGE_KEY = 'stitch-helper-human-final-v6';
 
   const DEFAULT_PROMPT = `你是一位资深中文文学润色编辑。现在做的是“补丁级二次润色”。
+
+会话模式说明：
+1. 在同一聊天线程里，我第一次通常会发送“完整说明 + 输入 JSON”。
+2. 在同一线程后续批次里，我可能只继续发送 JSON；如果没有再次附带完整说明，也请继续沿用第一次已经确认的规则，不要自行改变输出格式。
+3. 如果我换了新会话、换了模型、或者你的输出格式开始漂移，我会重新发送完整说明；在那之前，请默认沿用第一次收到的规则。
 
 任务要求：
 1. 只处理输入里的 modifications 数组。
 2. 每条只输出：
-   - id
-   - new_text
-   - reason
-   - status
+ - id
+ - new_text
+ - reason
+ - status
 3. 必须参考这些字段：
-   - old_text
-   - previous_old_text
-   - contextBefore
-   - contextAfter
-   - first_reason
-   - reason
+ - old_text
+ - previous_old_text
+ - contextBefore
+ - contextAfter
+ - first_reason
+ - reason
 4. 这是二次润色，不是重写全文；只能在 old_text 的局部范围内做更优表达。
 5. 如果无需改动，输出 status = keep。
 6. keep 时如果没有新增理由，reason 可以为空字符串。
 7. 不要漏 id，不要新增不存在的 id。
+8. 除 JSON 结果外，不要输出额外解释、前言、总结、代码块标记。
 
 输出 JSON 格式：
 {
@@ -558,287 +723,418 @@ status 可用值：
 - ok
 - keep
 - skip
-- ambiguous`;
+- ambiguous
+- conflict`;
 
-  const state = {
-    datasets: { working:null, result:null, next:null },
-    activeKey: 'working',
-    importFileName: '0.json',
+  const README_TEXT = `缝合助手（人工润色记录版）使用说明
 
-    batchSourceKey: null,
-    batches: [],
-    activeBatchIndex: null,
+一、主流程
+1. 导入一润 JSON。
+2. 在 ③ 区搜索 / 勾选要处理的条目，自动分批。
+3. 在 ② 区得到两套内容：
+   - 当前批次完整 prompt 包：适合第一次发给 AI、换会话、换模型、格式漂移时使用。
+   - 当前批次 JSON 包（不带提示词）：适合同一聊天线程里的后续批次续传。
+4. 在 ④+⑤ 区粘贴当前批次 AI 返回 JSON，导入当前批次结果。
+5. 在 ⑩ 区可手工修补当前批次条目。
+6. 在 ⑦ 区合并已导回批次，生成新的润色记录 JSON。
+7. 在 ⑧ 区载入一润后全文 / 合并文本，并把润色记录严格应用到全文。
+8. 在 ⑨ 区生成人工润色记录，给人看，不是给程序看。
+9. 下载二润全文时，会自动同时下载人工润色记录。
 
-    mergedRecordObject: null,
+二、人工润色记录格式
+默认按下面这种样式输出：
+1. 修改说明。
+   分段: 1
+   位置: 77-102
+   原文: ...
+   校正: ...
+   上下文：...
 
-    secondPassInputRawText: '',
-    secondPassInputFileName: '',
-    secondPassInputMods: null,
-    secondPassRecordObject: null,
+三、文件名
+默认使用纯中文：
+- 作品名二润数据.json
+- 作品名二润全文.txt
+- 作品名人工润色记录.txt`;
 
-    applySource: 'merged',
-    fullTextFileName: '',
-    strictValidation: null,
+  function defaultState(){
+    return {
+      version: 6,
+      datasets: [],
+      activeDatasetKey: '',
+      batchSourceKey: '',
+      checkedIdsByDataset: {},
+      batches: [],
+      activeBatchIndex: 0,
+      activePatchId: null,
+      promptTemplate: DEFAULT_PROMPT,
+      sourceSearch: '',
+      sourceStatusFilter: 'all',
+      maxPerBatch: 12,
+      maxChars: 80000,
+      history: [],
+      mergeResults: null,
+      secondPassRaw: null,
+      secondPassRecords: null,
+      applySource: 'merged',
+      fullText: '',
+      fullTextName: '',
+      outputFileName: '',
+      finalAppliedText: '',
+      finalPrettyText: '',
+      humanRecordText: '',
+      humanIncludeKeep: false,
+      humanIncludeContext: true
+    };
+  }
 
-    finalRawText: '',
-    finalRenderedText: '',
+  let state = loadState();
 
-    historyList: [],
-    selectedModContext: { mode:'dataset', datasetKey:'working', id:null }
-  };
-
-  function normalizeNewlines(s=''){ return String(s).replace(/\r\n?/g,'\n'); }
+  function $(id){ return document.getElementById(id); }
   function str(v){ return v == null ? '' : String(v); }
-  function safeNum(v, fallback=null){
+  function num(v, d = 0){
     const n = Number(v);
-    return Number.isFinite(n) ? n : fallback;
+    return Number.isFinite(n) ? n : d;
+  }
+  function nowStamp(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  }
+  function uid(prefix='id'){
+    return `${prefix}_${Math.random().toString(36).slice(2,10)}_${Date.now().toString(36)}`;
   }
   function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
-  function getBaseName(name){
-    const s = str(name || 'output').trim();
-    return s.replace(/\.[^.]+$/, '') || 'output';
+  function setText(el, text){ if(el) el.textContent = str(text); }
+  function snippet(s, n=80){
+    s = str(s).replace(/\s+/g,' ').trim();
+    return s.length > n ? s.slice(0, n) + '…' : s;
   }
-  function escapeHtml(s=''){
+  function escapeHtml(s){
     return str(s)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;');
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#39;");
   }
   function normalizeStatus(v){
-    const s = str(v || 'pending').trim().toLowerCase();
-    return ['pending','ok','keep','skip','ambiguous','conflict'].includes(s) ? s : 'pending';
+    const s = str(v).trim().toLowerCase();
+    if(['ok','keep','skip','pending','ambiguous','conflict'].includes(s)) return s;
+    if(s === 'done') return 'ok';
+    return 'pending';
   }
-  function setText(el, text){ if (el) el.textContent = str(text); }
-  function ensureArray(v){ return Array.isArray(v) ? v : []; }
+  function statusChip(s){
+    const n = normalizeStatus(s);
+    return `<span class="chip st-${n}">${n}</span>`;
+  }
 
   async function copyText(text){
     try{
-      if (navigator.clipboard?.writeText){
-        await navigator.clipboard.writeText(str(text));
-        return true;
-      }
-    }catch(_){}
-    try{
-      const ta = document.createElement('textarea');
-      ta.value = str(text);
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
+      await navigator.clipboard.writeText(text);
       return true;
-    }catch(_){}
-    return false;
-  }
-
-  async function readClipboardText(){
-    try{
-      if (navigator.clipboard?.readText) return await navigator.clipboard.readText();
-    }catch(_){}
-    return '';
-  }
-
-  function downloadText(name, text, mime='text/plain;charset=utf-8'){
-    const blob = new Blob([text], { type:mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  function publicItem(m){
-    return {
-      id: m.id,
-      chunkIndex: safeNum(m.chunkIndex, null),
-      sourceAbsoluteStart: safeNum(m.sourceAbsoluteStart, null),
-      sourceAbsoluteEnd: safeNum(m.sourceAbsoluteEnd, null),
-      absoluteStart: safeNum(m.absoluteStart, null),
-      absoluteEnd: safeNum(m.absoluteEnd, null),
-      previous_old_text: str(m.previous_old_text),
-      old_text: str(m.old_text),
-      new_text: str(m.new_text),
-      first_reason: str(m.first_reason),
-      reason: str(m.reason),
-      contextBefore: str(m.contextBefore),
-      contextAfter: str(m.contextAfter),
-      anchor_old_text: str(m.anchor_old_text),
-      status: normalizeStatus(m.status)
-    };
-  }
-
-  function publicDataset(ds){
-    if (!ds) return null;
-    return {
-      fileName: str(ds.fileName || ''),
-      title: str(ds.title || ''),
-      modifications: ensureArray(ds.modifications).map(publicItem)
-    };
-  }
-
-  function exactJsonSlice(text){
-    const t = normalizeNewlines(text || '').trim().replace(/^\uFEFF/, '');
-    if (!t) return '';
-    if (t.startsWith('{') || t.startsWith('[')) return t;
-
-    const fenced = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenced) return fenced[1].trim();
-
-    if (/^\s*</.test(t)) {
+    }catch(e){
       try{
-        const doc = new DOMParser().parseFromString(t, 'text/html');
-        const fromPre = doc.querySelector('pre, textarea');
-        const bodyText = str(fromPre ? fromPre.textContent : (doc.body?.textContent || '')).trim();
-        if (bodyText.startsWith('{') || bodyText.startsWith('[')) return bodyText;
-        const objPos = bodyText.indexOf('{');
-        const arrPos = bodyText.indexOf('[');
-        let start = -1;
-        if (objPos >= 0 && arrPos >= 0) start = Math.min(objPos, arrPos);
-        else start = Math.max(objPos, arrPos);
-        if (start >= 0) return bodyText.slice(start).trim();
-        return bodyText;
-      }catch(_){
-        return t;
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        return true;
+      }catch(err){
+        return false;
       }
     }
-
-    const objPos = t.indexOf('{');
-    const arrPos = t.indexOf('[');
-    let start = -1;
-    if (objPos >= 0 && arrPos >= 0) start = Math.min(objPos, arrPos);
-    else start = Math.max(objPos, arrPos);
-    return start >= 0 ? t.slice(start).trim() : t;
   }
 
-  function parseJsonAny(raw){
-    const text = exactJsonSlice(raw);
-    return JSON.parse(text);
+  function downloadText(filename, text){
+    const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
-  function extractModsFromAny(payload){
-    if (Array.isArray(payload)) return payload;
-    if (!payload || typeof payload !== 'object') return [];
-    if (Array.isArray(payload.modifications)) return payload.modifications;
-    if (Array.isArray(payload.batches)) {
-      const out = [];
-      for (const b of payload.batches) {
-        if (b && Array.isArray(b.modifications)) out.push(...b.modifications);
-      }
-      return out;
+  function downloadJson(filename, obj){
+    downloadText(filename, JSON.stringify(obj, null, 2));
+  }
+
+  function sanitizeFilename(name){
+    return str(name).replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      const merged = Object.assign(defaultState(), parsed || {});
+      if(!Array.isArray(merged.datasets)) merged.datasets = [];
+      if(!merged.checkedIdsByDataset || typeof merged.checkedIdsByDataset !== 'object') merged.checkedIdsByDataset = {};
+      if(!Array.isArray(merged.batches)) merged.batches = [];
+      if(!Array.isArray(merged.history)) merged.history = [];
+      if(!merged.promptTemplate) merged.promptTemplate = DEFAULT_PROMPT;
+      return merged;
+    }catch(e){
+      return defaultState();
     }
-    return [];
   }
 
-  function normalizeItem(raw, idx=0){
-    const sourceAbsoluteStart = safeNum(raw.sourceAbsoluteStart ?? raw.srcStart ?? raw.anchorStart ?? raw.startSource, null);
-    const sourceAbsoluteEnd = safeNum(raw.sourceAbsoluteEnd ?? raw.srcEnd ?? raw.anchorEnd ?? raw.endSource, null);
-    const absoluteStart = safeNum(raw.absoluteStart ?? raw.absStart ?? raw.start ?? raw.currentStart, null);
-    const absoluteEnd = safeNum(raw.absoluteEnd ?? raw.absEnd ?? raw.end ?? raw.currentEnd, null);
-
-    const reason0 = str(raw.reason);
-    const firstReason0 = str(raw.first_reason ?? raw.firstReason ?? reason0);
-
-    return {
-      id: safeNum(raw.id, idx + 1),
-      chunkIndex: safeNum(raw.chunkIndex ?? raw.chunk ?? raw.chunk_id, null),
-      sourceAbsoluteStart,
-      sourceAbsoluteEnd,
-      absoluteStart,
-      absoluteEnd,
-      previous_old_text: str(raw.previous_old_text ?? raw.previousOldText),
-      old_text: str(raw.old_text ?? raw.oldText ?? raw.anchor_old_text ?? raw.anchorOldText),
-      new_text: str(raw.new_text ?? raw.newText),
-      first_reason: firstReason0,
-      reason: reason0,
-      contextBefore: str(raw.contextBefore ?? raw.context_before),
-      contextAfter: str(raw.contextAfter ?? raw.context_after),
-      anchor_old_text: str(raw.anchor_old_text ?? raw.anchorOldText ?? raw.old_text ?? raw.oldText),
-      status: normalizeStatus(raw.status ?? 'pending'),
-      __selected: normalizeStatus(raw.status ?? 'pending') === 'pending'
-    };
+  function persistState(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){}
   }
 
-  function buildDatasetFromPayload(payload, fileName='0.json', title='工作集'){
-    const rawMods = extractModsFromAny(payload);
-    const mods = rawMods.map((m, i) => normalizeItem(m, i));
-    mods.sort((a,b) => a.id - b.id);
-    return { fileName, title, modifications: mods };
-  }
-
-  function getActiveDataset(){
-    return state.datasets[state.activeKey] || null;
-  }
-
-  function getDatasetByKey(key){
-    return state.datasets[key] || null;
+  function getCurrentDataset(){
+    return state.datasets.find(d => d.key === state.activeDatasetKey) || null;
   }
 
   function getBatchSourceDataset(){
-    return getDatasetByKey(state.batchSourceKey || state.activeKey);
+    return state.datasets.find(d => d.key === state.batchSourceKey) || null;
   }
 
-  function getVisibleMods(ds){
-    if (!ds) return [];
-    const ft = str($('filterText').value).trim().toLowerCase();
-    const fs = str($('filterStatus').value || 'all');
-    return ds.modifications.filter(m => {
-      const okStatus = fs === 'all' ? true : normalizeStatus(m.status) === fs;
-      if (!okStatus) return false;
-      if (!ft) return true;
-      const hay = [
-        m.id, m.old_text, m.new_text, m.reason, m.first_reason, m.contextBefore, m.contextAfter
-      ].join('\n').toLowerCase();
-      return hay.includes(ft);
+  function ensureCheckedMap(dsKey){
+    if(!state.checkedIdsByDataset[dsKey]) state.checkedIdsByDataset[dsKey] = {};
+    return state.checkedIdsByDataset[dsKey];
+  }
+
+  function readFileAsText(file){
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result || ''));
+      fr.onerror = () => reject(fr.error || new Error('读取文件失败'));
+      fr.readAsText(file, 'utf-8');
     });
   }
 
-  function countStatus(mods){
-    const obj = { pending:0, ok:0, keep:0, skip:0, ambiguous:0, conflict:0 };
-    for (const m of mods) obj[normalizeStatus(m.status)] = (obj[normalizeStatus(m.status)] || 0) + 1;
-    return obj;
+  function stripCodeFence(text){
+    const t = str(text).trim();
+    const m = t.match(/^```[\w-]*\n([\s\S]*?)\n```$/);
+    return m ? m[1] : t;
   }
 
+  function extractTextFromHtml(html){
+    try{
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const pre = doc.querySelector('pre');
+      if(pre && pre.textContent.trim()) return pre.textContent.trim();
+      const code = doc.querySelector('code');
+      if(code && code.textContent.trim()) return code.textContent.trim();
+      return (doc.body && doc.body.textContent ? doc.body.textContent : '').trim();
+    }catch(e){
+      return html;
+    }
+  }
+
+  function findBalancedJsonBlock(text, openChar){
+    const closeChar = openChar === '{' ? '}' : ']';
+    for(let start = text.indexOf(openChar); start !== -1; start = text.indexOf(openChar, start + 1)){
+      let depth = 0, inStr = false, esc = false;
+      for(let i = start; i < text.length; i++){
+        const ch = text[i];
+        if(inStr){
+          if(esc){ esc = false; continue; }
+          if(ch === '\\'){ esc = true; continue; }
+          if(ch === '"'){ inStr = false; continue; }
+          continue;
+        }
+        if(ch === '"'){ inStr = true; continue; }
+        if(ch === openChar) depth++;
+        else if(ch === closeChar){
+          depth--;
+          if(depth === 0){
+            const candidate = text.slice(start, i + 1);
+            try{
+              return JSON.parse(candidate);
+            }catch(e){}
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function parseAnyInput(text){
+    const raw = stripCodeFence(str(text)).trim();
+    if(!raw) throw new Error('输入为空。');
+
+    try{
+      return JSON.parse(raw);
+    }catch(e){}
+
+    if(/<\/?[a-z][\s\S]*>/i.test(raw)){
+      const htmlText = extractTextFromHtml(raw);
+      try{
+        return JSON.parse(htmlText);
+      }catch(e){}
+      const obj1 = findBalancedJsonBlock(htmlText, '{');
+      if(obj1) return obj1;
+      const arr1 = findBalancedJsonBlock(htmlText, '[');
+      if(arr1) return arr1;
+    }
+
+    const obj = findBalancedJsonBlock(raw, '{');
+    if(obj) return obj;
+    const arr = findBalancedJsonBlock(raw, '[');
+    if(arr) return arr;
+
+    throw new Error('无法从输入中解析出 JSON。');
+  }
+
+  function collectModifications(parsed){
+    if(Array.isArray(parsed)) return parsed;
+    if(parsed && Array.isArray(parsed.modifications)) return parsed.modifications;
+    if(parsed && parsed.data && Array.isArray(parsed.data.modifications)) return parsed.data.modifications;
+    if(parsed && Array.isArray(parsed.records)) return parsed.records;
+    if(parsed && Array.isArray(parsed.items)) return parsed.items;
+    return [];
+  }
+
+  function normalizeModification(m, idx){
+    return {
+      id: num(m.id, idx + 1),
+      previous_old_text: str(m.previous_old_text ?? m.previousOldText ?? ''),
+      old_text: str(m.old_text ?? m.oldText ?? ''),
+      new_text: str(m.new_text ?? m.newText ?? ''),
+      first_reason: str(m.first_reason ?? m.firstReason ?? m.reason ?? ''),
+      reason: str(m.reason ?? ''),
+      contextBefore: str(m.contextBefore ?? ''),
+      contextAfter: str(m.contextAfter ?? ''),
+      status: normalizeStatus(m.status),
+      chunk: str(m.chunk ?? m.chunkIndex ?? ''),
+      srcStart: str(m.srcStart ?? ''),
+      srcEnd: str(m.srcEnd ?? ''),
+      absStart: str(m.absStart ?? m.absoluteStart ?? m.sourceAbsoluteStart ?? ''),
+      absEnd: str(m.absEnd ?? m.absoluteEnd ?? m.sourceAbsoluteEnd ?? '')
+    };
+  }
+
+
+  function makeDatasetFromParsed(parsed, title='一润数据'){
+    const mods = collectModifications(parsed).map(normalizeModification);
+    if(!mods.length) throw new Error('未找到 modifications 数组。');
+    return {
+      key: uid('ds'),
+      title,
+      importedAt: nowStamp(),
+      modifications: mods
+    };
+  }
+
+  function importDatasetFromText(text, titleHint='一润数据'){
+    const parsed = parseAnyInput(text);
+    const ds = makeDatasetFromParsed(parsed, titleHint);
+
+    state.datasets.unshift(ds);
+    state.activeDatasetKey = ds.key;
+    state.batchSourceKey = ds.key;
+    state.checkedIdsByDataset[ds.key] = {};
+    autoCheckAllDataset(ds);
+
+    state.batches = [];
+    state.activeBatchIndex = 0;
+    state.activePatchId = ds.modifications[0]?.id ?? null;
+    state.mergeResults = null;
+    state.secondPassRaw = null;
+    state.secondPassRecords = null;
+    state.humanRecordText = '';
+
+    setText($('sourceLog'), `导入成功：${ds.title}\n条目数：${ds.modifications.length}\n已默认全选全部条目，并将自动分批。`);
+
+    persistState();
+    renderAll();
+    rebuildBatches();
+
+    return ds;
+  }
+
+
   function datasetSummaryText(ds){
-    if (!ds) return '暂无数据集。';
-    const c = countStatus(ds.modifications);
-    const selected = ds.modifications.filter(x => x.__selected).length;
+    if(!ds) return '暂无数据集。';
+    const total = ds.modifications.length;
+    const counts = {pending:0, ok:0, keep:0, skip:0, ambiguous:0, conflict:0};
+    ds.modifications.forEach(m => counts[normalizeStatus(m.status)]++);
+    const checkedMap = ensureCheckedMap(ds.key);
+    const checked = Object.keys(checkedMap).filter(k => checkedMap[k]).length;
     return [
-      `标题：${ds.title || '未命名'}`,
-      `文件：${ds.fileName || '未命名'}`,
-      `总条数：${ds.modifications.length}`,
-      `已勾选：${selected}`,
-      `pending=${c.pending} / ok=${c.ok} / keep=${c.keep} / skip=${c.skip} / ambiguous=${c.ambiguous} / conflict=${c.conflict}`
+      `当前数据集：${ds.title}`,
+      `条目总数：${total}`,
+      `已勾选：${checked}`,
+      `pending=${counts.pending} / ok=${counts.ok} / keep=${counts.keep} / skip=${counts.skip} / ambiguous=${counts.ambiguous} / conflict=${counts.conflict}`
     ].join('\n');
   }
 
-  function renderDatasetTabs(){
-    const wrap = $('datasetTabs');
-    const items = [
-      ['working', '当前工作集'],
-      ['result', '结果集'],
-      ['next', '下一轮工作集']
-    ];
-    wrap.innerHTML = items.map(([key, label]) => {
-      const ds = state.datasets[key];
-      const count = ds ? ds.modifications.length : 0;
-      return `<button class="tab ${state.activeKey === key ? 'active' : ''}" data-key="${key}">${label}（${count}）</button>`;
+  function getFilteredMods(ds){
+    if(!ds) return [];
+    const q = str(state.sourceSearch).trim().toLowerCase();
+    const sf = str(state.sourceStatusFilter || 'all').toLowerCase();
+    return ds.modifications.filter(m => {
+      if(sf !== 'all' && normalizeStatus(m.status) !== sf) return false;
+      if(!q) return true;
+      const hay = [
+        m.id, m.old_text, m.new_text, m.reason, m.first_reason,
+        m.previous_old_text, m.contextBefore, m.contextAfter, m.chunk
+      ].join('\n').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function renderSourceList(){
+    const box = $('sourceList');
+    const ds = getCurrentDataset();
+    if(!ds){
+      box.innerHTML = `<div class="muted">暂无条目。</div>`;
+      return;
+    }
+    const filtered = getFilteredMods(ds);
+    const checkedMap = ensureCheckedMap(ds.key);
+    if(!filtered.length){
+      box.innerHTML = `<div class="muted">当前筛选结果为空。</div>`;
+      return;
+    }
+    box.innerHTML = filtered.map(m => {
+      const checked = checkedMap[m.id] ? 'checked' : '';
+      return `
+        <label class="item" style="display:block;cursor:pointer">
+          <div class="row" style="justify-content:space-between">
+            <div class="checkbox">
+              <input type="checkbox" data-check-id="${m.id}" ${checked} />
+              <strong>ID ${m.id}</strong>
+              ${statusChip(m.status)}
+            </div>
+            <div class="tiny">分段：${escapeHtml(m.chunk || '-')}</div>
+          </div>
+          <div class="meta">原文：${escapeHtml(snippet(m.old_text, 80))}</div>
+          <div class="meta">校正：${escapeHtml(snippet(m.new_text, 80))}</div>
+          <div class="meta">说明：${escapeHtml(snippet(m.reason || m.first_reason, 90))}</div>
+        </label>
+      `;
     }).join('');
-    wrap.querySelectorAll('.tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.activeKey = btn.dataset.key;
-        if (!state.datasets[state.activeKey]) state.activeKey = 'working';
-        renderAll();
+    box.querySelectorAll('[data-check-id]').forEach(el => {
+      el.addEventListener('change', () => {
+        checkedMap[el.dataset.checkId] = el.checked;
         persistState();
+        renderStatsOnly();
       });
     });
   }
 
-  function renderDatasetSummary(){
-    const ds = getActiveDataset();
+  function renderStatsOnly(){
+    const ds = getCurrentDataset();
     setText($('datasetSummary'), datasetSummaryText(ds));
-    $('btnDownloadDataset').disabled = !ds;
-    $('btnBuildBatches').disabled = !ds || !ds.modifications.length;
+    const sourceDs = getBatchSourceDataset() || ds;
+    const batchCount = state.batches.length;
+    const totalChecked = ds ? Object.values(ensureCheckedMap(ds.key)).filter(Boolean).length : 0;
+    const current = state.batches[state.activeBatchIndex];
+    const info = [
+      `当前勾选：${totalChecked}`,
+      `当前批次数：${batchCount}`
+    ];
+    if(sourceDs) info.push(`当前批次来源：${sourceDs.title}`);
+    if(current) info.push(`激活批次条目：${current.ids.length}`);
+    setText($('batchStats'), info.join('\n'));
   }
 
   function makePromptItem(m){
@@ -855,83 +1151,104 @@ status 可用值：
     };
   }
 
-  function buildPromptPackage(batch){
-    if (!batch) return '';
-    const ds = getDatasetByKey(state.batchSourceKey);
-    if (!ds) return '';
-    const items = batch.ids.map(id => ds.modifications.find(m => m.id === id)).filter(Boolean).map(makePromptItem);
-    const payload = { modifications: items };
-    return `${$('promptTemplate').value.trim()}\n\n输入 JSON：\n${JSON.stringify(payload, null, 2)}`;
+  function buildPromptPayload(batch){
+    if(!batch) return null;
+    const ds = getBatchSourceDataset();
+    if(!ds) return null;
+    const items = batch.ids
+      .map(id => ds.modifications.find(m => String(m.id) === String(id)))
+      .filter(Boolean)
+      .map(makePromptItem);
+    return { modifications: items };
   }
 
-  function buildBatchesFromSelected(){
-    const ds = getActiveDataset();
-    if (!ds) return;
+  function buildPromptJsonPackage(batch){
+    const payload = buildPromptPayload(batch);
+    return payload ? JSON.stringify(payload, null, 2) : '';
+  }
 
-    const selected = ds.modifications.filter(m => m.__selected).sort((a,b) => a.id - b.id);
-    if (!selected.length) {
-      alert('当前没有勾选条目。');
+  function buildPromptPackage(batch){
+    const template = str($('promptTemplate').value).trim();
+    const jsonOnly = buildPromptJsonPackage(batch).trim();
+    if(!jsonOnly) return '';
+    if(!template) return jsonOnly;
+    return `${template}\n\n输入 JSON：\n${jsonOnly}`;
+  }
+
+  function refreshPromptPreviews(batch = state.batches[state.activeBatchIndex] || null){
+    const fullPrompt = buildPromptPackage(batch);
+    const jsonOnly = buildPromptJsonPackage(batch);
+    $('promptPreview').value = fullPrompt;
+    $('promptJsonPreview').value = jsonOnly;
+    $('btnCopyPromptPreview').disabled = !fullPrompt.trim();
+    $('btnCopyPromptJsonPreview').disabled = !jsonOnly.trim();
+  }
+
+  function estimatePromptItemChars(m){
+    return JSON.stringify(makePromptItem(m)).length + 16;
+  }
+
+  function rebuildBatches(){
+    const ds = getCurrentDataset();
+    if(!ds){ alert('请先导入一润 JSON。'); return; }
+
+    const checkedMap = ensureCheckedMap(ds.key);
+    const selected = ds.modifications.filter(m => checkedMap[m.id]);
+    if(!selected.length){
+      alert('请先勾选要分批的条目。');
       return;
     }
 
-    const maxItems = Math.max(1, safeNum($('batchMaxItems').value, 20) || 20);
-    const maxChars = Math.max(100, safeNum($('batchMaxChars').value, 12000) || 12000);
+    const maxPerBatch = parseLoosePositiveInt($('maxPerBatch').value, state.maxPerBatch || 12, 1);
+    const maxChars = parseLoosePositiveInt($('maxChars').value, state.maxChars || 80000, 100);
+    state.maxPerBatch = maxPerBatch;
+    state.maxChars = maxChars;
 
     const batches = [];
     let current = [];
-    let charBudget = 0;
+    let chars = 0;
 
-    function pushBatch(){
-      if (!current.length) return;
-      batches.push({
-        index: batches.length,
-        ids: current.map(m => m.id),
-        responseRaw: '',
-        imported: false,
-        importedAt: '',
-        statsText: ''
-      });
-      current = [];
-      charBudget = 0;
-    }
-
-    for (const m of selected) {
-      const itemLen = JSON.stringify(makePromptItem(m)).length;
-      const willOverflow = current.length >= maxItems || (current.length > 0 && charBudget + itemLen > maxChars);
-      if (willOverflow) pushBatch();
+    for(const m of selected){
+      const c = estimatePromptItemChars(m);
+      const overflowCount = current.length >= maxPerBatch;
+      const overflowChars = current.length > 0 && (chars + c) > maxChars;
+      if(overflowCount || overflowChars){
+        batches.push({ ids: current.map(x => x.id), responseRaw: '', imported: false, importedAt: '', importedPayload: null });
+        current = [];
+        chars = 0;
+      }
       current.push(m);
-      charBudget += itemLen;
+      chars += c;
     }
-    pushBatch();
+    if(current.length){
+      batches.push({ ids: current.map(x => x.id), responseRaw: '', imported: false, importedAt: '', importedPayload: null });
+    }
 
     state.batches = batches;
-    state.batchSourceKey = state.activeKey;
-    state.activeBatchIndex = batches.length ? 0 : null;
-
-    renderAll();
+    state.batchSourceKey = ds.key;
+    state.activeBatchIndex = 0;
+    state.activePatchId = batches[0]?.ids?.[0] ?? null;
+    state.humanRecordText = '';
+    setText($('currentBatchLog'), `已重建批次：${batches.length} 批`);
     persistState();
-  }
-
-  function renderBatchStats(){
-    const ds = getBatchSourceDataset();
-    if (!state.batches.length || !ds) {
-      setText($('batchStats'), '尚未生成批次。');
-      return;
-    }
-    const selected = ds.modifications.filter(m => m.__selected).length;
-    const imported = state.batches.filter(b => b.imported).length;
-    setText($('batchStats'), `批次数：${state.batches.length}\n来源数据集：${ds.title || state.batchSourceKey}\n来源条数：${ds.modifications.length}\n本次勾选：${selected}\n已导回批次：${imported}/${state.batches.length}`);
+    renderAll();
   }
 
   function renderBatchList(){
     const box = $('batchList');
-    if (!state.batches.length) {
+    const ds = getBatchSourceDataset();
+
+    if(!state.batches.length){
       box.innerHTML = `<div class="muted">尚未生成批次。</div>`;
       $('btnImportCurrentBatch').disabled = true;
       $('btnImportAllSavedBatches').disabled = true;
       $('btnClearCurrentBatchResponse').disabled = true;
       $('btnDownloadCurrentBatchJson').disabled = true;
       $('btnDownloadCurrentBatchPrompt').disabled = true;
+      $('promptPreview').value = '';
+      $('promptJsonPreview').value = '';
+      $('btnCopyPromptPreview').disabled = true;
+      $('btnCopyPromptJsonPreview').disabled = true;
       setText($('currentBatchInfo'), '请先导入一润 JSON。');
       $('batchResponseBox').value = '';
       setText($('currentBatchLog'), '等待当前批次返回。');
@@ -944,1163 +1261,1470 @@ status 可用值：
       const idsText = b.ids.length > 10 ? `${b.ids.slice(0,10).join(', ')} ...` : b.ids.join(', ');
       return `
         <div class="item ${active}" data-batch-index="${i}">
-          <div class="title">批次 ${i+1}</div>
+          <div class="title">批次 ${i + 1}</div>
           <div class="meta">条数：${b.ids.length} ｜ ${imported}</div>
           <div class="meta">ID：${escapeHtml(idsText)}</div>
-        </div>`;
+        </div>
+      `;
     }).join('');
 
     box.querySelectorAll('[data-batch-index]').forEach(el => {
       el.addEventListener('click', () => {
-        state.activeBatchIndex = safeNum(el.dataset.batchIndex, 0);
+        state.activeBatchIndex = num(el.dataset.batchIndex, 0);
+        const batch = state.batches[state.activeBatchIndex];
+        state.activePatchId = batch?.ids?.[0] ?? null;
         renderAll();
         persistState();
       });
     });
 
-    $('btnImportAllSavedBatches').disabled = !state.batches.some(b => str(b.responseRaw).trim());
-
     const batch = state.batches[state.activeBatchIndex] || null;
-    const ds = getBatchSourceDataset();
-    if (!batch || !ds) return;
+    refreshPromptPreviews(batch);
 
     const prompt = buildPromptPackage(batch);
-    $('promptPreview').value = prompt;
-    $('btnCopyPromptPreview').disabled = !prompt.trim();
-    $('btnDownloadCurrentBatchJson').disabled = false;
+    $('btnDownloadCurrentBatchJson').disabled = !buildPromptJsonPackage(batch).trim();
     $('btnDownloadCurrentBatchPrompt').disabled = !prompt.trim();
-    $('btnImportCurrentBatch').disabled = false;
-    $('btnClearCurrentBatchResponse').disabled = false;
-    $('batchResponseBox').value = batch.responseRaw || '';
+    $('btnImportCurrentBatch').disabled = !batch;
+    $('btnClearCurrentBatchResponse').disabled = !batch;
+    $('btnImportAllSavedBatches').disabled = !state.batches.some(b => str(b.responseRaw).trim());
 
-    setText($('currentBatchInfo'), `当前批次：${state.activeBatchIndex + 1}/${state.batches.length}\n来源数据集：${ds.title || state.batchSourceKey}\n条数：${batch.ids.length}\nID：${batch.ids.join(', ')}`);
+    $('batchResponseBox').value = batch?.responseRaw || '';
+    setText(
+      $('currentBatchInfo'),
+      batch && ds
+        ? `当前批次：${state.activeBatchIndex + 1}/${state.batches.length}\n来源数据集：${ds.title}\n条数：${batch.ids.length}\nID：${batch.ids.join(', ')}`
+        : '请先导入一润 JSON。'
+    );
   }
 
-  function renderModList(){
-    const box = $('modList');
-    let ds = getActiveDataset();
-    let mods = [];
-    let label = '';
+  function normalizeAiResult(parsed){
+    const arr = collectModifications(parsed);
+    const list = (arr.length ? arr : Array.isArray(parsed) ? parsed : []).map((m, idx) => ({
+      id: num(m.id, idx + 1),
+      new_text: str(m.new_text),
+      reason: str(m.reason),
+      status: normalizeStatus(m.status || 'ok')
+    })).filter(m => Number.isFinite(m.id));
+    if(!list.length) throw new Error('AI 返回中没有可导入的 modifications。');
+    return list;
+  }
 
-    if (state.activeBatchIndex != null && state.batches[state.activeBatchIndex] && getBatchSourceDataset()) {
-      ds = getBatchSourceDataset();
-      const ids = new Set(state.batches[state.activeBatchIndex].ids);
-      mods = ds.modifications.filter(m => ids.has(m.id));
-      label = `当前批次条目：${mods.length}`;
-    } else if (ds) {
-      mods = getVisibleMods(ds);
-      label = `当前可见条目：${mods.length}`;
-    }
+  function importBatchResultByIndex(index){
+    const batch = state.batches[index];
+    const ds = getBatchSourceDataset();
+    if(!batch || !ds) return;
 
-    setText($('listSummary'), mods.length ? label : '暂无条目');
-    if (!mods.length) {
-      box.innerHTML = `<div class="muted">暂无条目</div>`;
-      clearEditor();
+    const raw = str(batch.responseRaw).trim();
+    if(!raw){
+      setText($('currentBatchLog'), '当前批次返回框为空。');
       return;
     }
 
-    const currentId = state.selectedModContext.id;
-    box.innerHTML = mods.map(m => {
-      const active = currentId === m.id ? 'active' : '';
-      const selected = m.__selected ? '已勾选' : '未勾选';
-      const brief = str(m.old_text || m.anchor_old_text).slice(0, 48).replace(/\n/g, ' ');
-      return `
-        <div class="item ${active}" data-mod-id="${m.id}">
-          <div class="title">#${m.id} <span class="chip">${escapeHtml(m.status)}</span></div>
-          <div class="meta">${selected} ｜ chunk=${m.chunkIndex ?? ''} ｜ abs=${m.absoluteStart ?? ''}-${m.absoluteEnd ?? ''}</div>
-          <div class="meta">${escapeHtml(brief)}${brief.length >= 48 ? '…' : ''}</div>
-        </div>`;
-    }).join('');
+    let parsed, items;
+    try{
+      parsed = parseAnyInput(raw);
+      items = normalizeAiResult(parsed);
+    }catch(e){
+      setText($('currentBatchLog'), `导入失败：${e.message}`);
+      return;
+    }
 
-    box.querySelectorAll('[data-mod-id]').forEach(el => {
-      el.addEventListener('click', () => {
-        const id = safeNum(el.dataset.modId, null);
-        state.selectedModContext = {
-          mode: state.activeBatchIndex != null && state.batches[state.activeBatchIndex] ? 'batch' : 'dataset',
-          datasetKey: (state.activeBatchIndex != null && state.batches[state.activeBatchIndex]) ? state.batchSourceKey : state.activeKey,
-          id
+    const map = new Map(items.map(x => [String(x.id), x]));
+    const missing = [];
+    batch.ids.forEach(id => {
+      if(!map.has(String(id))) missing.push(id);
+    });
+
+    if(missing.length && $('fillMissingAsKeep').checked){
+      const fillItems = missing.map(id => {
+        const base = ds.modifications.find(m => String(m.id) === String(id));
+        return {
+          id: num(id),
+          new_text: base ? str(base.old_text) : '',
+          reason: '',
+          status: 'keep'
         };
-        loadSelectedItemIntoEditor();
-        renderModList();
+      });
+      fillItems.forEach(it => map.set(String(it.id), it));
+    }
+
+    let updated = 0;
+    batch.ids.forEach(id => {
+      const rec = map.get(String(id));
+      if(!rec) return;
+      const target = ds.modifications.find(m => String(m.id) === String(id));
+      if(!target) return;
+      if(normalizeStatus(rec.status) === 'keep' && !str(rec.new_text).trim()){
+        rec.new_text = target.old_text;
+      }
+      target.new_text = str(rec.new_text || target.new_text || target.old_text);
+      target.reason = str(rec.reason);
+      target.status = normalizeStatus(rec.status);
+      updated++;
+    });
+
+    batch.imported = true;
+    batch.importedAt = nowStamp();
+    batch.importedPayload = { modifications: Array.from(map.values()) };
+
+    const stillMissing = batch.ids.filter(id => !map.has(String(id)));
+    const lines = [
+      `批次 ${index + 1} 导入完成。`,
+      `命中条目：${updated}`,
+      `自动补 keep：${missing.length && $('fillMissingAsKeep').checked ? missing.length : 0}`,
+      `仍缺失：${stillMissing.length ? stillMissing.join(', ') : '无'}`
+    ];
+    setText($('currentBatchLog'), lines.join('\n'));
+    state.humanRecordText = '';
+    persistState();
+    renderAll();
+  }
+
+  function importAllSavedBatches(){
+    let count = 0;
+
+    state.batches.forEach((b, i) => {
+      if(str(b.responseRaw).trim()){
+        importBatchResultByIndex(i);
+        count++;
+      }
+    });
+
+    if(!count){
+      setText($('currentBatchLog'), '没有已保存的批次结果可导入。');
+      return;
+    }
+
+    mergeImportedBatches();
+    createNextRoundFromMerged(true);
+
+    setText(
+      $('currentBatchLog'),
+      `已处理全部已保存批次结果：${count} 批。\n已自动生成二润数据，并已自动进入下一轮工作集。`
+    );
+
+    persistState();
+    renderAll();
+  }
+
+
+  function getActiveBatchMods(){
+    const batch = state.batches[state.activeBatchIndex];
+    const ds = getBatchSourceDataset();
+    if(!batch || !ds) return [];
+    return batch.ids.map(id => ds.modifications.find(m => String(m.id) === String(id))).filter(Boolean);
+  }
+
+  function getActivePatchMod(){
+    const list = getActiveBatchMods();
+    if(!list.length) return null;
+    let current = list.find(m => String(m.id) === String(state.activePatchId));
+    if(!current){
+      current = list[0];
+      state.activePatchId = current.id;
+    }
+    return current;
+  }
+
+  function renderPatchWorkspace(){
+    const listBox = $('patchItemList');
+    const mods = getActiveBatchMods();
+    if(!mods.length){
+      listBox.innerHTML = '暂无条目';
+      clearPatchEditor();
+      renderDiffPreview(null);
+      return;
+    }
+
+    listBox.innerHTML = mods.map(m => `
+      <div class="item ${String(m.id) === String(state.activePatchId) ? 'active' : ''}" data-patch-id="${m.id}">
+        <div class="row" style="justify-content:space-between">
+          <div><strong>ID ${m.id}</strong></div>
+          <div>${statusChip(m.status)}</div>
+        </div>
+        <div class="meta">原文：${escapeHtml(snippet(m.old_text, 70))}</div>
+        <div class="meta">校正：${escapeHtml(snippet(m.new_text, 70))}</div>
+      </div>
+    `).join('');
+
+    listBox.querySelectorAll('[data-patch-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.activePatchId = el.dataset.patchId;
+        renderPatchWorkspace();
         persistState();
       });
     });
 
-    if (!mods.some(m => m.id === currentId)) {
-      state.selectedModContext = {
-        mode: state.activeBatchIndex != null && state.batches[state.activeBatchIndex] ? 'batch' : 'dataset',
-        datasetKey: (state.activeBatchIndex != null && state.batches[state.activeBatchIndex]) ? state.batchSourceKey : state.activeKey,
-        id: mods[0].id
-      };
-    }
-    loadSelectedItemIntoEditor();
+    const m = getActivePatchMod();
+    fillPatchEditor(m);
+    renderDiffPreview(m);
   }
 
-  function getSelectedEditorItem(){
-    const ds = getDatasetByKey(state.selectedModContext.datasetKey || state.activeKey);
-    if (!ds) return null;
-    return ds.modifications.find(m => m.id === state.selectedModContext.id) || null;
-  }
-
-  function clearEditor(){
-    ['edId','edChunkIndex','edAnchorStart','edAnchorEnd','edCurrentStart','edCurrentEnd'].forEach(id => $(id).value = '');
-    ['edPrevOld','edOld','edNew','edReason','edCtxBefore','edCtxAfter'].forEach(id => $(id).value = '');
-    $('edStatus').value = 'pending';
-    setText($('oldPreview'), '');
-    setText($('newPreview'), '');
-    setText($('diffSummary'), '');
-  }
-
-  function renderDiffSummary(oldText, newText){
-    const same = str(oldText) === str(newText);
-    if (same) {
-      $('oldPreview').innerHTML = escapeHtml(str(oldText || '(空)'));
-      $('newPreview').innerHTML = escapeHtml(str(newText || '(空)'));
-      setText($('diffSummary'), `无差异。长度：${str(oldText).length}`);
-      return;
-    }
-    $('oldPreview').innerHTML = `<del>${escapeHtml(str(oldText || '(空)'))}</del>`;
-    $('newPreview').innerHTML = `<ins>${escapeHtml(str(newText || '(空)'))}</ins>`;
-    const delta = str(newText).length - str(oldText).length;
-    setText($('diffSummary'), `存在差异。\n旧长度：${str(oldText).length}\n新长度：${str(newText).length}\n长度差：${delta >= 0 ? '+' : ''}${delta}`);
-  }
-
-  function loadSelectedItemIntoEditor(){
-    const item = getSelectedEditorItem();
-    if (!item) {
-      clearEditor();
-      return;
-    }
-    $('edId').value = item.id ?? '';
-    $('edStatus').value = normalizeStatus(item.status);
-    $('edChunkIndex').value = item.chunkIndex ?? '';
-    $('edAnchorStart').value = item.sourceAbsoluteStart ?? '';
-    $('edAnchorEnd').value = item.sourceAbsoluteEnd ?? '';
-    $('edCurrentStart').value = item.absoluteStart ?? '';
-    $('edCurrentEnd').value = item.absoluteEnd ?? '';
-    $('edPrevOld').value = str(item.previous_old_text);
-    $('edOld').value = str(item.old_text);
-    $('edNew').value = str(item.new_text);
-    $('edReason').value = str(item.reason);
-    $('edCtxBefore').value = str(item.contextBefore);
-    $('edCtxAfter').value = str(item.contextAfter);
-    renderDiffSummary(item.old_text, item.new_text);
-  }
-
-  function saveEditorToItem(){
-    const item = getSelectedEditorItem();
-    if (!item) return;
-    item.status = normalizeStatus($('edStatus').value);
-    item.chunkIndex = safeNum($('edChunkIndex').value, null);
-    item.sourceAbsoluteStart = safeNum($('edAnchorStart').value, null);
-    item.sourceAbsoluteEnd = safeNum($('edAnchorEnd').value, null);
-    item.absoluteStart = safeNum($('edCurrentStart').value, null);
-    item.absoluteEnd = safeNum($('edCurrentEnd').value, null);
-    item.previous_old_text = str($('edPrevOld').value);
-    item.old_text = str($('edOld').value);
-    item.new_text = str($('edNew').value);
-    item.reason = str($('edReason').value);
-    item.contextBefore = str($('edCtxBefore').value);
-    item.contextAfter = str($('edCtxAfter').value);
-    renderDiffSummary(item.old_text, item.new_text);
-    renderDatasetSummary();
-    renderModList();
-    renderBatchStats();
-    persistState();
-  }
-
-  function resolveReasonWithKeepFallback(baseItem, incomingMod){
-    const incomingReason = str(incomingMod?.reason).trim();
-    const incomingStatus = normalizeStatus(incomingMod?.status ?? 'keep');
-    const firstReason = str(baseItem?.first_reason ?? baseItem?.reason);
-    if (incomingReason) return incomingReason;
-    if (incomingStatus === 'keep') return firstReason;
-    return '';
-  }
-
-  function buildMergedRecordFromDataset(ds){
-    const out = ds.modifications.map(m => {
-      const item = publicItem(m);
-      item.reason = item.status === 'keep' && !str(item.reason).trim()
-        ? str(item.first_reason)
-        : str(item.reason);
-      return item;
+  function clearPatchEditor(){
+    [
+      'editId','editStatus','editChunk','editSrcStart','editSrcEnd','editAbsStart','editAbsEnd',
+      'editPreviousOldText','editOldText','editNewText','editFirstReason','editReason','editContextBefore','editContextAfter'
+    ].forEach(id => {
+      const el = $(id);
+      if(!el) return;
+      if(el.tagName === 'SELECT') el.value = 'pending';
+      else el.value = '';
     });
-    return { modifications: out };
   }
 
-  function buildMergedRecordFromIncoming(baseDs, incomingMods){
-    const byId = new Map();
-    for (const m of incomingMods) {
-      const nm = normalizeItem(m, 0);
-      byId.set(nm.id, nm);
-    }
-
-    let fallbackCount = 0;
-    let autoKeepCount = 0;
-
-    const out = baseDs.modifications.map(base => {
-      const incoming = byId.get(base.id);
-      let status = incoming ? normalizeStatus(incoming.status) : 'keep';
-      if (!incoming) autoKeepCount++;
-
-      const reason = resolveReasonWithKeepFallback(base, incoming || { status:'keep', reason:'' });
-      if (status === 'keep' && !str(incoming?.reason).trim()) fallbackCount++;
-
-      return {
-        id: base.id,
-        chunkIndex: base.chunkIndex,
-        sourceAbsoluteStart: base.sourceAbsoluteStart,
-        sourceAbsoluteEnd: base.sourceAbsoluteEnd,
-        absoluteStart: incoming && incoming.absoluteStart != null ? incoming.absoluteStart : base.absoluteStart,
-        absoluteEnd: incoming && incoming.absoluteEnd != null ? incoming.absoluteEnd : base.absoluteEnd,
-        previous_old_text: str(incoming?.previous_old_text || base.previous_old_text),
-        old_text: str(incoming?.old_text || base.old_text),
-        new_text: status === 'ok' ? str(incoming?.new_text) : str(incoming?.new_text || ''),
-        first_reason: str(base.first_reason || base.reason),
-        reason,
-        contextBefore: str(incoming?.contextBefore || base.contextBefore),
-        contextAfter: str(incoming?.contextAfter || base.contextAfter),
-        anchor_old_text: str(base.anchor_old_text || base.old_text),
-        status
-      };
-    });
-
-    return {
-      object: { modifications: out },
-      summary: { fallbackCount, autoKeepCount }
-    };
+  function fillPatchEditor(m){
+    if(!m){ clearPatchEditor(); return; }
+    $('editId').value = m.id;
+    $('editStatus').value = normalizeStatus(m.status);
+    $('editChunk').value = str(m.chunk);
+    $('editSrcStart').value = str(m.srcStart);
+    $('editSrcEnd').value = str(m.srcEnd);
+    $('editAbsStart').value = str(m.absStart);
+    $('editAbsEnd').value = str(m.absEnd);
+    $('editPreviousOldText').value = str(m.previous_old_text);
+    $('editOldText').value = str(m.old_text);
+    $('editNewText').value = str(m.new_text);
+    $('editFirstReason').value = str(m.first_reason);
+    $('editReason').value = str(m.reason);
+    $('editContextBefore').value = str(m.contextBefore);
+    $('editContextAfter').value = str(m.contextAfter);
   }
 
-  function parseResponseModsFromBox(raw){
-    const payload = parseJsonAny(raw);
-    const mods = extractModsFromAny(payload);
-    return mods.map((m, i) => normalizeItem(m, i));
-  }
-
-  function importCurrentBatch(){
-    const batch = state.batches[state.activeBatchIndex];
+  function saveCurrentPatch(){
     const ds = getBatchSourceDataset();
-    if (!batch || !ds) return;
+    if(!ds) return null;
+    const id = $('editId').value;
+    const m = ds.modifications.find(x => String(x.id) === String(id));
+    if(!m) return null;
 
-    const raw = str($('batchResponseBox').value).trim();
-    if (!raw) {
-      alert('当前批次返回框为空。');
-      return;
-    }
+    m.status = normalizeStatus($('editStatus').value);
+    m.chunk = str($('editChunk').value);
+    m.srcStart = str($('editSrcStart').value);
+    m.srcEnd = str($('editSrcEnd').value);
+    m.absStart = str($('editAbsStart').value);
+    m.absEnd = str($('editAbsEnd').value);
+    m.previous_old_text = str($('editPreviousOldText').value);
+    m.old_text = str($('editOldText').value);
+    m.new_text = str($('editNewText').value);
+    m.first_reason = str($('editFirstReason').value);
+    m.reason = str($('editReason').value);
+    m.contextBefore = str($('editContextBefore').value);
+    m.contextAfter = str($('editContextAfter').value);
 
-    let mods;
-    try{
-      mods = parseResponseModsFromBox(raw);
-    }catch(err){
-      alert('当前批次 JSON 解析失败：' + err.message);
-      return;
-    }
-
-    const scopeIds = new Set(batch.ids);
-    const byId = new Map(mods.filter(m => scopeIds.has(m.id)).map(m => [m.id, m]));
-    let filled = 0;
-    if ($('fillMissingKeep').checked) {
-      for (const id of batch.ids) {
-        if (!byId.has(id)) {
-          const base = ds.modifications.find(m => m.id === id);
-          byId.set(id, normalizeItem({
-            id,
-            status:'keep',
-            reason:'',
-            old_text: base ? base.old_text : '',
-            new_text:''
-          }, 0));
-          filled++;
-        }
-      }
-    }
-
-    for (const id of batch.ids) {
-      const incoming = byId.get(id);
-      if (!incoming) continue;
-      const item = ds.modifications.find(m => m.id === id);
-      if (!item) continue;
-      item.status = normalizeStatus(incoming.status);
-      if (incoming.chunkIndex != null) item.chunkIndex = incoming.chunkIndex;
-      if (incoming.sourceAbsoluteStart != null) item.sourceAbsoluteStart = incoming.sourceAbsoluteStart;
-      if (incoming.sourceAbsoluteEnd != null) item.sourceAbsoluteEnd = incoming.sourceAbsoluteEnd;
-      if (incoming.absoluteStart != null) item.absoluteStart = incoming.absoluteStart;
-      if (incoming.absoluteEnd != null) item.absoluteEnd = incoming.absoluteEnd;
-      if (str(incoming.previous_old_text)) item.previous_old_text = incoming.previous_old_text;
-      if (str(incoming.old_text)) item.old_text = incoming.old_text;
-      if (incoming.new_text != null) item.new_text = str(incoming.new_text);
-      if (incoming.reason != null) item.reason = str(incoming.reason);
-      if (incoming.contextBefore != null) item.contextBefore = str(incoming.contextBefore);
-      if (incoming.contextAfter != null) item.contextAfter = str(incoming.contextAfter);
-    }
-
-    batch.responseRaw = raw;
-    batch.imported = true;
-    batch.importedAt = new Date().toLocaleString();
-    batch.statsText = `导回 ${byId.size} 条；自动补 keep ${filled} 条。`;
-
-    setText($('currentBatchLog'), `导入成功。\n批次：${state.activeBatchIndex + 1}/${state.batches.length}\n实际导入：${byId.size}\n自动补 keep：${filled}`);
-
-    const nextIndex = state.batches.findIndex((b, i) => i > state.activeBatchIndex && !b.imported);
-    if (nextIndex >= 0) state.activeBatchIndex = nextIndex;
-
+    state.humanRecordText = '';
+    persistState();
     renderAll();
-    copyText($('promptPreview').value).catch?.(() => {});
-    persistState();
+    return m;
   }
 
-  function importAllSavedBatches(){
-    if (!state.batches.length) return;
-    const ds = getBatchSourceDataset();
-    if (!ds) return;
-    let ok = 0;
-    for (let i = 0; i < state.batches.length; i++) {
-      const b = state.batches[i];
-      if (!str(b.responseRaw).trim()) continue;
-      state.activeBatchIndex = i;
-      $('batchResponseBox').value = b.responseRaw;
-      try{
-        importCurrentBatch();
-        ok++;
-      }catch(_){}
-    }
-    setText($('currentBatchLog'), `已重导当前页面里保存的批次结果。\n成功批次数：${ok}`);
-    persistState();
+  function diffHtml(a, b, cls){
+    a = str(a);
+    b = str(b);
+    if(a === b) return escapeHtml(a || '（无差异）');
+    let start = 0;
+    while(start < a.length && start < b.length && a[start] === b[start]) start++;
+    let endA = a.length - 1;
+    let endB = b.length - 1;
+    while(endA >= start && endB >= start && a[endA] === b[endB]){ endA--; endB--; }
+    const pre = escapeHtml(a.slice(0, start));
+    const mid = escapeHtml(a.slice(start, endA + 1));
+    const suf = escapeHtml(a.slice(endA + 1));
+    return `${pre}<mark class="${cls}">${mid || '∅'}</mark>${suf}`;
   }
 
-  function importAllResultsAnytime(){
-    const raw = str($('allResultsPaste').value).trim();
-    if (!raw) {
-      alert('请先上传或粘贴“全部批次结果”。');
+  function renderDiffPreview(m){
+    if(!m){
+      $('oldPreview').innerHTML = '';
+      $('newPreview').innerHTML = '';
+      setText($('diffSummary'), '暂无差异。');
       return;
     }
-    const baseDs = getActiveDataset();
-    if (!baseDs) {
-      alert('请先导入一润 JSON。');
-      return;
-    }
+    $('oldPreview').innerHTML = diffHtml(m.old_text, m.new_text, 'diff-old');
+    $('newPreview').innerHTML = diffHtml(m.new_text, m.old_text, 'diff-new');
 
-    let payload, incomingMods;
-    try{
-      payload = parseJsonAny(raw);
-      incomingMods = extractModsFromAny(payload);
-    }catch(err){
-      alert('全部批次结果解析失败：' + err.message);
+    const oldLen = str(m.old_text).length;
+    const newLen = str(m.new_text).length;
+    const delta = newLen - oldLen;
+    setText($('diffSummary'),
+      `ID ${m.id}\nstatus=${normalizeStatus(m.status)}\nold_len=${oldLen} / new_len=${newLen} / Δ=${delta >= 0 ? '+' + delta : delta}\nreason=${m.reason || m.first_reason || '（空）'}`
+    );
+  }
+
+  function getTitleSource(){
+    return state.fullTextName
+      || (getCurrentDataset() && getCurrentDataset().title)
+      || (getBatchSourceDataset() && getBatchSourceDataset().title)
+      || '未命名作品';
+  }
+
+  function getWorkTitle(){
+    let name = sanitizeFilename(getTitleSource() || '未命名作品');
+    name = name.replace(/\.[^.]+$/,'');
+    name = name.replace(/（.*?）$/,'').replace(/\(.*?\)$/,'');
+    name = name.replace(/_merged.*$/i,'');
+    name = name.replace(/[-_ ]*\d{4}-\d{2}-\d{2}.*$/,'');
+    name = name.replace(/(一润后)?全文$/,'');
+    name = name.replace(/(一润|二润)?润色记录$/,'');
+    name = name.replace(/(一润|二润)?数据$/,'');
+    name = name.replace(/润色数据$/,'');
+    name = name.trim();
+    return name || '未命名作品';
+  }
+
+  function getChineseFilename(kind){
+    const title = getWorkTitle();
+    if(kind === 'mergedJson') return `${title}二润数据.json`;
+    if(kind === 'secondPassJson') return `${title}二润数据.json`;
+    if(kind === 'finalText') return `${title}二润全文.txt`;
+    if(kind === 'prettyText') return `${title}二润全文（331整理版）.txt`;
+    if(kind === 'humanRecord') return `${title}人工润色记录.txt`;
+    if(kind === 'dataset') return `${title}一润数据.json`;
+    if(kind === 'batchJson') return `第${state.activeBatchIndex + 1}批续传包.json`;
+    if(kind === 'batchPrompt') return `第${state.activeBatchIndex + 1}批完整提示词包.txt`;
+    return `${title}.txt`;
+  }
+
+  function mergeImportedBatches(){
+    const ds = getBatchSourceDataset() || getCurrentDataset();
+    if(!ds){
+      setText($('mergeLog'), '请先导入一润 JSON。');
       return;
     }
-
-    const built = buildMergedRecordFromIncoming(baseDs, incomingMods);
-    state.mergedRecordObject = built.object;
-    state.datasets.result = {
-      fileName: getBaseName(baseDs.fileName) + '_result.json',
-      title: '结果集',
-      modifications: built.object.modifications.map((m, i) => ({ ...normalizeItem(m, i), __selected:false }))
+    state.mergeResults = {
+      title: `${getWorkTitle()}二润数据`,
+      generatedAt: nowStamp(),
+      modifications: clone(ds.modifications)
     };
-    state.activeApplySource = 'merged';
-    $('applySourceMergedRecord').checked = true;
-
     setText($('mergeLog'),
-      `已导入全部批次结果并生成新的润色记录。\n` +
-      `基础条数：${baseDs.modifications.length}\n` +
-      `导入结果条数：${incomingMods.length}\n` +
-      `缺失自动补 keep：${built.summary.autoKeepCount}\n` +
-      `keep 原因回退 first_reason：${built.summary.fallbackCount}`
+      `已生成新的润色记录。\n标题：${state.mergeResults.title}\n条目数：${state.mergeResults.modifications.length}`
+    );
+    state.humanRecordText = '';
+    persistState();
+    renderAll();
+  }
+
+  function importAllResultsFromText(text){
+    try{
+      const parsed = parseAnyInput(text);
+      const mods = collectModifications(parsed).map(normalizeModification);
+      if(!mods.length) throw new Error('未找到 modifications 数组。');
+
+      state.mergeResults = {
+        title: `${getWorkTitle()}二润数据`,
+        generatedAt: nowStamp(),
+        modifications: mods
+      };
+
+      state.humanRecordText = '';
+
+      createNextRoundFromMerged(true);
+
+      setText(
+        $('mergeLog'),
+        `已导入外部二润数据。\n标题：${state.mergeResults.title}\n条目数：${mods.length}\n已自动进入下一轮工作集。`
+      );
+
+      persistState();
+      renderAll();
+    }catch(e){
+      setText($('mergeLog'), `导入外部二润数据失败：${e.message}`);
+    }
+  }
+
+
+  function createNextRoundFromMerged(silent = false){
+    if(!state.mergeResults || !Array.isArray(state.mergeResults.modifications) || !state.mergeResults.modifications.length){
+      if(!silent) alert('还没有新的润色记录。');
+      return null;
+    }
+
+    const ds = {
+      key: uid('ds'),
+      title: `${getWorkTitle()}二润数据`,
+      importedAt: nowStamp(),
+      modifications: clone(state.mergeResults.modifications).map(normalizeModification)
+    };
+
+    state.datasets.unshift(ds);
+    state.activeDatasetKey = ds.key;
+    state.batchSourceKey = ds.key;
+    state.checkedIdsByDataset[ds.key] = {};
+    autoCheckAllDataset(ds);
+
+    state.batches = [];
+    state.activeBatchIndex = 0;
+    state.activePatchId = ds.modifications[0]?.id ?? null;
+
+    if(!silent){
+      setText($('sourceLog'), `已自动进入下一轮工作集：${ds.title}\n条目数：${ds.modifications.length}\n已默认全选并自动分批。`);
+    }
+
+    persistState();
+    renderAll();
+    rebuildBatches();
+
+    return ds;
+  }
+
+
+  function importSecondPassRawFromText(text){
+    try{
+      const parsed = parseAnyInput(text);
+      state.secondPassRaw = parsed;
+      const mods = collectModifications(parsed);
+      setText($('secondPassJsonLog'), `已导入二润 JSON。\n检测到 modifications：${mods.length}`);
+      persistState();
+      renderAll();
+    }catch(e){
+      setText($('secondPassJsonLog'), `导入二润 JSON 失败：${e.message}`);
+    }
+  }
+
+  function generateSecondPassRecords(){
+    if(!state.secondPassRaw){
+      setText($('secondPassRecordLog'), '请先导入二润 JSON。');
+      return;
+    }
+
+    const rawMods = collectModifications(state.secondPassRaw);
+    if(!rawMods.length){
+      setText($('secondPassRecordLog'), '二润 JSON 中未找到 modifications。');
+      return;
+    }
+
+    const hasContextFields = rawMods.some(m =>
+      m.old_text != null || m.previous_old_text != null || m.contextBefore != null || m.contextAfter != null
     );
 
-    renderAll();
-    persistState();
-  }
-
-  function mergeAllImportedBatches(){
-    const ds = getBatchSourceDataset();
-    if (!ds) {
-      alert('没有可合并的数据集。');
-      return;
-    }
-    state.mergedRecordObject = buildMergedRecordFromDataset(ds);
-    state.datasets.result = {
-      fileName: getBaseName(ds.fileName) + '_result.json',
-      title: '结果集',
-      modifications: state.mergedRecordObject.modifications.map((m, i) => ({ ...normalizeItem(m, i), __selected:false }))
-    };
-    state.activeApplySource = 'merged';
-    $('applySourceMergedRecord').checked = true;
-
-    const count = state.mergedRecordObject.modifications.filter(m => m.status === 'keep' && !str(m.reason).trim() && str(m.first_reason).trim()).length;
-
-    setText($('mergeLog'),
-      `已合并已导回批次，生成新的润色记录。\n` +
-      `来源：${ds.title || state.batchSourceKey}\n` +
-      `总条数：${state.mergedRecordObject.modifications.length}\n` +
-      `keep 原因回退 first_reason：${count}`
-    );
-
-    renderAll();
-    persistState();
-  }
-
-  function exactUniqueFind(text, needle){
-    if (!needle) return { ok:false, reason:'old_text 为空' };
-    let first = text.indexOf(needle);
-    if (first < 0) return { ok:false, reason:'全文中找不到 old_text 的精确文本' };
-    const second = text.indexOf(needle, first + 1);
-    if (second >= 0) return { ok:false, reason:'全文中存在多个相同 old_text，且条目缺少 absoluteStart/absoluteEnd' };
-    return { ok:true, start:first, end:first + needle.length, mode:'unique-exact-search' };
-  }
-
-  function getActiveRecordObject(){
-    const useSecond = $('applySourceSecondPassRecord').checked;
-    return useSecond ? state.secondPassRecordObject : state.mergedRecordObject;
-  }
-
-  function validateRecordAgainstText(recordObject, baseText){
-    const text = normalizeNewlines(baseText || '');
-    const mods = ensureArray(recordObject?.modifications).map((m, i) => normalizeItem(m, i));
-    const failures = [];
-    const plan = [];
-
-    for (const m of mods) {
-      const oldText = str(m.old_text);
-      let start = safeNum(m.absoluteStart, null);
-      let end = safeNum(m.absoluteEnd, null);
-      let mode = 'absolute-range';
-
-      if (start != null && end != null) {
-        const slice = text.slice(start, end);
-        if (slice !== oldText) {
-          failures.push(`#${m.id} 命中失败：absoluteStart/absoluteEnd 对应文本与 old_text 不一致。`);
-          continue;
-        }
-      } else {
-        const found = exactUniqueFind(text, oldText);
-        if (!found.ok) {
-          failures.push(`#${m.id} 命中失败：${found.reason}`);
-          continue;
-        }
-        start = found.start;
-        end = found.end;
-        mode = found.mode;
-      }
-
-      plan.push({
-        id: m.id,
-        status: normalizeStatus(m.status),
-        start,
-        end,
-        oldText,
-        newText: str(m.new_text),
-        mode,
-        item: m
+    let records = [];
+    if(hasContextFields){
+      records = rawMods.map(normalizeModification);
+    }else{
+      const base =
+        (state.mergeResults && state.mergeResults.modifications) ||
+        (getBatchSourceDataset() && getBatchSourceDataset().modifications) ||
+        (getCurrentDataset() && getCurrentDataset().modifications) ||
+        [];
+      const aiMap = new Map(rawMods.map((m, idx) => [String(num(m.id, idx+1)), m]));
+      records = base.map((m, idx) => {
+        const ai = aiMap.get(String(m.id)) || {};
+        return normalizeModification({
+          ...m,
+          new_text: ai.new_text != null ? ai.new_text : m.new_text,
+          reason: ai.reason != null ? ai.reason : m.reason,
+          status: ai.status != null ? ai.status : m.status
+        }, idx);
       });
     }
 
-    plan.sort((a,b) => a.start - b.start || a.id - b.id);
-
-    for (let i = 1; i < plan.length; i++) {
-      if (plan[i].start < plan[i-1].end) {
-        failures.push(`#${plan[i].id} 与 #${plan[i-1].id} 区间重叠，无法严格应用。`);
+    records = records.map(m => {
+      if(normalizeStatus(m.status) === 'keep' && !str(m.reason).trim()){
+        m.reason = str(m.first_reason);
       }
-    }
+      if(normalizeStatus(m.status) === 'keep' && !str(m.new_text).trim()){
+        m.new_text = str(m.old_text);
+      }
+      return m;
+    });
 
-    return {
-      ok: failures.length === 0,
-      total: mods.length,
-      passed: plan.length,
-      failures,
-      plan
+    state.secondPassRecords = {
+      title: `${getWorkTitle()}二润数据`,
+      generatedAt: nowStamp(),
+      modifications: records
     };
+
+    setText($('secondPassRecordLog'),
+      `已生成二润润色记录。\n标题：${state.secondPassRecords.title}\n条目数：${records.length}`
+    );
+
+    state.humanRecordText = '';
+    persistState();
+    renderAll();
   }
 
-  function applyPlan(baseText, plan){
-    let out = '';
-    let pos = 0;
-    for (const p of plan) {
-      out += baseText.slice(pos, p.start);
-      if (p.status === 'ok') out += p.newText;
-      else out += baseText.slice(p.start, p.end);
-      pos = p.end;
+  function getApplySourceRecords(){
+    return state.mergeResults && Array.isArray(state.mergeResults.modifications)
+      ? state.mergeResults.modifications
+      : [];
+  }
+
+
+  function shouldApplyRecord(m){
+    const st = normalizeStatus(m.status);
+    if(['keep','skip','ambiguous','conflict','pending'].includes(st)) return false;
+    const oldText = str(m.old_text);
+    const newText = str(m.new_text);
+    if(!oldText) return false;
+    if(oldText === newText) return false;
+    return true;
+  }
+
+  function allIndexesOf(text, search){
+    const out = [];
+    if(!search) return out;
+    let start = 0;
+    while(true){
+      const i = text.indexOf(search, start);
+      if(i === -1) break;
+      out.push(i);
+      start = i + 1;
     }
-    out += baseText.slice(pos);
     return out;
   }
 
-  function render331Text(text){
-    let t = normalizeNewlines(text || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-    if (!$('use331Render').checked) return t;
+  function candidateScore(text, idx, rec, oldText){
+    let score = 0;
+    const before = str(rec.contextBefore);
+    const after = str(rec.contextAfter);
+    if(before){
+      const got = text.slice(Math.max(0, idx - before.length), idx);
+      if(got === before) score += 4;
+      else if(got.endsWith(before)) score += 1;
+    }
+    if(after){
+      const got = text.slice(idx + oldText.length, idx + oldText.length + after.length);
+      if(got === after) score += 4;
+      else if(got.startsWith(after.slice(0, Math.min(8, after.length)))) score += 1;
+    }
+    const absStart = num(rec.absStart, NaN);
+    const srcStart = num(rec.srcStart, NaN);
+    if(Number.isFinite(absStart) && idx === absStart) score += 6;
+    if(Number.isFinite(srcStart) && idx === srcStart) score += 2;
+    return score;
+  }
 
-    const lines = t.split('\n');
+  function locateRecord(text, rec){
+    const oldText = str(rec.old_text) || str(rec.previous_old_text);
+    if(!oldText) return { ok:false, reason:'old_text 为空' };
+    const indexes = allIndexesOf(text, oldText);
+    if(!indexes.length){
+      return { ok:false, reason:`全文中找不到 old_text（ID ${rec.id}）` };
+    }
+    if(indexes.length === 1){
+      return { ok:true, index:indexes[0], oldText };
+    }
+
+    const scored = indexes.map(i => ({
+      index:i,
+      score:candidateScore(text, i, rec, oldText)
+    })).sort((a,b) => b.score - a.score);
+
+    if(scored[0].score > (scored[1]?.score ?? -1)){
+      return { ok:true, index:scored[0].index, oldText };
+    }
+
+    const absStart = num(rec.absStart, NaN);
+    if(Number.isFinite(absStart) && indexes.includes(absStart)){
+      return { ok:true, index:absStart, oldText };
+    }
+
+    return { ok:false, reason:`old_text 命中 ${indexes.length} 处，无法唯一定位（ID ${rec.id}）` };
+  }
+
+  function sortRecordsForApply(records){
+    return clone(records).sort((a,b) => {
+      const aa = Number.isFinite(num(a.absStart, NaN)) ? num(a.absStart, NaN)
+        : Number.isFinite(num(a.srcStart, NaN)) ? num(a.srcStart, NaN)
+        : num(a.id, 0);
+      const bb = Number.isFinite(num(b.absStart, NaN)) ? num(b.absStart, NaN)
+        : Number.isFinite(num(b.srcStart, NaN)) ? num(b.srcStart, NaN)
+        : num(b.id, 0);
+      return aa - bb;
+    });
+  }
+
+  function applyRecordsStrict(text, records){
+    let working = str(text);
+    const logs = [];
+    const sorted = sortRecordsForApply(records);
+    let applied = 0;
+
+    for(const rec of sorted){
+      if(!shouldApplyRecord(rec)) continue;
+
+      const loc = locateRecord(working, rec);
+      if(!loc.ok){
+        logs.push(`失败：ID ${rec.id} ｜ 全文中找不到这段原文：${snippet(rec.old_text, 60)}`);
+        logs.push(`提示：请确认你上传的是“一润后的完整全文”，并且当前二润数据与这份全文来自同一轮。`);
+        return { ok:false, text:working, logs, applied };
+      }
+
+      const start = loc.index;
+      const end = start + loc.oldText.length;
+      working = working.slice(0, start) + str(rec.new_text) + working.slice(end);
+      applied++;
+      logs.push(`成功：ID ${rec.id} ｜ index=${start} ｜ ${snippet(loc.oldText, 40)} -> ${snippet(rec.new_text, 40)}`);
+    }
+
+    logs.unshift(`待应用记录：${records.filter(shouldApplyRecord).length}`);
+    logs.unshift(`严格命中应用完成：${applied} 条`);
+    return { ok:true, text:working, logs, applied };
+  }
+
+
+  function format331(text){
+    const raw = str(text).replace(/\r\n/g, '\n');
+    const lines = raw.split('\n');
     const out = [];
-    let prevBlank = false;
-    for (let line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        if (!prevBlank) out.push('');
-        prevBlank = true;
-        continue;
-      }
-      prevBlank = false;
-      if (/^###\s*/.test(trimmed)) {
-        if (out.length && out[out.length - 1] !== '') out.push('');
-        out.push(trimmed.replace(/\s+/g, ' ').trim());
+    const isHeading = line => {
+      const s = line.trim();
+      if(!s) return false;
+      return /^(第[一二三四五六七八九十百千万零〇0-9]+[章回节卷部篇幕]|Chapter\s+\d+|CHAPTER\s+\d+|[0-9一二三四五六七八九十]+[、.．]\S+)/i.test(s);
+    };
+    for(let i = 0; i < lines.length; i++){
+      const line = lines[i];
+      if(isHeading(line) && out.length && out[out.length - 1].trim() !== ''){
         out.push('');
-      } else {
-        out.push(line.replace(/[ \t]+$/g, ''));
       }
+      out.push(line);
+      if(isHeading(line)) out.push('');
     }
     return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  function getOutputBaseName(){
-    const manual = str($('applyOutputBaseName').value).trim();
-    if (manual) return manual;
-    if (state.fullTextFileName) return getBaseName(state.fullTextFileName);
-    return '一润后全文';
-  }
+  function validateFullTextOnly(){
+    const text = $('fullTextEditor').value;
+    const records = getApplySourceRecords();
 
-  function prevalidateStrict(){
-    const baseText = normalizeNewlines($('fullTextEditor').value);
-    if (!baseText.trim()) {
-      alert('请先导入或粘贴一润后全文 / 合并文本。');
-      return;
-    }
-    const record = getActiveRecordObject();
-    if (!record || !Array.isArray(record.modifications) || !record.modifications.length) {
-      alert('当前没有可用于全文应用的记录。请先生成⑦的新润色记录，或在⑧生成二润润色记录。');
+    if(!text.trim()){
+      setText($('strictValidateLog'), '请先载入一润后的完整全文。');
       return;
     }
 
-    const report = validateRecordAgainstText(record, baseText);
-    state.strictValidation = report;
-
-    if (!report.ok) {
-      setText($('strictValidateLog'),
-        `预校验失败。\n总条数：${report.total}\n成功命中：${report.passed}\n失败条数：${report.failures.length}\n\n` +
-        report.failures.slice(0, 30).join('\n')
-      );
-      $('btnBuildFinalText').disabled = true;
-      $('btnDownloadFinalRaw').disabled = true;
-      $('btnDownloadFinalRendered').disabled = true;
-      persistState();
+    if(!records.length){
+      setText($('strictValidateLog'), '当前没有可用二润数据。\n请先在 ④/⑤ 区导入全部批次结果，或在 ⑦ 区导入外部二润数据。');
       return;
     }
 
-    const exactFallbackCount = report.plan.filter(p => p.mode === 'unique-exact-search').length;
-    setText($('strictValidateLog'),
-      `预校验通过（100%）。\n` +
-      `总条数：${report.total}\n` +
-      `绝对位置命中：${report.total - exactFallbackCount}\n` +
-      `唯一精确命中：${exactFallbackCount}\n` +
-      `当前来源：${$('applySourceSecondPassRecord').checked ? '⑧ 二润润色记录' : '⑦ 新润色记录'}`
+    const title = state.mergeResults?.title || `${getWorkTitle()}二润数据`;
+    const result = applyRecordsStrict(text, records);
+
+    setText(
+      $('strictValidateLog'),
+      result.ok
+        ? `预校验通过。\n当前二润数据：${title}\n条目数：${records.length}\n应用条数：${result.applied}\n\n${result.logs.slice(0, 18).join('\n')}`
+        : `预校验失败。\n当前二润数据：${title}\n条目数：${records.length}\n已成功应用：${result.applied}\n\n${result.logs.slice(0, 18).join('\n')}`
     );
-    $('btnBuildFinalText').disabled = false;
-    persistState();
   }
 
-  function buildFinalText(){
-    if (!state.strictValidation || !state.strictValidation.ok) {
-      alert('请先预校验全文，且必须 100% 通过。');
-      return;
-    }
-    const baseText = normalizeNewlines($('fullTextEditor').value);
-    const finalRaw = applyPlan(baseText, state.strictValidation.plan);
-    const finalRendered = render331Text(finalRaw);
 
-    state.finalRawText = finalRaw;
-    state.finalRenderedText = finalRendered;
-
-    $('finalRawPreview').value = finalRaw;
-    $('finalRenderedPreview').value = finalRendered;
-
-    setText($('finalTextLog'),
-      `已生成应用后全文。\n` +
-      `输出基底名：${getOutputBaseName()}\n` +
-      `原始全文长度：${baseText.length}\n` +
-      `应用后长度：${finalRaw.length}`
-    );
-    $('btnDownloadFinalRaw').disabled = !state.finalRawText;
-    $('btnDownloadFinalRendered').disabled = !state.finalRenderedText;
-    persistState();
+  function humanPositionText(m){
+    const a1 = str(m.absStart).trim();
+    const a2 = str(m.absEnd).trim();
+    if(a1 || a2) return `${a1 || '?'}-${a2 || '?'}`;
+    const s1 = str(m.srcStart).trim();
+    const s2 = str(m.srcEnd).trim();
+    if(s1 || s2) return `${s1 || '?'}-${s2 || '?'}`;
+    return '';
   }
 
-  function buildNextRound(){
-    if (!state.mergedRecordObject || !state.mergedRecordObject.modifications?.length) {
-      alert('请先生成新的润色记录。');
-      return;
-    }
+  function humanContextText(m){
+    const ctx = `${str(m.contextBefore)}${str(m.old_text)}${str(m.contextAfter)}`.trim();
+    if(!ctx) return '';
+    return ctx.length > 260 ? ctx.slice(0, 260) + '…' : ctx;
+  }
 
-    const baseText = normalizeNewlines($('fullTextEditor').value);
-    if (!baseText.trim()) {
-      alert('生成下一轮工作集前，请先在⑧载入一润后全文 / 合并文本。');
-      return;
-    }
+  function humanHeadlineText(m){
+    const st = normalizeStatus(m.status);
+    const text = str(m.reason || m.first_reason).trim();
+    if(text) return text.replace(/\s+/g, ' ').trim();
+    if(st === 'keep') return '保留原文，不作调整。';
+    if(st === 'skip') return '本条暂不处理。';
+    if(st === 'ambiguous') return '该处语义暂不明确，暂不贸然改动。';
+    if(st === 'conflict') return '该处存在冲突，需人工复核。';
+    return '对原文进行了局部润色，使表达更自然。';
+  }
 
-    const validation = validateRecordAgainstText(state.mergedRecordObject, baseText);
-    if (!validation.ok) {
-      alert('当前新的润色记录还不能严格命中⑧中的全文，无法安全生成下一轮工作集。请先修正并通过预校验。');
-      return;
-    }
+  function shouldShowInHumanRecord(m, includeKeep){
+    const st = normalizeStatus(m.status);
+    if(st === 'ok') return true;
+    if(st === 'keep') return includeKeep;
+    if(['skip','ambiguous','conflict'].includes(st)) return true;
+    return false;
+  }
 
-    let offset = 0;
-    const posMap = new Map();
-    for (const p of validation.plan) {
-      const appliedText = p.status === 'ok' ? str(p.newText) : str(p.oldText);
-      const newStart = p.start + offset;
-      const newEnd = newStart + appliedText.length;
-      offset += appliedText.length - (p.end - p.start);
-      posMap.set(p.id, { start:newStart, end:newEnd, appliedText });
-    }
+  function buildHumanRecord(records, includeKeep, includeContext){
+    const rows = records.filter(m => shouldShowInHumanRecord(m, includeKeep));
+    if(!rows.length) return '';
+    const lines = [];
+    let idx = 1;
+    rows.forEach(m => {
+      const st = normalizeStatus(m.status);
+      const oldText = str(m.old_text);
+      const newText = st === 'keep' ? (str(m.new_text).trim() || oldText) : (str(m.new_text).trim() || oldText);
+      const headline = humanHeadlineText(m);
+      const chunk = str(m.chunk || '').trim();
+      const pos = humanPositionText(m);
+      const ctx = humanContextText(m);
 
-    const nextMods = state.mergedRecordObject.modifications.map((m, i) => {
-      const nm = normalizeItem(m, i);
-      const pos = posMap.get(nm.id);
-      const appliedText = pos ? pos.appliedText : (nm.status === 'ok' ? str(nm.new_text) : str(nm.old_text));
-      return {
-        id: nm.id,
-        chunkIndex: nm.chunkIndex,
-        sourceAbsoluteStart: nm.sourceAbsoluteStart,
-        sourceAbsoluteEnd: nm.sourceAbsoluteEnd,
-        absoluteStart: pos ? pos.start : nm.absoluteStart,
-        absoluteEnd: pos ? pos.end : nm.absoluteEnd,
-        previous_old_text: str(nm.old_text),
-        old_text: appliedText,
-        new_text: '',
-        first_reason: str(nm.first_reason || nm.reason),
-        reason: str(nm.reason),
-        contextBefore: str(nm.contextBefore),
-        contextAfter: str(nm.contextAfter),
-        anchor_old_text: appliedText,
-        status: 'pending',
-        __selected: true
-      };
+      lines.push(`${idx}. ${headline}`);
+      if(chunk) lines.push(`   分段: ${chunk}`);
+      if(pos) lines.push(`   位置: ${pos}`);
+      lines.push(`   原文: ${oldText || '（空）'}`);
+      lines.push(`   校正: ${newText || '（空）'}`);
+      if(includeContext && ctx) lines.push(`   上下文：${ctx}`);
+      lines.push('');
+      idx++;
     });
+    return lines.join('\n').trim();
+  }
 
-    state.datasets.next = {
-      fileName: getBaseName(state.importFileName) + '_next.json',
-      title: '下一轮工作集',
-      modifications: nextMods
-    };
-    state.activeKey = 'next';
+  function generateHumanRecord(silent = false){
+    const records = getApplySourceRecords();
+    if(!records.length){
+      if(!silent){
+        $('humanRecordPreview').value = '';
+        setText($('humanRecordLog'), '当前记录来源为空，无法生成人工润色记录。');
+      }
+      state.humanRecordText = '';
+      persistState();
+      return '';
+    }
 
-    setText($('mergeLog'),
-      `${$('mergeLog').textContent}\n\n已生成下一轮工作集。\n` +
-      `条数：${nextMods.length}\n` +
-      `说明：old_text 已提升为当前轮文本；previous_old_text 保留上一轮 old_text。`
+    const includeKeep = !!$('humanIncludeKeep').checked;
+    const includeContext = !!$('humanIncludeContext').checked;
+    const text = buildHumanRecord(records, includeKeep, includeContext);
+
+    state.humanIncludeKeep = includeKeep;
+    state.humanIncludeContext = includeContext;
+    state.humanRecordText = text;
+
+    $('humanRecordPreview').value = text;
+    $('btnCopyHumanRecord').disabled = !text.trim();
+    $('btnDownloadHumanRecord').disabled = !text.trim();
+
+    if(!silent){
+      setText(
+        $('humanRecordLog'),
+        text.trim()
+          ? `已生成人工润色记录。\n来源：当前二润数据\n条目数：${text.split(/\n\n+/).filter(Boolean).length}`
+          : '当前筛选条件下没有可输出的人类可读润色记录。'
+      );
+
+    }
+
+    persistState();
+    return text;
+  }
+
+  function generateFinalText(){
+    const text = $('fullTextEditor').value;
+    const records = getApplySourceRecords();
+    if(!text.trim()){
+      setText($('finalTextLog'), '请先载入全文。');
+      return;
+    }
+    if(!records.length){
+      setText($('finalTextLog'), '当前应用记录来源为空。');
+      return;
+    }
+
+    const result = applyRecordsStrict(text, records);
+    if(!result.ok){
+      state.finalAppliedText = '';
+      state.finalPrettyText = '';
+      setText($('finalTextLog'), `生成失败：\n${result.logs.join('\n')}`);
+      persistState();
+      renderPreviews();
+      renderAll();
+      return;
+    }
+
+    state.finalAppliedText = result.text;
+    state.finalPrettyText = $('use331').checked ? format331(result.text) : result.text;
+
+    setText(
+      $('finalTextLog'),
+      `应用后全文已生成。\n成功应用：${result.applied} 条\n输出长度：${state.finalAppliedText.length}\n331长度：${state.finalPrettyText.length}`
     );
 
+    persistState();
+    renderPreviews();
+    generateHumanRecord(true);
     renderAll();
-    persistState();
   }
 
-  function importSecondPassJson(){
-    const raw = str($('secondPassJsonPaste').value).trim();
-    if (!raw) {
-      alert('请先上传或粘贴二润 JSON。');
-      return;
-    }
-    let payload, mods;
-    try{
-      payload = parseJsonAny(raw);
-      mods = extractModsFromAny(payload).map((m, i) => normalizeItem(m, i));
-    }catch(err){
-      alert('二润 JSON 解析失败：' + err.message);
-      return;
-    }
-    state.secondPassInputRawText = raw;
-    state.secondPassInputMods = mods;
-    setText($('secondPassJsonLog'),
-      `已导入二润 JSON。\n文件：${state.secondPassInputFileName || '（粘贴内容）'}\n条数：${mods.length}`
-    );
-    persistState();
-  }
-
-  function clearSecondPassJson(){
-    state.secondPassInputRawText = '';
-    state.secondPassInputFileName = '';
-    state.secondPassInputMods = null;
-    state.secondPassRecordObject = null;
-    $('secondPassJsonPaste').value = '';
-    setText($('secondPassJsonLog'), '尚未导入二润 JSON。');
-    setText($('secondPassRecordLog'), '尚未生成二润润色记录。');
-    $('btnDownloadSecondPassRecord').disabled = true;
-    if ($('applySourceSecondPassRecord').checked) {
-      $('applySourceMergedRecord').checked = true;
-    }
-    persistState();
-  }
-
-  function buildSecondPassRecord(){
-    if (!state.secondPassInputMods || !state.secondPassInputMods.length) {
-      alert('请先导入二润 JSON。');
-      return;
-    }
-    const baseDs = getActiveDataset();
-    if (!baseDs) {
-      alert('请先导入一润 JSON / 工作集。');
-      return;
-    }
-
-    const built = buildMergedRecordFromIncoming(baseDs, state.secondPassInputMods);
-    state.secondPassRecordObject = built.object;
-    $('applySourceSecondPassRecord').checked = true;
-
-    setText($('secondPassRecordLog'),
-      `已生成二润润色记录。\n` +
-      `基础数据集：${baseDs.title || state.activeKey}\n` +
-      `总条数：${built.object.modifications.length}\n` +
-      `缺失自动补 keep：${built.summary.autoKeepCount}\n` +
-      `keep 原因回退 first_reason：${built.summary.fallbackCount}`
-    );
-
-    $('btnDownloadSecondPassRecord').disabled = false;
-    persistState();
-  }
-
-  function downloadMergedRecord(){
-    if (!state.mergedRecordObject) return;
-    downloadText(`${getBaseName(state.importFileName)}_新润色记录.json`, JSON.stringify(state.mergedRecordObject, null, 2), 'application/json;charset=utf-8');
-  }
-
-  function downloadSecondPassRecord(){
-    if (!state.secondPassRecordObject) return;
-    downloadText(`${getOutputBaseName()}.json`, JSON.stringify(state.secondPassRecordObject, null, 2), 'application/json;charset=utf-8');
-  }
-
-  function saveSnapshot(){
-    const snap = {
-      id: Date.now(),
-      title: `${new Date().toLocaleString()} ｜ ${getActiveDataset()?.title || '无数据集'}`,
-      data: exportStateObject()
-    };
-    state.historyList.unshift(snap);
-    saveHistory();
-    renderHistory();
-  }
-
-  function deleteAllHistory(){
-    if (!confirm('确定清空全部历史记录？')) return;
-    state.historyList = [];
-    saveHistory();
-    renderHistory();
+  function renderPreviews(){
+    $('fullTextPreview').value = str($('fullTextEditor').value);
+    $('finalRawPreview').value = str(state.finalAppliedText);
+    $('finalRenderedPreview').value = str(state.finalPrettyText);
   }
 
   function renderHistory(){
     const box = $('historyList');
-    if (!state.historyList.length) {
-      box.innerHTML = `<div class="muted">暂无历史记录</div>`;
+    if(!state.history.length){
+      box.innerHTML = `<div class="muted">暂无历史。</div>`;
       return;
     }
-    box.innerHTML = state.historyList.map(h => `
-      <div class="item" data-history-id="${h.id}">
-        <div class="title">${escapeHtml(h.title)}</div>
-        <div class="ops">
-          <button class="btn secondary" data-act="restore" data-history-id="${h.id}">恢复</button>
-          <button class="btn bad" data-act="delete" data-history-id="${h.id}">删除</button>
+
+    box.innerHTML = state.history.map(h => `
+      <div class="item">
+        <div class="title">${escapeHtml(h.name)}</div>
+        <div class="meta">${escapeHtml(h.time)}</div>
+        <div class="toolbar">
+          <button class="btn secondary" data-restore-history="${h.id}">恢复</button>
+          <button class="btn danger" data-delete-history="${h.id}">删除</button>
         </div>
       </div>
     `).join('');
 
-    box.querySelectorAll('[data-act="restore"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = safeNum(btn.dataset.historyId, null);
-        const found = state.historyList.find(x => x.id === id);
-        if (!found) return;
-        importStateObject(found.data);
-        renderAll();
+    box.querySelectorAll('[data-restore-history]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const h = state.history.find(x => x.id === btn.dataset.restoreHistory);
+        if(!h) return;
+        state = clone(h.snapshot);
         persistState();
+        bindStateToInputs();
+        renderAll();
       });
     });
-    box.querySelectorAll('[data-act="delete"]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = safeNum(btn.dataset.historyId, null);
-        state.historyList = state.historyList.filter(x => x.id !== id);
-        saveHistory();
+
+    box.querySelectorAll('[data-delete-history]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.history = state.history.filter(x => x.id !== btn.dataset.deleteHistory);
+        persistState();
         renderHistory();
       });
     });
   }
 
-  function exportStateObject(){
-    return {
-      datasets: {
-        working: publicDataset(state.datasets.working),
-        result: publicDataset(state.datasets.result),
-        next: publicDataset(state.datasets.next)
-      },
-      activeKey: state.activeKey,
-      importFileName: state.importFileName,
-      batchSourceKey: state.batchSourceKey,
-      batches: clone(state.batches),
-      activeBatchIndex: state.activeBatchIndex,
-      mergedRecordObject: clone(state.mergedRecordObject),
-      secondPassInputRawText: state.secondPassInputRawText,
-      secondPassInputFileName: state.secondPassInputFileName,
-      secondPassInputMods: clone(state.secondPassInputMods),
-      secondPassRecordObject: clone(state.secondPassRecordObject),
-      fullTextFileName: state.fullTextFileName,
-      strictValidation: clone(state.strictValidation),
-      finalRawText: state.finalRawText,
-      finalRenderedText: state.finalRenderedText,
-      selectedModContext: clone(state.selectedModContext),
-      ui: {
-        promptTemplate: $('promptTemplate').value,
-        filterText: $('filterText').value,
-        filterStatus: $('filterStatus').value,
-        batchMaxItems: $('batchMaxItems').value,
-        batchMaxChars: $('batchMaxChars').value,
-        fillMissingKeep: $('fillMissingKeep').checked,
-        allResultsPaste: $('allResultsPaste').value,
-        secondPassJsonPaste: $('secondPassJsonPaste').value,
-        fullTextEditor: $('fullTextEditor').value,
-        applyOutputBaseName: $('applyOutputBaseName').value,
-        use331Render: $('use331Render').checked,
-        applySource: $('applySourceSecondPassRecord').checked ? 'second' : 'merged'
-      }
-    };
-  }
-
-  function importStateObject(raw){
-    const d = raw || {};
-    state.datasets.working = d.datasets?.working ? buildDatasetFromPayload(d.datasets.working, d.datasets.working.fileName || 'working.json', d.datasets.working.title || '当前工作集') : null;
-    state.datasets.result = d.datasets?.result ? buildDatasetFromPayload(d.datasets.result, d.datasets.result.fileName || 'result.json', d.datasets.result.title || '结果集') : null;
-    state.datasets.next = d.datasets?.next ? buildDatasetFromPayload(d.datasets.next, d.datasets.next.fileName || 'next.json', d.datasets.next.title || '下一轮工作集') : null;
-
-    state.activeKey = d.activeKey || 'working';
-    state.importFileName = d.importFileName || '0.json';
-    state.batchSourceKey = d.batchSourceKey || null;
-    state.batches = Array.isArray(d.batches) ? d.batches : [];
-    state.activeBatchIndex = d.activeBatchIndex ?? null;
-    state.mergedRecordObject = d.mergedRecordObject || null;
-    state.secondPassInputRawText = d.secondPassInputRawText || '';
-    state.secondPassInputFileName = d.secondPassInputFileName || '';
-    state.secondPassInputMods = d.secondPassInputMods || null;
-    state.secondPassRecordObject = d.secondPassRecordObject || null;
-    state.fullTextFileName = d.fullTextFileName || '';
-    state.strictValidation = d.strictValidation || null;
-    state.finalRawText = d.finalRawText || '';
-    state.finalRenderedText = d.finalRenderedText || '';
-    state.selectedModContext = d.selectedModContext || { mode:'dataset', datasetKey:'working', id:null };
-
-    const ui = d.ui || {};
-    $('promptTemplate').value = ui.promptTemplate || DEFAULT_PROMPT;
-    $('filterText').value = ui.filterText || '';
-    $('filterStatus').value = ui.filterStatus || 'all';
-    $('batchMaxItems').value = ui.batchMaxItems || 20;
-    $('batchMaxChars').value = ui.batchMaxChars || 12000;
-    $('fillMissingKeep').checked = ui.fillMissingKeep !== false;
-    $('allResultsPaste').value = ui.allResultsPaste || '';
-    $('secondPassJsonPaste').value = ui.secondPassJsonPaste || '';
-    $('fullTextEditor').value = ui.fullTextEditor || '';
-    $('applyOutputBaseName').value = ui.applyOutputBaseName || '';
-    $('use331Render').checked = ui.use331Render !== false;
-    if (ui.applySource === 'second') $('applySourceSecondPassRecord').checked = true;
-    else $('applySourceMergedRecord').checked = true;
-  }
-
-  function persistState(){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(exportStateObject()));
-    }catch(_){}
-  }
-
-  function loadPersistedState(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      importStateObject(JSON.parse(raw));
-    }catch(_){}
-  }
-
   function saveHistory(){
-    try{
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(state.historyList));
-    }catch(_){}
+    const snapshot = clone(state);
+    const h = {
+      id: uid('history'),
+      time: nowStamp(),
+      name: `${getWorkTitle()} / 批次${state.batches.length || 0}`,
+      snapshot
+    };
+    state.history.unshift(h);
+    state.history = state.history.slice(0, 20);
+    persistState();
+    renderHistory();
   }
 
-  function loadHistory(){
-    try{
-      const raw = localStorage.getItem(HISTORY_KEY);
-      state.historyList = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(state.historyList)) state.historyList = [];
-    }catch(_){
-      state.historyList = [];
+  function renderMergeSection(){
+    $('btnDownloadMergedJson').disabled = !(state.mergeResults && state.mergeResults.modifications?.length);
+    $('btnCreateNextRound').disabled = !(state.mergeResults && state.mergeResults.modifications?.length);
+    if(state.mergeResults && state.mergeResults.modifications?.length){
+      setText($('mergeLog'),
+        `新的润色记录已就绪。\n标题：${state.mergeResults.title}\n条目数：${state.mergeResults.modifications.length}`
+      );
     }
   }
 
-  function syncPreviews(){
-    $('fullTextPreview').value = $('fullTextEditor').value;
-    $('finalRawPreview').value = state.finalRawText || '';
-    $('finalRenderedPreview').value = state.finalRenderedText || '';
+  function renderSecondPassSection(){
+    $('btnDownloadSecondPassRecords').disabled = !(state.secondPassRecords && state.secondPassRecords.modifications?.length);
+    if(state.secondPassRaw){
+      const rawCount = collectModifications(state.secondPassRaw).length;
+      setText($('secondPassJsonLog'), `已导入二润 JSON。\n检测到 modifications：${rawCount}`);
+    }
+    if(state.secondPassRecords && state.secondPassRecords.modifications?.length){
+      setText($('secondPassRecordLog'),
+        `已生成二润润色记录。\n标题：${state.secondPassRecords.title}\n条目数：${state.secondPassRecords.modifications.length}`
+      );
+    }
   }
 
-  function renderMergeArea(){
-    $('btnMergeAllBatches').disabled = !getBatchSourceDataset();
-    $('btnDownloadMergedRecord').disabled = !state.mergedRecordObject;
-    $('btnCreateNextRound').disabled = !state.mergedRecordObject;
-    $('btnDownloadSecondPassRecord').disabled = !state.secondPassRecordObject;
-    $('btnValidateStrict').disabled = !getActiveRecordObject() || !str($('fullTextEditor').value).trim();
+  function renderHumanSection(){
+    $('humanIncludeKeep').checked = !!state.humanIncludeKeep;
+    $('humanIncludeContext').checked = !!state.humanIncludeContext;
+    $('humanRecordPreview').value = str(state.humanRecordText);
+    $('btnCopyHumanRecord').disabled = !str(state.humanRecordText).trim();
+    $('btnDownloadHumanRecord').disabled = !str(state.humanRecordText).trim();
+    if(!str(state.humanRecordText).trim()){
+      setText($('humanRecordLog'), '尚未生成人工润色记录。');
+    }
   }
 
-  function renderPromptPreviewOnly(){
-    const batch = state.batches[state.activeBatchIndex] || null;
-    const prompt = buildPromptPackage(batch);
-    $('promptPreview').value = prompt;
-    $('btnCopyPromptPreview').disabled = !prompt.trim();
+  function bindStateToInputs(){
+    $('promptTemplate').value = str(state.promptTemplate || DEFAULT_PROMPT);
+    $('searchText').value = str(state.sourceSearch);
+    $('statusFilter').value = str(state.sourceStatusFilter || 'all');
+    $('maxPerBatch').value = num(state.maxPerBatch, 12);
+    $('maxChars').value = num(state.maxChars, 80000);
+    if($('outputFileName')) $('outputFileName').value = str(state.outputFileName || '');
+    $('fullTextEditor').value = str(state.fullText);
+    document.querySelectorAll('input[name="applySource"]').forEach(r => {
+      r.checked = r.value === state.applySource;
+    });
+    $('humanIncludeKeep').checked = !!state.humanIncludeKeep;
+    $('humanIncludeContext').checked = !!state.humanIncludeContext;
+    $('use331').checked = true;
   }
 
   function renderAll(){
-    renderDatasetTabs();
-    renderDatasetSummary();
-    renderBatchStats();
+    const ds = getCurrentDataset();
+    setText($('readmeText'), README_TEXT);
+    setText($('datasetSummary'), datasetSummaryText(ds));
+    renderSourceList();
+    renderStatsOnly();
     renderBatchList();
-    renderPromptPreviewOnly();
-    renderModList();
-    renderMergeArea();
+    renderPatchWorkspace();
     renderHistory();
-    syncPreviews();
+    renderMergeSection();
+    renderSecondPassSection();
+    renderApplySourceInfo();
+    renderHumanSection();
+    renderPreviews();
+    $('btnDownloadDataset').disabled = !ds;
+    $('btnDownloadFinalText').disabled = !str(state.finalAppliedText).trim();
+    $('btnDownload331Text').disabled = !str(state.finalPrettyText).trim();
   }
 
-  async function handleAutoPasteCurrentBatch(){
-    const text = await readClipboardText();
-    if (text && !$('batchResponseBox').value.trim()) $('batchResponseBox').value = text;
+
+  const BOX_LAYOUT_KEY = 'stitch_box_layout_v2';
+
+  function parseLoosePositiveInt(value, fallback, min = 1){
+    const digits = str(value).replace(/[^\d]/g, '');
+    if(!digits) return fallback;
+    const n = Number(digits);
+    if(!Number.isFinite(n)) return fallback;
+    return Math.max(min, n);
   }
 
-  function bindAutosaveInputs(){
-    document.querySelectorAll('[data-save-key]').forEach(el => {
-      const evt = el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input';
-      el.addEventListener(evt, () => {
-        if (el.id === 'fullTextEditor') syncPreviews();
-        if (el.id === 'promptTemplate') renderPromptPreviewOnly();
-        if (el.id === 'filterText' || el.id === 'filterStatus') renderModList();
-        persistState();
+  function autoCheckAllDataset(ds){
+    if(!ds) return;
+    const checkedMap = ensureCheckedMap(ds.key);
+    ds.modifications.forEach(m => {
+      checkedMap[m.id] = true;
+    });
+  }
+
+  function buildCompactModuleGrid(){
+    const wrap = document.querySelector('.wrap');
+    if(!wrap) return;
+    if(wrap.querySelector(':scope > .module-grid')) return;
+
+    const desc = wrap.querySelector(':scope > .desc');
+    const all = Array.from(wrap.children).filter(el => {
+      if(el.tagName === 'H1') return false;
+      if(el.classList && el.classList.contains('desc')) return false;
+      return true;
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'module-grid';
+
+    if(desc) desc.after(grid);
+    else wrap.appendChild(grid);
+
+    all.forEach(el => grid.appendChild(el));
+
+    Array.from(grid.children).forEach(el => {
+      const titleEl = el.querySelector && el.querySelector('h2,summary');
+      const title = titleEl ? titleEl.textContent.trim() : '';
+
+      if(el.tagName === 'DETAILS') el.classList.add('module-span-2');
+      if(title.includes('一润后全文')) el.classList.add('module-span-2');
+    });
+  }
+
+  function upgradeTextLikeInputsToResizable(){
+    const targets = Array.from(document.querySelectorAll('input[type="text"], input[type="number"]'));
+
+    targets.forEach(input => {
+      if(!input.id) return;
+      if(input.dataset.upgradedToTextarea === '1') return;
+      if(input.type === 'file') return;
+
+      const ta = document.createElement('textarea');
+
+      Array.from(input.attributes).forEach(attr => {
+        if(attr.name === 'type') return;
+        if(attr.name === 'value') return;
+        ta.setAttribute(attr.name, attr.value);
       });
+
+      ta.value = input.value || '';
+      ta.rows = 1;
+      ta.dataset.upgradedToTextarea = '1';
+      ta.className = `${input.className || ''} single-line-resizable`.trim();
+
+      if(input.readOnly) ta.readOnly = true;
+      if(input.disabled) ta.disabled = true;
+
+      ta.addEventListener('keydown', e => {
+        if(e.key === 'Enter') e.preventDefault();
+      });
+
+      ta.addEventListener('input', () => {
+        if(ta.value.includes('\n') || ta.value.includes('\r')){
+          ta.value = ta.value.replace(/[\r\n]+/g, ' ');
+        }
+      });
+
+      input.replaceWith(ta);
     });
   }
 
-  function bindEvents(){
-    $('btnCopyReadme').addEventListener('click', async () => {
-      const ok = await copyText(README_TEXT);
-      alert(ok ? 'README 已复制。' : '复制失败，请手动复制。');
-    });
-
-    $('btnCopyPromptTemplate').addEventListener('click', async () => {
-      const ok = await copyText($('promptTemplate').value);
-      alert(ok ? '提示词模板已复制。' : '复制失败，请手动复制。');
-    });
-
-    $('btnCopyPromptPreview').addEventListener('click', async () => {
-      const ok = await copyText($('promptPreview').value);
-      alert(ok ? '当前批次完整 prompt 包已复制。' : '复制失败，请手动复制。');
-    });
-
-    $('sourceFile').addEventListener('change', async e => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      const raw = await f.text();
-      $('sourcePaste').value = raw;
-      try{
-        const payload = parseJsonAny(raw);
-        state.datasets.working = buildDatasetFromPayload(payload, f.name, '当前工作集');
-        state.datasets.result = null;
-        state.datasets.next = null;
-        state.activeKey = 'working';
-        state.importFileName = f.name;
-        state.batchSourceKey = null;
-        state.batches = [];
-        state.activeBatchIndex = null;
-        state.mergedRecordObject = null;
-        state.secondPassRecordObject = null;
-        state.strictValidation = null;
-        state.finalRawText = '';
-        state.finalRenderedText = '';
-        state.selectedModContext = { mode:'dataset', datasetKey:'working', id: state.datasets.working.modifications[0]?.id ?? null };
-        setText($('sourceLog'), `导入成功。\n文件：${f.name}\n条数：${state.datasets.working.modifications.length}`);
-        renderAll();
-        persistState();
-      }catch(err){
-        alert('一润 JSON 自动导入失败：' + err.message);
-      }
-    });
-
-    $('btnImportSource').addEventListener('click', () => {
-      const raw = str($('sourcePaste').value).trim();
-      if (!raw) {
-        alert('请先上传或粘贴一润 JSON。');
-        return;
-      }
-      try{
-        const payload = parseJsonAny(raw);
-        state.datasets.working = buildDatasetFromPayload(payload, state.importFileName || '0.json', '当前工作集');
-        state.datasets.result = null;
-        state.datasets.next = null;
-        state.activeKey = 'working';
-        state.batchSourceKey = null;
-        state.batches = [];
-        state.activeBatchIndex = null;
-        state.mergedRecordObject = null;
-        state.secondPassRecordObject = null;
-        state.strictValidation = null;
-        state.finalRawText = '';
-        state.finalRenderedText = '';
-        state.selectedModContext = { mode:'dataset', datasetKey:'working', id: state.datasets.working.modifications[0]?.id ?? null };
-        setText($('sourceLog'), `导入成功。\n条数：${state.datasets.working.modifications.length}`);
-        renderAll();
-        persistState();
-      }catch(err){
-        alert('一润 JSON 解析失败：' + err.message);
-      }
-    });
-
-    $('btnDownloadDataset').addEventListener('click', () => {
-      const ds = getActiveDataset();
-      if (!ds) return;
-      downloadText(getBaseName(ds.fileName || state.importFileName) + '.json', JSON.stringify(publicDataset(ds), null, 2), 'application/json;charset=utf-8');
-    });
-
-    $('btnBuildBatches').addEventListener('click', buildBatchesFromSelected);
-
-    $('btnSelectVisible').addEventListener('click', () => {
-      const ds = getActiveDataset(); if (!ds) return;
-      for (const m of getVisibleMods(ds)) m.__selected = true;
-      renderAll(); persistState();
-    });
-    $('btnClearVisible').addEventListener('click', () => {
-      const ds = getActiveDataset(); if (!ds) return;
-      for (const m of getVisibleMods(ds)) m.__selected = false;
-      renderAll(); persistState();
-    });
-    $('btnInvertVisible').addEventListener('click', () => {
-      const ds = getActiveDataset(); if (!ds) return;
-      for (const m of getVisibleMods(ds)) m.__selected = !m.__selected;
-      renderAll(); persistState();
-    });
-    $('btnSelectPending').addEventListener('click', () => {
-      const ds = getActiveDataset(); if (!ds) return;
-      for (const m of ds.modifications) if (normalizeStatus(m.status) === 'pending') m.__selected = true;
-      renderAll(); persistState();
-    });
-    $('btnClearAllSelection').addEventListener('click', () => {
-      const ds = getActiveDataset(); if (!ds) return;
-      for (const m of ds.modifications) m.__selected = false;
-      renderAll(); persistState();
-    });
-
-    $('btnDownloadCurrentBatchJson').addEventListener('click', () => {
-      const batch = state.batches[state.activeBatchIndex];
-      const ds = getBatchSourceDataset();
-      if (!batch || !ds) return;
-      const items = batch.ids.map(id => ds.modifications.find(m => m.id === id)).filter(Boolean).map(makePromptItem);
-      downloadText(`batch_${state.activeBatchIndex + 1}.json`, JSON.stringify({ modifications: items }, null, 2), 'application/json;charset=utf-8');
-    });
-
-    $('btnDownloadCurrentBatchPrompt').addEventListener('click', () => {
-      const prompt = $('promptPreview').value;
-      if (!prompt.trim()) return;
-      downloadText(`batch_${state.activeBatchIndex + 1}.prompt.txt`, prompt);
-    });
-
-    $('batchResponseBox').addEventListener('focus', handleAutoPasteCurrentBatch);
-    $('btnImportCurrentBatch').addEventListener('click', importCurrentBatch);
-    $('btnImportAllSavedBatches').addEventListener('click', importAllSavedBatches);
-    $('btnClearCurrentBatchResponse').addEventListener('click', () => {
-      $('batchResponseBox').value = '';
-      const batch = state.batches[state.activeBatchIndex];
-      if (batch) batch.responseRaw = '';
-      renderAll();
-      persistState();
-    });
-
-    $('btnSaveMod').addEventListener('click', saveEditorToItem);
-    $('btnMarkKeep').addEventListener('click', () => {
-      $('edStatus').value = 'keep';
-      saveEditorToItem();
-    });
-    $('btnMarkSkip').addEventListener('click', () => {
-      $('edStatus').value = 'skip';
-      saveEditorToItem();
-    });
-    $('btnUseNewAsOld').addEventListener('click', () => {
-      $('edOld').value = $('edNew').value;
-      saveEditorToItem();
-    });
-
-    $('allResultsFile').addEventListener('change', async e => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      $('allResultsPaste').value = await f.text();
-      persistState();
-    });
-    $('btnImportAllResultsAnytime').addEventListener('click', importAllResultsAnytime);
-    $('btnMergeAllBatches').addEventListener('click', mergeAllImportedBatches);
-    $('btnDownloadMergedRecord').addEventListener('click', downloadMergedRecord);
-    $('btnCreateNextRound').addEventListener('click', buildNextRound);
-
-    $('fullTextFile').addEventListener('change', async e => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      const raw = await f.text();
-      $('fullTextEditor').value = normalizeNewlines(raw);
-      state.fullTextFileName = f.name;
-      if (!$('applyOutputBaseName').value.trim()) $('applyOutputBaseName').value = getBaseName(f.name);
-      syncPreviews();
-      renderMergeArea();
-      persistState();
-    });
-
-    $('secondPassJsonFile').addEventListener('change', async e => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      const raw = await f.text();
-      $('secondPassJsonPaste').value = raw;
-      state.secondPassInputFileName = f.name;
-      try{
-        importSecondPassJson();
-      }catch(_){}
-    });
-
-    $('btnImportSecondPassJson').addEventListener('click', importSecondPassJson);
-    $('btnClearSecondPassJson').addEventListener('click', clearSecondPassJson);
-    $('btnBuildSecondPassRecord').addEventListener('click', buildSecondPassRecord);
-    $('btnDownloadSecondPassRecord').addEventListener('click', downloadSecondPassRecord);
-
-    $('applySourceMergedRecord').addEventListener('change', () => { renderMergeArea(); persistState(); });
-    $('applySourceSecondPassRecord').addEventListener('change', () => { renderMergeArea(); persistState(); });
-
-    $('btnValidateStrict').addEventListener('click', prevalidateStrict);
-    $('btnBuildFinalText').addEventListener('click', buildFinalText);
-    $('btnDownloadFinalRaw').addEventListener('click', () => {
-      if (!state.finalRawText) return;
-      downloadText(`${getOutputBaseName()}.txt`, state.finalRawText);
-    });
-    $('btnDownloadFinalRendered').addEventListener('click', () => {
-      if (!state.finalRenderedText) return;
-      downloadText(`${getOutputBaseName()}_331整理版.txt`, state.finalRenderedText);
-    });
-
-    $('btnSaveSnapshot').addEventListener('click', saveSnapshot);
-    $('btnDeleteAllHistory').addEventListener('click', deleteAllHistory);
-  }
-
-  function init(){
-    $('readmeBox').textContent = README_TEXT;
-    $('promptTemplate').value = DEFAULT_PROMPT;
-
-    loadHistory();
-    loadPersistedState();
-    bindAutosaveInputs();
-    bindEvents();
-    renderAll();
-
-    if (state.strictValidation?.ok && state.finalRawText) {
-      $('btnBuildFinalText').disabled = false;
-      $('btnDownloadFinalRaw').disabled = false;
-      $('btnDownloadFinalRendered').disabled = false;
+  function loadBoxLayoutMap(){
+    try{
+      return JSON.parse(localStorage.getItem(BOX_LAYOUT_KEY) || '{}');
+    }catch(e){
+      return {};
     }
   }
 
-  init();
+  function saveBoxLayoutMap(map){
+    try{
+      localStorage.setItem(BOX_LAYOUT_KEY, JSON.stringify(map));
+    }catch(e){}
+  }
+
+  function applySavedBoxLayout(el){
+    if(!el || !el.id) return;
+    const map = loadBoxLayoutMap();
+    const saved = map[el.id];
+    if(!saved) return;
+    if(saved.width) el.style.width = saved.width;
+    if(saved.height) el.style.height = saved.height;
+  }
+
+  function rememberBoxLayout(el){
+    if(!el || !el.id) return;
+    const map = loadBoxLayoutMap();
+    map[el.id] = {
+      width: el.style.width || `${el.offsetWidth}px`,
+      height: el.style.height || `${el.offsetHeight}px`
+    };
+    saveBoxLayoutMap(map);
+  }
+
+  function getResizableTargets(){
+    return Array.from(document.querySelectorAll(
+      'textarea, .preview-box, .listbox, .history-list, .batch-list'
+    )).filter(el => el.id);
+  }
+
+  function initResizableBoxPersistence(){
+    const targets = getResizableTargets();
+
+    targets.forEach(el => {
+      applySavedBoxLayout(el);
+    });
+
+    if(typeof ResizeObserver === 'undefined'){
+      window.addEventListener('mouseup', () => {
+        getResizableTargets().forEach(el => rememberBoxLayout(el));
+      });
+      return;
+    }
+
+    const ro = new ResizeObserver(entries => {
+      entries.forEach(entry => {
+        rememberBoxLayout(entry.target);
+      });
+    });
+
+    targets.forEach(el => ro.observe(el));
+  }
+
+  function renderApplySourceInfo(){
+    const box = $('applySourceInfo');
+    if(!box) return;
+
+    const records = getApplySourceRecords();
+    if(!records.length){
+      setText(box, '尚无可用二润数据。\n请先在 ④/⑤ 区导入全部批次结果，或在 ⑦ 区导入外部二润数据。');
+      return;
+    }
+
+    const title = state.mergeResults?.title || `${getWorkTitle()}二润数据`;
+    setText(
+      box,
+      `当前应用数据：${title}\n条目数：${records.length}\n说明：这里必须上传“一润后的完整全文”；程序会用当前二润数据中的 old_text 在全文里严格定位。`
+    );
+  }
+
+
+  buildCompactModuleGrid();
+  upgradeTextLikeInputsToResizable();
+
+  $('btnCopyReadme').addEventListener('click', async () => {
+    const ok = await copyText(README_TEXT);
+    if(!ok) alert('复制失败，请手工复制。');
+  });
+
+  $('sourceFile').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      const text = await readFileAsText(file);
+      $('sourcePaste').value = text;
+      importDatasetFromText(text, file.name || '一润数据');
+    }catch(err){
+      setText($('sourceLog'), `读取文件失败：${err.message}`);
+    }
+  });
+
+  $('btnImportSource').addEventListener('click', () => {
+    try{
+      importDatasetFromText($('sourcePaste').value, '一润数据');
+    }catch(e){
+      setText($('sourceLog'), `导入失败：${e.message}`);
+    }
+  });
+
+  $('btnDownloadDataset').addEventListener('click', () => {
+    const ds = getCurrentDataset();
+    if(!ds) return;
+    downloadJson(getChineseFilename('dataset'), { modifications: ds.modifications });
+  });
+
+  $('promptTemplate').addEventListener('input', () => {
+    state.promptTemplate = $('promptTemplate').value;
+    persistState();
+    refreshPromptPreviews();
+  });
+
+  $('btnCopyPromptTemplate').addEventListener('click', async () => {
+    const ok = await copyText($('promptTemplate').value);
+    if(!ok) alert('复制失败，请手工复制。');
+  });
+
+  $('btnCopyPromptPreview').addEventListener('click', async () => {
+    const text = str($('promptPreview').value).trim();
+    if(!text) return;
+    const ok = await copyText(text);
+    if(!ok) alert('复制失败，请手工复制。');
+  });
+
+  $('btnCopyPromptJsonPreview').addEventListener('click', async () => {
+    const text = str($('promptJsonPreview').value).trim();
+    if(!text) return;
+    const ok = await copyText(text);
+    if(!ok) alert('复制失败，请手工复制。');
+  });
+
+  $('searchText').addEventListener('input', () => {
+    state.sourceSearch = $('searchText').value;
+    persistState();
+    renderSourceList();
+  });
+
+  $('statusFilter').addEventListener('change', () => {
+    state.sourceStatusFilter = $('statusFilter').value;
+    persistState();
+    renderSourceList();
+  });
+
+  $('btnCheckFiltered').addEventListener('click', () => {
+    const ds = getCurrentDataset();
+    if(!ds) return;
+    const checkedMap = ensureCheckedMap(ds.key);
+    getFilteredMods(ds).forEach(m => checkedMap[m.id] = true);
+    persistState();
+    renderAll();
+  });
+
+  $('btnUncheckFiltered').addEventListener('click', () => {
+    const ds = getCurrentDataset();
+    if(!ds) return;
+    const checkedMap = ensureCheckedMap(ds.key);
+    getFilteredMods(ds).forEach(m => delete checkedMap[m.id]);
+    persistState();
+    renderAll();
+  });
+
+  $('btnInvertFiltered').addEventListener('click', () => {
+    const ds = getCurrentDataset();
+    if(!ds) return;
+    const checkedMap = ensureCheckedMap(ds.key);
+    getFilteredMods(ds).forEach(m => checkedMap[m.id] = !checkedMap[m.id]);
+    persistState();
+    renderAll();
+  });
+
+  $('btnCheckPending').addEventListener('click', () => {
+    const ds = getCurrentDataset();
+    if(!ds) return;
+    const checkedMap = ensureCheckedMap(ds.key);
+    ds.modifications.filter(m => normalizeStatus(m.status) === 'pending').forEach(m => checkedMap[m.id] = true);
+    persistState();
+    renderAll();
+  });
+
+  $('btnClearChecks').addEventListener('click', () => {
+    const ds = getCurrentDataset();
+    if(!ds) return;
+    state.checkedIdsByDataset[ds.key] = {};
+    persistState();
+    renderAll();
+  });
+
+  $('maxPerBatch').addEventListener('change', () => {
+    const n = parseLoosePositiveInt($('maxPerBatch').value, 12, 1);
+    $('maxPerBatch').value = n;
+    state.maxPerBatch = n;
+    persistState();
+  });
+
+  $('maxChars').addEventListener('change', () => {
+    const n = parseLoosePositiveInt($('maxChars').value, 80000, 100);
+    $('maxChars').value = n;
+    state.maxChars = n;
+    persistState();
+  });
+
+
+  $('btnRebuildBatches').addEventListener('click', rebuildBatches);
+
+  $('btnDownloadCurrentBatchJson').addEventListener('click', () => {
+    const batch = state.batches[state.activeBatchIndex];
+    const json = buildPromptJsonPackage(batch);
+    if(!json.trim()) return;
+    downloadText(getChineseFilename('batchJson'), json);
+  });
+
+  $('btnDownloadCurrentBatchPrompt').addEventListener('click', () => {
+    const batch = state.batches[state.activeBatchIndex];
+    const txt = buildPromptPackage(batch);
+    if(!txt.trim()) return;
+    downloadText(getChineseFilename('batchPrompt'), txt);
+  });
+
+  $('batchResponseBox').addEventListener('input', () => {
+    const batch = state.batches[state.activeBatchIndex];
+    if(!batch) return;
+    batch.responseRaw = $('batchResponseBox').value;
+    persistState();
+    $('btnImportAllSavedBatches').disabled = !state.batches.some(b => str(b.responseRaw).trim());
+  });
+
+  $('btnImportCurrentBatch').addEventListener('click', () => {
+    importBatchResultByIndex(state.activeBatchIndex);
+  });
+
+  $('btnImportAllSavedBatches').addEventListener('click', importAllSavedBatches);
+
+  $('btnClearCurrentBatchResponse').addEventListener('click', () => {
+    const batch = state.batches[state.activeBatchIndex];
+    if(!batch) return;
+    batch.responseRaw = '';
+    $('batchResponseBox').value = '';
+    persistState();
+    renderAll();
+  });
+
+  $('btnSavePatch').addEventListener('click', () => {
+    const m = saveCurrentPatch();
+    if(m) setText($('diffSummary'), `已保存 ID ${m.id}`);
+  });
+
+  $('btnMarkKeep').addEventListener('click', () => {
+    $('editStatus').value = 'keep';
+    saveCurrentPatch();
+  });
+
+  $('btnMarkSkip').addEventListener('click', () => {
+    $('editStatus').value = 'skip';
+    saveCurrentPatch();
+  });
+
+  $('btnPromoteNewToOld').addEventListener('click', () => {
+    const ds = getBatchSourceDataset();
+    if(!ds) return;
+    const id = $('editId').value;
+    const m = ds.modifications.find(x => String(x.id) === String(id));
+    if(!m) return;
+    m.previous_old_text = str(m.old_text);
+    m.old_text = str(m.new_text || m.old_text);
+    state.humanRecordText = '';
+    persistState();
+    renderAll();
+  });
+
+  $('allResultsFile').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      const text = await readFileAsText(file);
+      $('allResultsPaste').value = text;
+      importAllResultsFromText(text);
+    }catch(err){
+      setText($('mergeLog'), `读取文件失败：${err.message}`);
+    }
+  });
+
+  $('btnImportAllResultsPaste').addEventListener('click', () => {
+    importAllResultsFromText($('allResultsPaste').value);
+  });
+
+  $('btnMergeImportedBatches').addEventListener('click', mergeImportedBatches);
+
+  $('btnDownloadMergedJson').addEventListener('click', () => {
+    if(!state.mergeResults) return;
+    downloadJson(getChineseFilename('mergedJson'), { modifications: state.mergeResults.modifications });
+  });
+
+  $('btnCreateNextRound').addEventListener('click', createNextRoundFromMerged);
+
+  $('fullTextFile').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      const text = await readFileAsText(file);
+      state.fullText = text;
+      state.fullTextName = file.name || '全文';
+      $('fullTextEditor').value = text;
+      $('outputFileName').value = '';
+      persistState();
+      renderPreviews();
+      renderAll();
+    }catch(err){
+      setText($('strictValidateLog'), `读取全文失败：${err.message}`);
+    }
+  });
+
+  $('fullTextEditor').addEventListener('input', () => {
+    state.fullText = $('fullTextEditor').value;
+    persistState();
+    renderPreviews();
+  });
+
+  $('outputFileName').addEventListener('input', () => {
+    state.outputFileName = $('outputFileName').value;
+    persistState();
+  });
+
+  document.querySelectorAll('input[name="applySource"]').forEach(r => {
+    r.addEventListener('change', () => {
+      if(r.checked){
+        state.applySource = r.value;
+        state.humanRecordText = '';
+        persistState();
+      }
+    });
+  });
+
+  $('secondPassFile').addEventListener('change', async e => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    try{
+      const text = await readFileAsText(file);
+      $('secondPassJsonPaste').value = text;
+      importSecondPassRawFromText(text);
+    }catch(err){
+      setText($('secondPassJsonLog'), `读取文件失败：${err.message}`);
+    }
+  });
+
+  $('btnImportSecondPass').addEventListener('click', () => {
+    importSecondPassRawFromText($('secondPassJsonPaste').value);
+  });
+
+  $('btnClearSecondPass').addEventListener('click', () => {
+    state.secondPassRaw = null;
+    state.secondPassRecords = null;
+    state.humanRecordText = '';
+    $('secondPassJsonPaste').value = '';
+    setText($('secondPassJsonLog'), '尚未导入二润 JSON。');
+    setText($('secondPassRecordLog'), '尚未生成二润润色记录。');
+    persistState();
+    renderAll();
+  });
+
+  $('btnGenerateSecondPassRecords').addEventListener('click', generateSecondPassRecords);
+
+  $('btnDownloadSecondPassRecords').addEventListener('click', () => {
+    if(!state.secondPassRecords) return;
+    downloadJson(getChineseFilename('secondPassJson'), { modifications: state.secondPassRecords.modifications });
+  });
+
+  $('btnValidateFullText').addEventListener('click', validateFullTextOnly);
+  $('btnGenerateFinalText').addEventListener('click', generateFinalText);
+
+  $('btnDownloadFinalText').addEventListener('click', () => {
+    if(!state.finalAppliedText) return;
+
+    downloadText(getChineseFilename('finalText'), state.finalAppliedText);
+
+    const human = str(state.humanRecordText).trim() || generateHumanRecord(true);
+    if(human.trim()){
+      downloadText(getChineseFilename('humanRecord'), human);
+    }
+  });
+
+
+  $('btnDownload331Text').addEventListener('click', () => {
+    if(!state.finalPrettyText) return;
+    downloadText(getChineseFilename('prettyText'), state.finalPrettyText);
+  });
+
+  $('humanIncludeKeep').addEventListener('change', () => {
+    state.humanIncludeKeep = $('humanIncludeKeep').checked;
+    persistState();
+  });
+
+  $('humanIncludeContext').addEventListener('change', () => {
+    state.humanIncludeContext = $('humanIncludeContext').checked;
+    persistState();
+  });
+
+  $('btnGenerateHumanRecord').addEventListener('click', () => {
+    generateHumanRecord(false);
+  });
+
+  $('btnCopyHumanRecord').addEventListener('click', async () => {
+    const text = str($('humanRecordPreview').value).trim();
+    if(!text) return;
+    const ok = await copyText(text);
+    if(!ok) alert('复制失败，请手工复制。');
+  });
+
+  $('btnDownloadHumanRecord').addEventListener('click', () => {
+    const text = str($('humanRecordPreview').value).trim();
+    if(!text) return;
+    downloadText(getChineseFilename('humanRecord'), text);
+  });
+
+  $('btnSaveHistory').addEventListener('click', saveHistory);
+
+  $('btnClearHistory').addEventListener('click', () => {
+    if(!confirm('确认清空全部历史？')) return;
+    state.history = [];
+    persistState();
+    renderHistory();
+  });
+
+  function renderPatchWorkspace(){
+    const listBox = $('patchItemList');
+    const mods = getActiveBatchMods();
+    if(!mods.length){
+      listBox.innerHTML = '暂无条目';
+      clearPatchEditor();
+      renderDiffPreview(null);
+      return;
+    }
+
+    listBox.innerHTML = mods.map(m => `
+      <div class="item ${String(m.id) === String(state.activePatchId) ? 'active' : ''}" data-patch-id="${m.id}">
+        <div class="row" style="justify-content:space-between">
+          <div><strong>ID ${m.id}</strong></div>
+          <div>${statusChip(m.status)}</div>
+        </div>
+        <div class="meta">原文：${escapeHtml(snippet(m.old_text, 70))}</div>
+        <div class="meta">校正：${escapeHtml(snippet(m.new_text, 70))}</div>
+      </div>
+    `).join('');
+
+    listBox.querySelectorAll('[data-patch-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        state.activePatchId = el.dataset.patchId;
+        renderPatchWorkspace();
+        persistState();
+      });
+    });
+
+    const m = getActivePatchMod();
+    fillPatchEditor(m);
+    renderDiffPreview(m);
+  }
+
+  bindStateToInputs();
+  $('readmeText').textContent = README_TEXT;
+  renderAll();
+  initResizableBoxPersistence();
 })();
 </script>
 </body>
